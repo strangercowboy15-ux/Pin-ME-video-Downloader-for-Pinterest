@@ -1,7 +1,58 @@
 import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Polls /api/healthz until the server responds, then resolves.
+function useServerReady() {
+  const [ready, setReady] = useState<'checking' | 'ready'>('checking');
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const check = async () => {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch('/api/healthz', { signal: controller.signal });
+        clearTimeout(timeout);
+        if (res.ok && !cancelled) { setReady('ready'); return; }
+      } catch { /* server still waking */ }
+      if (!cancelled) timer = setTimeout(check, 3000);
+    };
+
+    check();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, []);
+
+  return ready;
+}
+
+function WakingScreen() {
+  const [dots, setDots] = useState('');
+  useEffect(() => {
+    const id = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 500);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="min-h-[100dvh] w-full bg-background text-foreground flex flex-col items-center justify-center gap-6 font-sans px-6">
+      <img src="/logo.png" alt="pinME Logo" className="h-20 w-20 object-contain rounded-2xl" />
+      <div className="text-center space-y-2">
+        <p className="text-lg font-semibold text-white">
+          Starting server<span className="inline-block w-6 text-left">{dots}</span>
+        </p>
+        <p className="text-sm text-muted-foreground max-w-xs">
+          The server is waking up — this usually takes 20–30 seconds. Hang tight!
+        </p>
+      </div>
+      {/* Spinner */}
+      <div className="h-6 w-6 rounded-full border-2 border-white/10 border-t-primary animate-spin" />
+    </div>
+  );
+}
+
 export default function App() {
+  const serverReady = useServerReady();
   const [url, setUrl] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -14,6 +65,8 @@ export default function App() {
       setShowOnboarding(true);
     }
   }, []);
+
+  if (serverReady === 'checking') return <WakingScreen />;
 
   const dismissOnboarding = () => {
     localStorage.setItem('pinme_onboarding_seen', 'true');
