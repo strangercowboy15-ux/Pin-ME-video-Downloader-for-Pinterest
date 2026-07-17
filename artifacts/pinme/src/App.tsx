@@ -246,6 +246,13 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Footer */}
+      <footer className="mt-auto pt-12 pb-6 text-center text-xs text-gray-600">
+        <a href="#privacy" className="hover:text-gray-400 transition-colors">
+          Privacy Policy
+        </a>
+      </footer>
     </div>
   );
 }
