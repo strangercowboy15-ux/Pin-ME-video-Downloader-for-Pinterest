@@ -5,14 +5,6 @@
  * pinME Downloader API
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
-}
-
-export interface PinInput {
-  /** Pinterest pin URL (pinterest.com or pin.it short link) */
-  url: string;
-}
 
 export interface PinInfo {
   /** Server-proxied download path for the video */
@@ -25,9 +17,3 @@ export interface PinInfo {
      */
   title?: string | null;
 }
-
-export interface ErrorResponse {
-  /** Human-readable error message */
-  error: string;
-}
-

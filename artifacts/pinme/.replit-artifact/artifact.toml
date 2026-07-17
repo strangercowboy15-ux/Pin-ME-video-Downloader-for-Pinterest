@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "pinME Downloader"
+version = "1.0.0"
+id = "artifacts/pinme"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19310
+
+[services.development]
+run = "pnpm --filter @workspace/pinme run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pinme", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/pinme/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19310"
+BASE_PATH = "/"
