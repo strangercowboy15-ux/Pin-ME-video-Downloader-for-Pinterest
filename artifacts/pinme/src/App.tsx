@@ -247,8 +247,22 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Support */}
+      <p className="text-center text-xs text-gray-600 pb-4">
+        If you like my app, feel free to support me{' '}
+        <a
+          href="https://ko-fi.com/pinmeapp"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-gray-400 hover:text-gray-200 underline underline-offset-2 transition-colors"
+        >
+          here
+        </a>
+        .
+      </p>
+
       {/* Footer */}
-      <footer className="mt-auto pt-12 pb-6 text-center text-xs text-gray-600">
+      <footer className="mt-0 pb-6 text-center text-xs text-gray-600">
         <a href="#privacy" className="hover:text-gray-400 transition-colors">
           Privacy Policy
         </a>
