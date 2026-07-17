@@ -182,6 +182,19 @@ export default function App() {
           <p className="text-center text-xs text-muted-foreground leading-relaxed px-4">
             Video will be saved to your device's Downloads folder (and usually appears in your Gallery/Photos app automatically).
           </p>
+
+          <p className="text-center text-xs text-gray-600 pt-4">
+            If you like my app, feel free to support me{' '}
+            <a
+              href="https://ko-fi.com/pinmeapp"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-gray-200 underline underline-offset-2 transition-colors"
+            >
+              here
+            </a>
+            .
+          </p>
         </div>
       </main>
 
@@ -246,20 +259,6 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Support */}
-      <p className="text-center text-xs text-gray-600 pb-4">
-        If you like my app, feel free to support me{' '}
-        <a
-          href="https://ko-fi.com/pinmeapp"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-gray-400 hover:text-gray-200 underline underline-offset-2 transition-colors"
-        >
-          here
-        </a>
-        .
-      </p>
 
       {/* Footer */}
       <footer className="mt-0 pb-6 text-center text-xs text-gray-600">
