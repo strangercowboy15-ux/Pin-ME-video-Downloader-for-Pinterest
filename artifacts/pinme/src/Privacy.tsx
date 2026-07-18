@@ -16,7 +16,7 @@ export default function Privacy() {
       {/* Content */}
       <main className="max-w-2xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-bold mb-2">Privacy Policy</h1>
-        <p className="text-sm text-gray-400 mb-10">Last updated: July 2025</p>
+        <p className="text-sm text-gray-400 mb-10">Last updated: July 2026</p>
 
         <section className="space-y-8 text-gray-200 leading-relaxed">
 
