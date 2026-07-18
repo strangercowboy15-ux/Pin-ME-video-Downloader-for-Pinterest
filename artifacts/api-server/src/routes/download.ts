@@ -52,7 +52,11 @@ function isPinterestUrl(rawUrl: string): boolean {
   }
 }
 
-function runYtDlp(args: string[]): Promise<{ stdout: string; stderr: string }> {
+// Spawn yt-dlp, optionally calling onStderrLine for each stderr line (for stage detection).
+function runYtDlp(
+  args: string[],
+  onStderrLine?: (line: string) => void,
+): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       proc.kill("SIGKILL");
@@ -62,8 +66,19 @@ function runYtDlp(args: string[]): Promise<{ stdout: string; stderr: string }> {
     const proc = spawn("yt-dlp", args);
     let stdout = "";
     let stderr = "";
+    let stderrBuf = ""; // line buffer for callback
+
     proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
-    proc.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+    proc.stderr.on("data", (d: Buffer) => {
+      const chunk = d.toString();
+      stderr += chunk;
+      if (onStderrLine) {
+        stderrBuf += chunk;
+        const lines = stderrBuf.split("\n");
+        stderrBuf = lines.pop() ?? "";
+        for (const line of lines) onStderrLine(line);
+      }
+    });
     proc.on("close", (code: number | null) => {
       clearTimeout(timeout);
       if (code !== 0) {
@@ -106,7 +121,6 @@ async function getPinMeta(url: string): Promise<PinMeta> {
     throw err;
   }
 
-  // yt-dlp may emit multiple JSON lines (one per entry); take the last valid one
   const lines = stdout.trim().split("\n");
   let info: Record<string, unknown> | null = null;
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -117,7 +131,6 @@ async function getPinMeta(url: string): Promise<PinMeta> {
   }
   if (!info) throw new Error("PARSE_ERROR");
 
-  // Detect image-only pins: no video formats, or all formats are images
   const formats = (info.formats as Array<Record<string, unknown>>) || [];
   const hasVideoFormats = formats.some(
     (f) => f.vcodec && f.vcodec !== "none" && f.vcodec !== null
@@ -133,19 +146,34 @@ async function getPinMeta(url: string): Promise<PinMeta> {
   };
 }
 
-async function downloadVideo(url: string, pinId: string): Promise<{ filePath: string }> {
+// onStage is called whenever a meaningful stage transition is detected in stderr.
+async function downloadVideo(
+  url: string,
+  pinId: string,
+  onStage?: (label: string) => void,
+): Promise<{ filePath: string }> {
   const outputTemplate = `/tmp/pinme-${pinId}.%(ext)s`;
+  let mergeSignalled = false;
 
-  await runYtDlp([
-    "--no-playlist",
-    "--no-warnings",
-    "--format", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/bestvideo+bestaudio/best",
-    "--merge-output-format", "mp4",
-    "-o", outputTemplate,
-    url,
-  ]);
+  await runYtDlp(
+    [
+      "--no-playlist",
+      "--no-warnings",
+      "--concurrent-fragments", "4",   // download HLS segments in parallel
+      "--format", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/bestvideo+bestaudio/best",
+      "--merge-output-format", "mp4",
+      "-o", outputTemplate,
+      url,
+    ],
+    (line) => {
+      // "[Merger] Merging formats into ..." signals the ffmpeg merge step
+      if (!mergeSignalled && line.includes("[Merger]")) {
+        mergeSignalled = true;
+        onStage?.("Processing video...");
+      }
+    },
+  );
 
-  // Find the actual output file (yt-dlp resolves %(ext)s at download time)
   const preferredPath = `/tmp/pinme-${pinId}.mp4`;
   if (fs.existsSync(preferredPath)) {
     const stat = fs.statSync(preferredPath);
@@ -156,12 +184,11 @@ async function downloadVideo(url: string, pinId: string): Promise<{ filePath: st
     return { filePath: preferredPath };
   }
 
-  // Fallback: glob for any file with this pinId prefix
-  const dir = "/tmp";
-  const files = fs.readdirSync(dir);
+  // Fallback: find any file with this pinId prefix
+  const files = fs.readdirSync("/tmp");
   for (const f of files) {
     if (f.startsWith(`pinme-${pinId}.`) && !f.endsWith(".part") && !f.endsWith(".ytdl")) {
-      const fp = path.join(dir, f);
+      const fp = path.join("/tmp", f);
       const stat = fs.statSync(fp);
       if (stat.size >= 10_000) return { filePath: fp };
       fs.unlinkSync(fp);
@@ -174,90 +201,85 @@ async function downloadVideo(url: string, pinId: string): Promise<{ filePath: st
 
 function buildFilename(title: string | null, filePath: string): string {
   const ext = path.extname(filePath).slice(1) || "mp4";
-  // Reject obviously-wrong titles (blank, just the ext, very short generics)
   const genericTitles = new Set(["mp4", "mkv", "webm", "video", "watch", "pin", ""]);
   const cleaned = (title || "")
     .replace(/[^\w\s\-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
-
   if (!cleaned || genericTitles.has(cleaned) || cleaned.length < 3) {
     return `pinme-video-${Date.now()}.${ext}`;
   }
-
   return `${cleaned.slice(0, 60)}.${ext}`;
 }
 
+function toUserError(msg: string): { status: number; error: string } {
+  if (msg === "NO_VIDEO")    return { status: 400, error: "This pin doesn't contain a video." };
+  if (msg === "UNAVAILABLE") return { status: 404, error: "Couldn't fetch this video. It may be unavailable or private." };
+  if (msg === "TIMEOUT")     return { status: 504, error: "Request timed out. Please try again." };
+  return { status: 500, error: "Couldn't fetch this video. It may be unavailable or private." };
+}
+
 // POST /api/get-pin
-// Step 1: Resolve metadata, Step 2: Download via yt-dlp, Step 3: Return stream token
+// Returns a Server-Sent Events stream so the frontend can show live progress stages.
+// Events: { type: "stage", label: string }
+//         { type: "ready", token: string, filename: string, title: string|null }
+//         { type: "error", message: string }
 router.post("/get-pin", async (req, res) => {
   const { url } = req.body as { url?: string };
 
+  // Validate before opening the SSE stream so we can still return a proper JSON 400.
   if (!url || typeof url !== "string" || !url.trim()) {
     res.status(400).json({ error: "This doesn't look like a Pinterest link." });
     return;
   }
-
   const trimmed = url.trim();
-
   if (!isPinterestUrl(trimmed)) {
     res.status(400).json({ error: "This doesn't look like a Pinterest link." });
     return;
   }
 
-  let meta: PinMeta;
+  // Open SSE stream
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  const send = (data: object) => {
+    if (!res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
   try {
-    meta = await getPinMeta(trimmed);
+    // Stage 1 — metadata
+    send({ type: "stage", label: "Fetching video info..." });
+    const meta = await getPinMeta(trimmed);
+
+    // Stage 2 — download (stage 3 "Processing video..." fires from the stderr callback inside downloadVideo)
+    send({ type: "stage", label: "Downloading video..." });
+    const { filePath } = await downloadVideo(trimmed, meta.id, (label) => send({ type: "stage", label }));
+
+    // Stage 4 — build token
+    send({ type: "stage", label: "Preparing download..." });
+    const filename = buildFilename(meta.title, filePath);
+    const token = randomBytes(16).toString("hex");
+    pendingDownloads.set(token, {
+      filePath,
+      filename,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+
+    send({ type: "ready", token, filename, title: meta.title ?? null });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    req.log?.error({ err: msg, url: trimmed }, "get-pin meta failed");
-    if (msg === "NO_VIDEO") {
-      res.status(400).json({ error: "This pin doesn't contain a video." });
-    } else if (msg === "UNAVAILABLE") {
-      res.status(404).json({ error: "Couldn't fetch this video. It may be unavailable or private." });
-    } else if (msg === "TIMEOUT") {
-      res.status(504).json({ error: "Request timed out. Please try again." });
-    } else {
-      res.status(500).json({ error: "Couldn't fetch this video. It may be unavailable or private." });
-    }
-    return;
+    req.log?.error({ err: msg, url: trimmed }, "get-pin failed");
+    const { error } = toUserError(msg);
+    send({ type: "error", message: error });
+  } finally {
+    res.end();
   }
-
-  let filePath: string;
-  try {
-    ({ filePath } = await downloadVideo(trimmed, meta.id));
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    req.log?.error({ err: msg, url: trimmed, id: meta.id }, "get-pin download failed");
-    if (msg === "NO_VIDEO") {
-      res.status(400).json({ error: "This pin doesn't contain a video." });
-    } else if (msg === "TIMEOUT") {
-      res.status(504).json({ error: "Download timed out. Please try again." });
-    } else {
-      res.status(500).json({ error: "Couldn't fetch this video. It may be unavailable or private." });
-    }
-    return;
-  }
-
-  const filename = buildFilename(meta.title, filePath);
-  const token = randomBytes(16).toString("hex");
-
-  pendingDownloads.set(token, {
-    filePath,
-    filename,
-    expiresAt: Date.now() + 10 * 60 * 1000,
-  });
-
-  res.json({
-    downloadUrl: `/api/stream/${token}`,
-    filename,
-    title: meta.title || null,
-  });
 });
 
-// GET /api/stream/:token
-// Streams the pre-downloaded video file to the browser as a native file download
+// GET /api/stream/:token — unchanged
 router.get("/stream/:token", (req, res) => {
   const { token } = req.params;
 
@@ -302,12 +324,7 @@ router.get("/stream/:token", (req, res) => {
     cleanup();
     if (!res.headersSent) res.status(500).end();
   });
-
-  res.on("close", () => {
-    // Client disconnected early (e.g. download cancelled) — clean up anyway
-    fileStream.destroy();
-    cleanup();
-  });
+  res.on("close", () => { fileStream.destroy(); cleanup(); });
 
   fileStream.pipe(res);
 });

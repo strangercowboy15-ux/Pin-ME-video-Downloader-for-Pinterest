@@ -85,6 +85,61 @@ function WakingScreen() {
   );
 }
 
+// ─── Progress label shown during loading ─────────────────────────────────────
+
+function ProgressLabel({ label }: { label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-3 w-full">
+      <AnimatePresence mode="wait">
+        <motion.p
+          key={label}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.2 }}
+          className="text-sm text-muted-foreground text-center"
+        >
+          {label}
+        </motion.p>
+      </AnimatePresence>
+      <div className="css-spinner" />
+    </div>
+  );
+}
+
+// ─── SSE stream parser ───────────────────────────────────────────────────────
+
+type SSEEvent =
+  | { type: 'stage'; label: string }
+  | { type: 'ready'; token: string; filename: string; title: string | null }
+  | { type: 'error'; message: string };
+
+async function* readSSE(response: Response): AsyncGenerator<SSEEvent> {
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      // SSE events are delimited by double newlines
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() ?? '';
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith('data: ')) continue;
+        try {
+          yield JSON.parse(line.slice(6)) as SSEEvent;
+        } catch { /* malformed event — skip */ }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 // ─── Main app ────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -92,10 +147,10 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [url, setUrl] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [progressLabel, setProgressLabel] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Hide splash after 1.8 s
   useEffect(() => {
     const id = setTimeout(() => setShowSplash(false), 1800);
     return () => clearTimeout(id);
@@ -126,26 +181,46 @@ export default function App() {
 
   const triggerDownload = async (targetUrl: string) => {
     setStatus('loading');
+    setProgressLabel('Fetching video info...');
     setErrorMsg('');
+
     try {
       const response = await fetch('/api/get-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: targetUrl }),
       });
+
+      // Validation errors (400) are returned as JSON before SSE opens
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || 'Something went wrong. Please check your connection and try again.');
       }
-      const { downloadUrl, filename } = await response.json();
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = filename || 'pinterest-video.mp4';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setStatus('success');
-      setTimeout(() => { setUrl(''); setStatus('idle'); }, 3000);
+
+      let downloadTriggered = false;
+
+      for await (const event of readSSE(response)) {
+        if (event.type === 'stage') {
+          setProgressLabel(event.label);
+        } else if (event.type === 'ready') {
+          setProgressLabel('Starting download...');
+          const a = document.createElement('a');
+          a.href = `/api/stream/${event.token}`;
+          a.download = event.filename || 'pinterest-video.mp4';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          downloadTriggered = true;
+          setStatus('success');
+          setTimeout(() => { setUrl(''); setStatus('idle'); setProgressLabel(''); }, 3000);
+        } else if (event.type === 'error') {
+          throw new Error(event.message);
+        }
+      }
+
+      if (!downloadTriggered) {
+        throw new Error('Something went wrong. Please try again.');
+      }
     } catch (err: any) {
       setStatus('error');
       setErrorMsg(err.message || 'Something went wrong. Please check your connection and try again.');
@@ -154,12 +229,12 @@ export default function App() {
 
   return (
     <>
-      {/* Splash — shown for 1.8 s on every load */}
+      {/* Splash */}
       <AnimatePresence>
         {showSplash && <SplashScreen />}
       </AnimatePresence>
 
-      {/* Server-waking screen — shown after splash if API not yet up */}
+      {/* Server-waking */}
       {!showSplash && serverReady === 'checking' && <WakingScreen />}
 
       {/* Main UI */}
@@ -224,9 +299,10 @@ export default function App() {
                   )}
                 </AnimatePresence>
 
-                <div className="pt-2 h-[60px] flex justify-center items-center w-full">
+                {/* Action area — fixed min-height so layout doesn't shift between states */}
+                <div className="pt-2 min-h-[72px] flex justify-center items-center w-full">
                   {status === 'loading' ? (
-                    <div className="css-spinner" data-testid="status-loading" />
+                    <ProgressLabel label={progressLabel} />
                   ) : status === 'success' ? (
                     <motion.div
                       initial={{ opacity: 0, scale: 0.9 }}
@@ -270,14 +346,14 @@ export default function App() {
             </div>
           </main>
 
-          {/* Footer — kept well above the badge zone */}
+          {/* Footer */}
           <footer className="mt-0 pb-16 text-center text-xs text-gray-600">
             <a href="#privacy" className="hover:text-gray-400 transition-colors">
               Privacy Policy
             </a>
           </footer>
 
-          {/* Badge-blend gradient — fixed, pointer-events off, sits behind badge */}
+          {/* Badge-blend gradient */}
           <div
             aria-hidden="true"
             className="fixed bottom-0 right-0 pointer-events-none"
