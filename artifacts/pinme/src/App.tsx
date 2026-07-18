@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { trackDownload } from './analytics';
 
 // ─── Server-ready hook ───────────────────────────────────────────────────────
 
@@ -210,6 +211,7 @@ export default function App() {
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
+          trackDownload(); // fire GA4 event — silent if blocked or unconfigured
           downloadTriggered = true;
           setStatus('success');
           setTimeout(() => { setUrl(''); setStatus('idle'); setProgressLabel(''); }, 3000);
