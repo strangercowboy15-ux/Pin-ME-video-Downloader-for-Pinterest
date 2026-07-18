@@ -270,12 +270,24 @@ export default function App() {
             </div>
           </main>
 
-          {/* Footer */}
-          <footer className="mt-0 pb-6 text-center text-xs text-gray-600">
+          {/* Footer — kept well above the badge zone */}
+          <footer className="mt-0 pb-16 text-center text-xs text-gray-600">
             <a href="#privacy" className="hover:text-gray-400 transition-colors">
               Privacy Policy
             </a>
           </footer>
+
+          {/* Badge-blend gradient — fixed, pointer-events off, sits behind badge */}
+          <div
+            aria-hidden="true"
+            className="fixed bottom-0 right-0 pointer-events-none"
+            style={{
+              width: 220,
+              height: 100,
+              background:
+                'radial-gradient(ellipse at 100% 100%, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.6) 45%, transparent 75%)',
+            }}
+          />
         </div>
       )}
     </>
