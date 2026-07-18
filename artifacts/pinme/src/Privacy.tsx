@@ -83,8 +83,7 @@ export default function Privacy() {
                 className="text-primary hover:underline"
               >
                 Google's Privacy Policy
-              </a>
-              .
+              </a>.
             </p>
           </div>
 
