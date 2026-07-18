@@ -71,8 +71,20 @@ export default function Privacy() {
           <div>
             <h2 className="text-lg font-semibold text-white mb-2">Analytics &amp; third-party services</h2>
             <p>
-              This app does not use any analytics platforms, advertising networks, or third-party
-              tracking scripts. No data about your usage is shared with or sold to any third party.
+              This app uses Google Analytics to understand basic usage patterns, such as how many
+              people visit the site and how many downloads happen. Google Analytics may collect
+              anonymized information such as your approximate location (country-level) and
+              device/browser type. We do not collect or share any personally identifiable
+              information. You can learn more about how Google handles data at{' '}
+              <a
+                href="https://policies.google.com/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                Google's Privacy Policy
+              </a>
+              .
             </p>
           </div>
 
@@ -86,7 +98,6 @@ export default function Privacy() {
               >
                 pinmevideodownloader@gmail.com
               </a>
-              .
             </p>
           </div>
 
