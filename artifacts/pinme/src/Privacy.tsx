@@ -5,6 +5,14 @@ export default function Privacy() {
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
       <header className="border-b border-white/10 px-6 py-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => { window.location.hash = ''; }}
+          aria-label="Close Privacy Policy and return to the home page"
+          className="h-11 w-11 flex items-center justify-center rounded-lg text-2xl leading-none text-primary hover:bg-primary/10 transition-colors"
+        >
+          ✘
+        </button>
         <a href="#" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <img src="/logo.png" alt="pinME Logo" className="h-8 w-8 object-contain rounded-lg" />
           <span className="text-lg font-bold tracking-tight">
