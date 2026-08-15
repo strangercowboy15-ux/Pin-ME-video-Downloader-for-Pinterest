@@ -333,13 +333,12 @@ export default function App() {
               </p>
 
               <p className="text-center text-xs text-gray-600 pt-4">
-                If you like my app, feel free to support me{' '}
+                Made for everyone. If you'd like to buy me a coffee, you can{' '}
                 <a
                   href="https://ko-fi.com/pinmeapp"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="kofi-pulse underline underline-offset-2"
-                  style={{ color: '#E60023' }}
+                  className="kofi-rainbow underline underline-offset-2"
                 >
                   here
                 </a>

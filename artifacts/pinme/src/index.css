@@ -87,11 +87,17 @@
   to { transform: rotate(360deg); }
 }
 
-@keyframes kofi-pulse {
-  0%, 100% { opacity: 1;    text-shadow: 0 0 6px rgba(230, 0, 35, 0.25); }
-  50%       { opacity: 0.7; text-shadow: 0 0 14px rgba(230, 0, 35, 0.6); }
+@keyframes kofi-rainbow {
+  0%       { color: #ff0000; text-shadow: 0 0 8px currentColor; }
+  14.28%   { color: #ff7f00; text-shadow: 0 0 8px currentColor; }
+  28.56%   { color: #ffff00; text-shadow: 0 0 8px currentColor; }
+  42.84%   { color: #00a000; text-shadow: 0 0 8px currentColor; }
+  57.12%   { color: #0000ff; text-shadow: 0 0 8px currentColor; }
+  71.40%   { color: #4b0082; text-shadow: 0 0 8px currentColor; }
+  85.68%   { color: #8f00ff; text-shadow: 0 0 8px currentColor; }
+  100%     { color: #ff0000; text-shadow: 0 0 8px currentColor; }
 }
 
-.kofi-pulse {
-  animation: kofi-pulse 2.8s ease-in-out infinite;
+.kofi-rainbow {
+  animation: kofi-rainbow 5s linear infinite;
 }
