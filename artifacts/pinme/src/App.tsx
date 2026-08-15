@@ -143,7 +143,7 @@ async function* readSSE(response: Response): AsyncGenerator<SSEEvent> {
 
 // ─── Main app ────────────────────────────────────────────────────────────────
 
-export default function App() {
+export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
   const serverReady = useServerReady();
   const [showSplash, setShowSplash] = useState(true);
   const [url, setUrl] = useState('');
@@ -349,9 +349,13 @@ export default function App() {
 
           {/* Footer */}
           <footer className="mt-0 pb-16 text-center text-xs text-gray-600">
-            <a href="#privacy" className="hover:text-gray-400 transition-colors">
+            <button
+              type="button"
+              onClick={onOpenPrivacy}
+              className="hover:text-gray-400 transition-colors"
+            >
               Privacy Policy
-            </a>
+            </button>
           </footer>
 
           {/* Badge-blend gradient */}

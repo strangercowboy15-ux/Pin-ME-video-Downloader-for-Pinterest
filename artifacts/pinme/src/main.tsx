@@ -6,25 +6,26 @@ import './index.css';
 import { trackPageView } from './analytics'; // initialises GA4 as a side-effect
 
 function Root() {
-  const [hash, setHash] = React.useState(window.location.hash);
+  const [view, setView] = React.useState<'home' | 'privacy'>(
+    () => window.location.hash === '#privacy' ? 'privacy' : 'home',
+  );
 
   React.useEffect(() => {
-    // Fire page_view for the initial route
-    trackPageView(hash === '#privacy' ? '/privacy' : '/');
+    trackPageView(view === 'privacy' ? '/privacy' : '/');
+  }, [view]);
 
-    const onHashChange = () => {
-      const next = window.location.hash;
-      setHash(next);
-      // Fire page_view on every client-side route change
-      trackPageView(next === '#privacy' ? '/privacy' : '/');
-    };
-
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (hash === '#privacy') return <Privacy />;
-  return <App />;
+  // Keep both views mounted so switching back to the home view does not
+  // remount App and replay its splash screen.
+  return (
+    <>
+      <div className={view === 'home' ? 'block' : 'hidden'}>
+        <App onOpenPrivacy={() => setView('privacy')} />
+      </div>
+      <div className={view === 'privacy' ? 'block' : 'hidden'}>
+        <Privacy onClose={() => setView('home')} />
+      </div>
+    </>
+  );
 }
 
 createRoot(document.getElementById('root')!).render(<Root />);
