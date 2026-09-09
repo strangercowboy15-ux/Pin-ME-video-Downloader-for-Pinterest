@@ -34,6 +34,7 @@
 }
 
 :root, .dark {
+  color-scheme: dark;
   --background: 0 0% 7%; /* #121212 */
   --foreground: 0 0% 100%;
   
@@ -65,6 +66,36 @@
   --radius: 0.75rem;
 }
 
+.light {
+  color-scheme: light;
+  --background: 0 0% 98%;
+  --foreground: 0 0% 10%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 10%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 10%;
+
+  --primary: 351 100% 45%; /* #E60023 */
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 0 0% 93%;
+  --secondary-foreground: 0 0% 15%;
+  --muted: 0 0% 93%;
+  --muted-foreground: 0 0% 38%;
+
+  --accent: 351 100% 45%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 72% 45%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 0 0% 84%;
+  --input: 0 0% 100%;
+  --ring: 351 100% 45%;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -77,9 +108,9 @@
 .css-spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid rgba(255, 255, 255, 0.2);
+  border: 3px solid hsl(var(--foreground) / 0.2);
   border-radius: 50%;
-  border-top-color: #fff;
+  border-top-color: hsl(var(--foreground));
   animation: spin 1s ease-in-out infinite;
 }
 
@@ -100,4 +131,13 @@
 
 .kofi-rainbow {
   animation: kofi-rainbow 5s linear infinite;
+}
+
+.badge-blend {
+  background: radial-gradient(
+    ellipse at 100% 100%,
+    hsl(var(--background) / 0.95) 0%,
+    hsl(var(--background) / 0.6) 45%,
+    transparent 75%
+  );
 }

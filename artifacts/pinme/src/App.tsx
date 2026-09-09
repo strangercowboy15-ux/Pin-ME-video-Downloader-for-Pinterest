@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trackDownload } from './analytics';
+import { ThemeToggle } from './theme';
 
 // ─── Server-ready hook ───────────────────────────────────────────────────────
 
@@ -74,14 +75,14 @@ function WakingScreen() {
     <div className="min-h-[100dvh] w-full bg-background text-foreground flex flex-col items-center justify-center gap-6 font-sans px-6">
       <img src="/logo.png" alt="pinME Logo" className="h-20 w-20 object-contain rounded-2xl" />
       <div className="text-center space-y-2">
-        <p className="text-lg font-semibold text-white">
+        <p className="text-lg font-semibold text-foreground">
           Starting server<span className="inline-block w-6 text-left">{dots}</span>
         </p>
         <p className="text-sm text-muted-foreground max-w-xs">
           The server is waking up — this usually takes 20–30 seconds. Hang tight!
         </p>
       </div>
-      <div className="h-6 w-6 rounded-full border-2 border-white/10 border-t-primary animate-spin" />
+      <div className="h-6 w-6 rounded-full border-2 border-foreground/10 border-t-primary animate-spin" />
     </div>
   );
 }
@@ -243,12 +244,15 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
       {!showSplash && serverReady === 'ready' && (
         <div className="min-h-[100dvh] w-full bg-background text-foreground flex flex-col font-sans">
           {/* Header */}
-          <header className="flex items-center gap-2 p-6 justify-center sm:justify-start">
+          <header className="relative flex items-center gap-2 p-6 justify-center sm:justify-start">
             <img src="/logo.png" alt="pinME Logo" className="h-10 w-10 object-contain" />
             <span className="text-2xl font-bold tracking-tight">
-              <span className="text-white">pin</span>
+              <span className="text-foreground">pin</span>
               <span className="text-primary">ME</span>
             </span>
+            <div className="absolute right-6 top-5">
+              <ThemeToggle />
+            </div>
           </header>
 
           {/* Main Content */}
@@ -268,14 +272,14 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
                     onChange={(e) => setUrl(e.target.value)}
                     onPaste={handleNativePaste}
                     placeholder="Paste Pinterest link here..."
-                    className="w-full bg-input/50 border border-border rounded-xl py-4 pl-4 pr-14 text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner"
+                    className="w-full bg-input/50 border border-border rounded-xl py-4 pl-4 pr-14 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner"
                     disabled={status === 'loading'}
                     data-testid="input-url"
                   />
                   <button
                     type="button"
                     onClick={handlePasteClick}
-                    className="absolute right-2 p-2 text-muted-foreground hover:text-white transition-colors"
+                    className="absolute right-2 p-2 text-muted-foreground hover:text-foreground transition-colors"
                     title="Paste from clipboard"
                     disabled={status === 'loading'}
                     data-testid="button-paste"
@@ -332,7 +336,7 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
                 Video will be saved to your device's Downloads folder (and usually appears in your Gallery/Photos app automatically).
               </p>
 
-              <p className="text-center text-xs text-gray-600 pt-4">
+              <p className="text-center text-xs text-muted-foreground pt-4">
                 Made for everyone. If you'd like to buy me a coffee, you can{' '}
                 <a
                   href="https://ko-fi.com/pinmeapp"
@@ -348,11 +352,11 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
           </main>
 
           {/* Footer */}
-          <footer className="mt-0 pb-16 text-center text-xs text-gray-600">
+          <footer className="mt-0 pb-16 text-center text-xs text-muted-foreground">
             <button
               type="button"
               onClick={onOpenPrivacy}
-              className="hover:text-gray-400 transition-colors"
+              className="hover:text-foreground transition-colors"
             >
               Privacy Policy
             </button>
@@ -361,7 +365,7 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
           {/* Badge-blend gradient */}
           <div
             aria-hidden="true"
-            className="fixed bottom-0 right-0 pointer-events-none"
+            className="badge-blend fixed bottom-0 right-0 pointer-events-none"
             style={{
               width: 220,
               height: 100,

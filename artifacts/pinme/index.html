@@ -12,6 +12,14 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="pinME Downloader" />
     <meta name="twitter:description" content="Dead-simple Pinterest video downloader." />
+    <script>
+      try {
+        const savedTheme = localStorage.getItem('pinme-theme');
+        document.documentElement.classList.add(savedTheme === 'light' ? 'light' : 'dark');
+      } catch {
+        document.documentElement.classList.add('dark');
+      }
+    </script>
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

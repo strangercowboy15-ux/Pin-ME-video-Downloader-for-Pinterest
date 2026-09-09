@@ -4,6 +4,7 @@ import App from './App';
 import Privacy from './Privacy';
 import './index.css';
 import { trackPageView } from './analytics'; // initialises GA4 as a side-effect
+import { ThemeProvider } from './theme';
 
 function Root() {
   const [view, setView] = React.useState<'home' | 'privacy'>(
@@ -28,4 +29,8 @@ function Root() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(<Root />);
+createRoot(document.getElementById('root')!).render(
+  <ThemeProvider>
+    <Root />
+  </ThemeProvider>,
+);
