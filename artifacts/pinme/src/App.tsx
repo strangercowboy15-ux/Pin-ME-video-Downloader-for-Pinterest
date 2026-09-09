@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trackDownload } from './analytics';
-import { ThemeToggle } from './theme';
 
 // ─── Server-ready hook ───────────────────────────────────────────────────────
 
@@ -244,15 +243,12 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
       {!showSplash && serverReady === 'ready' && (
         <div className="min-h-[100dvh] w-full bg-background text-foreground flex flex-col font-sans">
           {/* Header */}
-          <header className="relative flex items-center gap-2 p-6 justify-center sm:justify-start">
+          <header className="flex items-center gap-2 p-6 justify-center sm:justify-start">
             <img src="/logo.png" alt="pinME Logo" className="h-10 w-10 object-contain" />
             <span className="text-2xl font-bold tracking-tight">
               <span className="text-foreground">pin</span>
               <span className="text-primary">ME</span>
             </span>
-            <div className="absolute right-6 top-5">
-              <ThemeToggle />
-            </div>
           </header>
 
           {/* Main Content */}

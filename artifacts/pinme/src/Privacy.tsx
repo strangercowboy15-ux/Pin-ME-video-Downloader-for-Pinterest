@@ -1,5 +1,4 @@
 import React from 'react';
-import { ThemeToggle } from './theme';
 
 export default function Privacy({ onClose }: { onClose: () => void }) {
   return (
@@ -25,9 +24,6 @@ export default function Privacy({ onClose }: { onClose: () => void }) {
             pin<span className="text-primary">ME</span>
           </span>
         </button>
-        <div className="ml-auto">
-          <ThemeToggle />
-        </div>
       </header>
 
       {/* Content */}

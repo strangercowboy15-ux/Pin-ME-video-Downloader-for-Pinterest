@@ -4,7 +4,7 @@ import App from './App';
 import Privacy from './Privacy';
 import './index.css';
 import { trackPageView } from './analytics'; // initialises GA4 as a side-effect
-import { ThemeProvider } from './theme';
+import { ThemeProvider, ThemeToggle } from './theme';
 
 function Root() {
   const [view, setView] = React.useState<'home' | 'privacy'>(
@@ -19,6 +19,9 @@ function Root() {
   // remount App and replay its splash screen.
   return (
     <>
+      <div className="fixed top-5 right-6 z-[60]">
+        <ThemeToggle />
+      </div>
       <div className={view === 'home' ? 'block' : 'hidden'}>
         <App onOpenPrivacy={() => setView('privacy')} />
       </div>
