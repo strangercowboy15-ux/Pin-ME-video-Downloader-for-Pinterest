@@ -365,8 +365,6 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
             style={{
               width: 220,
               height: 100,
-              background:
-                'radial-gradient(ellipse at 100% 100%, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.6) 45%, transparent 75%)',
             }}
           />
         </div>
