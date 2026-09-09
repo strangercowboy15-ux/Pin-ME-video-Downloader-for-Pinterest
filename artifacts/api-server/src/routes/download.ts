@@ -3,9 +3,18 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { URL } from "url";
-import { randomBytes } from "crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 
 const router = Router();
+
+const DOWNLOAD_TTL_MS = 30 * 60 * 1000;
+
+type DownloadTokenPayload = {
+  url: string;
+  pinId: string;
+  filename: string;
+  expiresAt: number;
+};
 
 // In-memory store: token → { filePath, filename, expiresAt }
 const pendingDownloads = new Map<
@@ -25,6 +34,55 @@ setInterval(() => {
     }
   }
 }, 2 * 60 * 1000);
+
+function getTokenSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("SESSION_SECRET_UNAVAILABLE");
+  return secret;
+}
+
+function createDownloadToken(payload: DownloadTokenPayload): string {
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = createHmac("sha256", getTokenSecret())
+    .update(encodedPayload)
+    .digest("base64url");
+  return `${encodedPayload}.${signature}`;
+}
+
+function parseDownloadToken(token: string): DownloadTokenPayload | null {
+  const [encodedPayload, encodedSignature] = token.split(".");
+  if (!encodedPayload || !encodedSignature) return null;
+
+  try {
+    const expectedSignature = createHmac("sha256", getTokenSecret())
+      .update(encodedPayload)
+      .digest();
+    const providedSignature = Buffer.from(encodedSignature, "base64url");
+    if (
+      providedSignature.length !== expectedSignature.length ||
+      !timingSafeEqual(providedSignature, expectedSignature)
+    ) {
+      return null;
+    }
+
+    const payload = JSON.parse(
+      Buffer.from(encodedPayload, "base64url").toString("utf8"),
+    ) as Partial<DownloadTokenPayload>;
+
+    if (
+      typeof payload.url !== "string" ||
+      typeof payload.pinId !== "string" ||
+      typeof payload.filename !== "string" ||
+      typeof payload.expiresAt !== "number"
+    ) {
+      return null;
+    }
+
+    return payload as DownloadTokenPayload;
+  } catch {
+    return null;
+  }
+}
 
 function isPinterestUrl(rawUrl: string): boolean {
   try {
@@ -261,11 +319,17 @@ router.post("/get-pin", async (req, res) => {
     // Stage 4 — build token
     send({ type: "stage", label: "Preparing download..." });
     const filename = buildFilename(meta.title, filePath);
-    const token = randomBytes(16).toString("hex");
+    const expiresAt = Date.now() + DOWNLOAD_TTL_MS;
+    const token = createDownloadToken({
+      url: trimmed,
+      pinId: meta.id,
+      filename,
+      expiresAt,
+    });
     pendingDownloads.set(token, {
       filePath,
       filename,
-      expiresAt: Date.now() + 10 * 60 * 1000,
+      expiresAt,
     });
 
     send({ type: "ready", token, filename, title: meta.title ?? null });
@@ -279,17 +343,46 @@ router.post("/get-pin", async (req, res) => {
   }
 });
 
-// GET /api/stream/:token — unchanged
-router.get("/stream/:token", (req, res) => {
+// GET /api/stream/:token
+// Serves the prepared file when it is available. If the API process restarted
+// or the token was routed to another instance, the signed token lets us fetch
+// and process the original Pinterest URL again instead of losing the download.
+router.get("/stream/:token", async (req, res): Promise<void> => {
   const { token } = req.params;
-
-  const entry = pendingDownloads.get(token);
-  if (!entry) {
+  const payload = parseDownloadToken(token);
+  if (!payload || payload.expiresAt <= Date.now()) {
     res.status(404).json({ error: "Download link expired. Please try again." });
     return;
   }
 
-  const { filePath, filename } = entry;
+  const entry = pendingDownloads.get(token);
+  let filePath: string;
+  let filename = payload.filename;
+
+  if (entry && fs.existsSync(entry.filePath)) {
+    filePath = entry.filePath;
+    filename = entry.filename;
+  } else {
+    try {
+      req.log?.warn("Prepared download was unavailable; fetching a fresh copy");
+      const fresh = await downloadVideo(
+        payload.url,
+        `retry-${randomBytes(8).toString("hex")}`,
+      );
+      filePath = fresh.filePath;
+      pendingDownloads.set(token, {
+        filePath,
+        filename,
+        expiresAt: payload.expiresAt,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      req.log?.error({ err: msg }, "Fresh download retry failed");
+      const { status, error } = toUserError(msg);
+      res.status(status).json({ error });
+      return;
+    }
+  }
 
   if (!fs.existsSync(filePath)) {
     pendingDownloads.delete(token);
@@ -313,18 +406,22 @@ router.get("/stream/:token", (req, res) => {
 
   const fileStream = fs.createReadStream(filePath);
 
-  const cleanup = () => {
+  const removeFailedDownload = () => {
     pendingDownloads.delete(token);
     try { fs.unlinkSync(filePath); } catch { /* best-effort */ }
   };
 
-  fileStream.on("end", cleanup);
+  // Keep the entry until its expiry so browsers can retry the same download
+  // URL (some mobile browsers issue more than one request while starting a
+  // download). The interval cleanup above removes it after the valid window.
   fileStream.on("error", (err) => {
     req.log?.error({ err }, "stream read error");
-    cleanup();
+    removeFailedDownload();
     if (!res.headersSent) res.status(500).end();
   });
-  res.on("close", () => { fileStream.destroy(); cleanup(); });
+  res.on("close", () => {
+    if (!res.writableFinished) fileStream.destroy();
+  });
 
   fileStream.pipe(res);
 });
