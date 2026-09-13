@@ -71,6 +71,8 @@ export function ThemeToggle() {
   return (
     <button
       type="button"
+      onMouseDown={(event) => event.preventDefault()}
+      onTouchStart={(event) => event.preventDefault()}
       onClick={toggleTheme}
       aria-label={`Switch to ${nextTheme} theme`}
       title={`Switch to ${nextTheme} theme`}
