@@ -19,7 +19,7 @@ export default function Privacy({ onClose }: { onClose: () => void }) {
           className="flex items-center gap-3 hover:opacity-80 transition-opacity"
           aria-label="Return to the home page"
         >
-          <img src="/logo.png" alt="pinME Logo" className="h-8 w-8 object-contain rounded-lg" />
+          <img src="/header-logo.png" alt="pinME Logo" className="h-8 w-8 object-contain rounded-lg" />
           <span className="text-lg font-bold tracking-tight">
             pin<span className="text-primary">ME</span>
           </span>

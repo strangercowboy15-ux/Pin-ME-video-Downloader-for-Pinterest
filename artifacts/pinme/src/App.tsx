@@ -42,7 +42,7 @@ function SplashScreen() {
       className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center gap-5"
     >
       <motion.img
-        src="/logo.png"
+        src="/splash-logo.png"
         alt="pinME"
         className="h-24 w-24 object-contain rounded-3xl"
         initial={{ scale: 0.85, opacity: 0 }}
@@ -72,7 +72,7 @@ function WakingScreen() {
 
   return (
     <div className="min-h-[100dvh] w-full bg-background text-foreground flex flex-col items-center justify-center gap-6 font-sans px-6">
-      <img src="/logo.png" alt="pinME Logo" className="h-20 w-20 object-contain rounded-2xl" />
+      <img src="/splash-logo.png" alt="pinME Logo" className="h-20 w-20 object-contain rounded-2xl" />
       <div className="text-center space-y-2">
         <p className="text-lg font-semibold text-foreground">
           Starting server<span className="inline-block w-6 text-left">{dots}</span>
@@ -244,7 +244,7 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
         <div className="min-h-[100dvh] w-full bg-background text-foreground flex flex-col font-sans">
           {/* Header */}
           <header className="flex items-center gap-2 p-6 justify-center sm:justify-start">
-            <img src="/logo.png" alt="pinME Logo" className="h-10 w-10 object-contain" />
+            <img src="/header-logo.png" alt="pinME Logo" className="h-10 w-10 object-contain" />
             <span className="text-2xl font-bold tracking-tight">
               <span className="text-foreground">pin</span>
               <span className="text-primary">ME</span>
