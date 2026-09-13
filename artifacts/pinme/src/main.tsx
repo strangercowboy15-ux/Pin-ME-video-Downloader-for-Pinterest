@@ -19,8 +19,10 @@ function Root() {
   // remount App and replay its splash screen.
   return (
     <>
-      <div className="fixed top-5 right-6 z-[60]">
-        <ThemeToggle />
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex justify-end p-4 sm:p-5">
+        <div className="pointer-events-auto">
+          <ThemeToggle />
+        </div>
       </div>
       <div className={view === 'home' ? 'block' : 'hidden'}>
         <App onOpenPrivacy={() => setView('privacy')} />

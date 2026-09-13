@@ -4,7 +4,7 @@ export default function Privacy({ onClose }: { onClose: () => void }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="border-b border-border px-6 py-4 flex items-center gap-3">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/95 px-6 py-4 flex items-center gap-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <button
           type="button"
           onClick={onClose}
