@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trackDownload } from './analytics';
+import { SeasonalBackdrop, useSeason } from './seasonal';
 
 // ─── Server-ready hook ───────────────────────────────────────────────────────
 
@@ -145,6 +146,7 @@ async function* readSSE(response: Response): AsyncGenerator<SSEEvent> {
 
 export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
   const serverReady = useServerReady();
+  const season = useSeason();
   const [showSplash, setShowSplash] = useState(true);
   const [url, setUrl] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -241,9 +243,11 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
 
       {/* Main UI */}
       {!showSplash && serverReady === 'ready' && (
-        <div className="min-h-[100dvh] w-full bg-background text-foreground flex flex-col font-sans">
+        <div className="relative min-h-[100dvh] w-full bg-background text-foreground flex flex-col font-sans">
+          <SeasonalBackdrop season={season} />
+
           {/* Header */}
-          <header className="flex items-center gap-2 p-6 justify-center sm:justify-start">
+          <header className="relative z-10 flex items-center gap-2 p-6 justify-center sm:justify-start">
             <img src="/header-logo.png" alt="pinME Logo" className="h-10 w-10 object-contain" />
             <span className="text-2xl font-bold tracking-tight">
               <span className="text-foreground">pin</span>
@@ -252,7 +256,7 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
           </header>
 
           {/* Main Content */}
-          <main className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto relative -mt-16">
+          <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto -mt-16">
             <div className="w-full space-y-8">
               <div className="text-center space-y-2">
                 <h1 className="text-3xl font-bold tracking-tight">Download any Pinterest video.</h1>
@@ -319,7 +323,11 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
                     <button
                       type="submit"
                       disabled={!url.trim()}
-                      className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:hover:bg-primary text-primary-foreground py-4 rounded-xl font-semibold text-lg transition-colors shadow-[0_0_20px_rgba(230,0,35,0.2)]"
+                      className={`w-full ${
+                        season === 'default'
+                          ? 'bg-primary hover:bg-primary/90 disabled:hover:bg-primary'
+                          : `seasonal-button seasonal-button-${season}`
+                      } disabled:opacity-50 text-primary-foreground py-4 rounded-xl font-semibold text-lg transition-colors shadow-[0_0_20px_rgba(230,0,35,0.2)]`}
                       data-testid="button-submit"
                     >
                       Download Video
@@ -348,7 +356,7 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
           </main>
 
           {/* Footer */}
-          <footer className="mt-0 pb-16 text-center text-xs text-muted-foreground">
+          <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
             <button
               type="button"
               onClick={onOpenPrivacy}
