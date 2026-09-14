@@ -2,12 +2,16 @@ import { Router } from "express";
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
-import { URL } from "url";
+import { fileURLToPath, URL } from "url";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 
 const router = Router();
 
 const DOWNLOAD_TTL_MS = 30 * 60 * 1000;
+const bundledYtDlpPath = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../vendor/yt-dlp",
+);
 
 type DownloadTokenPayload = {
   url: string;
@@ -110,6 +114,12 @@ function isPinterestUrl(rawUrl: string): boolean {
   }
 }
 
+function getYtDlpCommand(): string {
+  if (process.env.YT_DLP_PATH) return process.env.YT_DLP_PATH;
+  if (fs.existsSync(bundledYtDlpPath)) return bundledYtDlpPath;
+  return "yt-dlp";
+}
+
 // Spawn yt-dlp, optionally calling onStderrLine for each stderr line (for stage detection).
 function runYtDlp(
   args: string[],
@@ -121,7 +131,7 @@ function runYtDlp(
       reject(new Error("TIMEOUT"));
     }, 120_000);
 
-    const proc = spawn("yt-dlp", args);
+    const proc = spawn(getYtDlpCommand(), args);
     let stdout = "";
     let stderr = "";
     let stderrBuf = ""; // line buffer for callback
