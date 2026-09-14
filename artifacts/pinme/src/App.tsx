@@ -188,7 +188,7 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
     setErrorMsg('');
 
     try {
-      const response = await fetch('/api/get-pin', {
+      const response = await fetch('https://pinme-api-server.onrender.com/api/get-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: targetUrl }),
@@ -208,7 +208,7 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
         } else if (event.type === 'ready') {
           setProgressLabel('Starting download...');
           const a = document.createElement('a');
-          a.href = `/api/stream/${event.token}`;
+          a.href = `https://pinme-api-server.onrender.com/api/stream/${event.token}`;
           a.download = event.filename || 'pinterest-video.mp4';
           document.body.appendChild(a);
           a.click();
