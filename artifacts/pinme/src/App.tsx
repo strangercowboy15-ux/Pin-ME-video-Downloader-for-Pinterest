@@ -144,7 +144,13 @@ async function* readSSE(response: Response): AsyncGenerator<SSEEvent> {
 
 // ─── Main app ────────────────────────────────────────────────────────────────
 
-export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
+export default function App({
+  onOpenPrivacy,
+  onSplashComplete,
+}: {
+  onOpenPrivacy: () => void;
+  onSplashComplete?: () => void;
+}) {
   const serverReady = useServerReady();
   const season = useSeason();
   const [showSplash, setShowSplash] = useState(true);
@@ -155,9 +161,12 @@ export default function App({ onOpenPrivacy }: { onOpenPrivacy: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const id = setTimeout(() => setShowSplash(false), 1800);
+    const id = setTimeout(() => {
+      setShowSplash(false);
+      onSplashComplete?.();
+    }, 1800);
     return () => clearTimeout(id);
-  }, []);
+  }, [onSplashComplete]);
 
   const handlePasteClick = async () => {
     try {
