@@ -1,2 +1,3 @@
 User-agent: *
 Allow: /
+Sitemap: https://pin-me-video-downloader-for-pinterest--strangercowboy.replit.app/sitemap.xml
