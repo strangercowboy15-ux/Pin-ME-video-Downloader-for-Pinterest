@@ -11,7 +11,7 @@ function Root() {
     () => window.location.pathname === '/privacy' ? 'privacy' : 'home',
   );
   const [showThemeToggle, setShowThemeToggle] = React.useState(
-    () => window.location.pathname === '/privacy'',
+    () => window.location.pathname === '/privacy',
   );
 
   const handleSplashComplete = React.useCallback(() => {
