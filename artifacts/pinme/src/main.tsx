@@ -8,10 +8,10 @@ import { ThemeProvider, ThemeToggle } from './theme';
 
 function Root() {
   const [view, setView] = React.useState<'home' | 'privacy'>(
-    () => window.location.hash === '#privacy' ? 'privacy' : 'home',
+    () => window.location.pathname === '/privacy' ? 'privacy' : 'home',
   );
   const [showThemeToggle, setShowThemeToggle] = React.useState(
-    () => window.location.hash === '#privacy',
+    () => window.location.pathname === '/privacy'',
   );
 
   const handleSplashComplete = React.useCallback(() => {
@@ -19,10 +19,15 @@ function Root() {
   }, []);
 
   React.useEffect(() => {
-    trackPageView(view === 'privacy' ? '/privacy' : '/');
-  }, [view]);
-// Scroll to top whenever the view changes
-React.useEffect(() => {
+  trackPageView(view === 'privacy' ? '/privacy' : '/');
+
+  // Update URL to match the current view
+  const path = view === 'privacy' ? '/privacy' : '/';
+  if (window.location.pathname !== path) {
+    window.history.replaceState(null, '', path);
+  }
+
+  // Scroll to top whenever the view changes
   window.scrollTo(0, 0);
 }, [view]);
 
