@@ -132,3 +132,4 @@ export default function Privacy({ onClose }: { onClose: () => void }) {
 >
   Home
 </button>
+</footer>
