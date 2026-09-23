@@ -265,7 +265,7 @@ export default function App({
           </header>
 
           {/* Main Content */}
-          <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto -mt-16">
+          <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto 
             <div className="w-full space-y-8">
               <div className="text-center space-y-2">
                 <h1 className="text-3xl font-bold tracking-tight">Download any Pinterest video.</h1>
