@@ -99,7 +99,7 @@ export default function Privacy({ onClose }: { onClose: () => void }) {
                 className="text-primary hover:underline"
               >
                 Google's Privacy Policy
-              </a>.
+              </a>
             </p>
           </div>
 
