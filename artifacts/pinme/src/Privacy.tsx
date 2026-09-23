@@ -15,7 +15,10 @@ export default function Privacy({ onClose }: { onClose: () => void }) {
         </button>
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => {
+  window.location.hash = '';
+  onClose();
+}}
           className="flex items-center gap-3 hover:opacity-80 transition-opacity"
           aria-label="Return to the home page"
         >
