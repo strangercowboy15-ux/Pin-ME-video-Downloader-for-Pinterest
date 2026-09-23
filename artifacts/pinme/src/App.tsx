@@ -375,7 +375,7 @@ export default function App({
             </button>
           </footer>
 
-{/* How it works */}
+{/* How it works 🔻*/}
 <section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
   <h2 className="text-xl font-bold text-center">How it works</h2>
   <ol className="space-y-2 text-sm text-muted-foreground">
