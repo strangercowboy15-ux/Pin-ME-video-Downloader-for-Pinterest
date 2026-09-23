@@ -95,7 +95,7 @@ export default function Privacy({ onClose }: { onClose: () => void }) {
               <a
                 href="https://policies.google.com/privacy"
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="noopener noreferrer"spellCheck={false}
                 className="text-primary hover:underline"
               >
                 Google's Privacy Policy
