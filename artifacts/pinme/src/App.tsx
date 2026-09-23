@@ -346,7 +346,7 @@ export default function App({
               </form>
 
               <p className="text-center text-xs text-muted-foreground leading-relaxed px-4">
-                Video will be saved to your device's Downloads folder (and usually appears in your Gallery/Photos app automatically).
+                Video will be saved to your device's Downloads folder (and usually appears in your Gallery/Photos app automatically)
               </p>
 
               <p className="text-center text-xs text-muted-foreground pt-4">
