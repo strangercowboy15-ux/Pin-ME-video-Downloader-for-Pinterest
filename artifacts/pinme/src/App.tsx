@@ -381,37 +381,37 @@ export default function App({
   <ol className="space-y-2 text-sm text-muted-foreground">
     <li className="flex gap-3">
       <span className="font-bold text-foreground">1.</span>
-      <span>Copy a Pinterest video link</span>
+      <span>Copy a Pinterest video link 📎</span>
     </li>
     <li className="flex gap-3">
       <span className="font-bold text-foreground">2.</span>
-      <span>Paste it in the box above</span>
+      <span>Paste it in the box above 📥</span>
     </li>
     <li className="flex gap-3">
       <span className="font-bold text-foreground">3.</span>
-      <span>Click "Download Video"</span>
+      <span>Click "Download Video" 📹</span>
     </li>
     <li className="flex gap-3">
       <span className="font-bold text-foreground">4.</span>
-      <span>Your video saves to your device</span>
+      <span>Your video saves to your device 📱</span>
     </li>
   </ol>
 </section>
 
 {/* FAQ */}
 <section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
-  <h2 className="text-xl font-bold text-center">Frequently Asked Questions</h2>
+  <h2 className="text-xl font-bold text-center">Frequently Asked Questions ❓</h2>
   <div className="space-y-4 text-sm">
     <div>
-      <h3 className="font-semibold text-foreground">Is Pin ME free?</h3>
+      <h3 className="font-semibold text-foreground">💯 Is Pin ME free?</h3>
       <p className="text-muted-foreground">Yes, completely free. No account required.</p>
     </div>
     <div>
-      <h3 className="font-semibold text-foreground">Where do downloads go?</h3>
+      <h3 className="font-semibold text-foreground">🗂️ Where do downloads go?</h3>
       <p className="text-muted-foreground">Your video saves to your device's Downloads folder.</p>
     </div>
     <div>
-      <h3 className="font-semibold text-foreground">Do you store my links?</h3>
+      <h3 className="font-semibold text-foreground">🔒 Do you store my links?</h3>
       <p className="text-muted-foreground">No. Links are processed and deleted immediately.</p>
     </div>
   </div>
