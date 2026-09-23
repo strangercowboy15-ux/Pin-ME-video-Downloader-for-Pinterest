@@ -256,7 +256,7 @@ export default function App({
           <SeasonalBackdrop season={season} />
 
           {/* Header */}
-          <header className="sticky top-0 z-50 flex items-center gap-2 p-6 justify-center sm:justify-start bg-background/80 backdrop-blur-sm">
+          <header className="sticky top-0 z-50 flex items-center gap-2 p-6 justify-center sm:justify-start bg-background 
             <img src="/header-logo.png" alt="pinME Logo" className="h-10 w-10 object-contain" />
             <span className="text-2xl font-bold tracking-tight">
               <span className="text-foreground">pin</span>
