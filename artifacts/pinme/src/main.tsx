@@ -21,6 +21,10 @@ function Root() {
   React.useEffect(() => {
     trackPageView(view === 'privacy' ? '/privacy' : '/');
   }, [view]);
+// Scroll to top whenever the view changes
+React.useEffect(() => {
+  window.scrollTo(0, 0);
+}, [view]);
 
   // Keep both views mounted so switching back to the home view does not
   // remount App and replay its splash screen.
