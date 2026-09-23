@@ -122,8 +122,13 @@ export default function Privacy({ onClose }: { onClose: () => void }) {
       {/* Footer */}
       <footer className="border-t border-border mt-16 px-6 py-6 text-center text-sm text-muted-foreground">
         © {new Date().getFullYear()} pinME Downloader ·{' '}
-        <a href="#" className="hover:text-foreground transition-colors">Home</a>
-      </footer>
-    </div>
-  );
-}
+         <button
+  type="button"
+  onClick={() => {
+    window.history.replaceState(null, '', window.location.pathname);
+    onClose();
+  }}
+  className="hover:text-foreground transition-colors"
+>
+  Home
+</button>
