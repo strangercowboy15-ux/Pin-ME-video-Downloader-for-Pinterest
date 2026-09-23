@@ -44,7 +44,10 @@ React.useEffect(() => {
         />
       </div>
       <div className={view === 'privacy' ? 'block' : 'hidden'}>
-        <Privacy onClose={() => setView('home')} />
+      <Privacy onClose={() => {
+  window.history.replaceState(null, '', window.location.pathname);
+  setView('home');
+}} />
       </div>
     </>
   );
