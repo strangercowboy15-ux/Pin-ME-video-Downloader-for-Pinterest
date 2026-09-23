@@ -400,7 +400,7 @@ export default function App({
 
 {/* FAQ */}
 <section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
-  <h2 className="text-xl font-bold text-center">Frequently Asked Questions❓</h2>
+  <h2 className="text-xl font-bold text-center">Frequently Asked Questions<span className="text-primary">❓</span>
   <div className="space-y-4 text-sm">
     <div>
       <h3 className="font-semibold text-foreground">💯 Is Pin ME free?</h3>
