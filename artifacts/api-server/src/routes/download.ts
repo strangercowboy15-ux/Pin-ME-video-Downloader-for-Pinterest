@@ -62,6 +62,7 @@ function parseDownloadToken(token: string): DownloadTokenPayload | null {
       .update(encodedPayload)
       .digest();
     const providedSignature = Buffer.from(encodedSignature, "base64url");
+
     if (
       providedSignature.length !== expectedSignature.length ||
       !timingSafeEqual(providedSignature, expectedSignature)
@@ -147,15 +148,25 @@ function runYtDlp(
         for (const line of lines) onStderrLine(line);
       }
     });
+
     proc.on("close", (code: number | null) => {
       clearTimeout(timeout);
       if (code !== 0) {
-        reject(Object.assign(new Error(`yt-dlp exit ${code}`), { code, stdout, stderr }));
+        reject(
+          Object.assign(
+            new Error(`yt-dlp exit ${code}`),
+            { code, stdout, stderr },
+          ),
+        );
       } else {
         resolve({ stdout, stderr });
       }
     });
-    proc.on("error", (err) => { clearTimeout(timeout); reject(err); });
+
+    proc.on("error", (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
   });
 }
 
@@ -164,10 +175,12 @@ interface PinMeta {
   title: string | null;
   hasVideo: boolean;
   isImage?: boolean;
+  imageUrl?: string | null;
 }
 
 async function getPinMeta(url: string): Promise<PinMeta> {
   let stdout: string;
+
   try {
     ({ stdout } = await runYtDlp([
       "--dump-json", "--no-playlist", "--no-warnings", url,
@@ -175,20 +188,22 @@ async function getPinMeta(url: string): Promise<PinMeta> {
   } catch (err) {
     const e = err as { stderr?: string };
     const errLower = (e.stderr || "").toLowerCase();
+
     if (
-  errLower.includes("unsupported url") ||
-  errLower.includes("no video") ||
-  errLower.includes("not a video")
-) {
-  // yt-dlp doesn't handle this URL — likely an image pin.
-  // Return image meta so we use gallery-dl instead.
-  return {
-    id: randomBytes(4).toString("hex"),
-    title: null,
-    hasVideo: false,
-    isImage: true,
-  };
-}
+      errLower.includes("unsupported url") ||
+      errLower.includes("no video") ||
+      errLower.includes("not a video")
+    ) {
+      // yt-dlp doesn't handle this URL — likely an image pin.
+      // Return image meta so we use gallery-dl instead.
+      return {
+        id: randomBytes(4).toString("hex"),
+        title: null,
+        hasVideo: false,
+        isImage: true,
+      };
+    }
+
     if (
       errLower.includes("private") ||
       errLower.includes("unavailable") ||
@@ -196,17 +211,23 @@ async function getPinMeta(url: string): Promise<PinMeta> {
       errLower.includes("not exist") ||
       errLower.includes("login required")
     ) throw new Error("UNAVAILABLE");
+
     throw err;
   }
 
   const lines = stdout.trim().split("\n");
   let info: Record<string, unknown> | null = null;
+
   for (let i = lines.length - 1; i >= 0; i--) {
     try {
       const parsed = JSON.parse(lines[i].trim());
-      if (parsed && typeof parsed === "object") { info = parsed; break; }
+      if (parsed && typeof parsed === "object") {
+        info = parsed;
+        break;
+      }
     } catch { /* skip */ }
   }
+
   if (!info) throw new Error("PARSE_ERROR");
 
   const formats = (info.formats as Array<Record<string, unknown>>) || [];
@@ -217,6 +238,17 @@ async function getPinMeta(url: string): Promise<PinMeta> {
   const ext = (info.ext as string || "").toLowerCase();
   const isImage = ["jpg", "jpeg", "png", "webp", "gif"].includes(ext);
 
+  // Debug info
+  console.log("=== getPinMeta DEBUG ===");
+  console.log("ext:", ext);
+  console.log("isImage:", isImage);
+  console.log("hasVideoFormats:", hasVideoFormats);
+  console.log("info.url:", info.url);
+  console.log("info.thumbnail:", info.thumbnail);
+  console.log("info.ext:", info.ext);
+  console.log("formats count:", formats.length);
+  console.log("=== END getPinMeta DEBUG ===");
+
   // If no video formats and it's not clearly a video — treat as image
   if (!hasVideoFormats) {
     return {
@@ -224,6 +256,7 @@ async function getPinMeta(url: string): Promise<PinMeta> {
       title: (info.title as string) || null,
       hasVideo: false,
       isImage: true,
+      imageUrl: (info.url as string) || null,
     };
   }
 
@@ -233,7 +266,6 @@ async function getPinMeta(url: string): Promise<PinMeta> {
     hasVideo: true,
   };
 }
-
 
 function getGalleryDlCommand(): string {
   if (process.env.GALLERY_DL_PATH) return process.env.GALLERY_DL_PATH;
@@ -256,25 +288,39 @@ function runGalleryDl(
     let stderrBuf = "";
 
     proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
+
     proc.stderr.on("data", (d: Buffer) => {
       const chunk = d.toString();
       stderr += chunk;
+
       if (onStderrLine) {
         stderrBuf += chunk;
         const lines = stderrBuf.split("\n");
         stderrBuf = lines.pop() ?? "";
+
         for (const line of lines) onStderrLine(line);
       }
     });
+
     proc.on("close", (code: number | null) => {
       clearTimeout(timeout);
+
       if (code !== 0) {
-        reject(Object.assign(new Error(`gallery-dl exit ${code}`), { code, stdout, stderr }));
+        reject(
+          Object.assign(
+            new Error(`gallery-dl exit ${code}`),
+            { code, stdout, stderr },
+          ),
+        );
       } else {
         resolve({ stdout, stderr });
       }
     });
-    proc.on("error", (err) => { clearTimeout(timeout); reject(err); });
+
+    proc.on("error", (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
   });
 }
 
@@ -282,35 +328,58 @@ async function downloadImage(
   url: string,
   pinId: string,
   onStage?: (label: string) => void,
+  imageUrl?: string | null,
 ): Promise<{ filePath: string }> {
   const outputDir = `/tmp/pinme-img-${pinId}`;
   fs.mkdirSync(outputDir, { recursive: true });
   onStage?.("Downloading image...");
 
+  // Direct image URL fetch (reliable)
+  if (imageUrl) {
+    console.log("=== Direct image fetch ===");
+    console.log("imageUrl:", imageUrl);
+
+    try {
+      const res = await fetch(imageUrl);
+
+      if (res.ok) {
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const extMatch = imageUrl.match(/\.(jpg|jpeg|png|webp|gif)/i);
+        const ext = extMatch ? extMatch[1] : "jpg";
+        const filePath = path.join(outputDir, `${pinId}.${ext}`);
+
+        fs.writeFileSync(filePath, buffer);
+
+        console.log("Saved directly:", filePath);
+        return { filePath };
+      }
+    } catch (err) {
+      console.log("Direct fetch failed:", err);
+    }
+  }
+
+  // Fallback: gallery-dl
+  console.log("=== gallery-dl fallback ===");
+
   const result = await runGalleryDl([
     "-d", outputDir,
-    "--filename", "{id}.{extension}",
     "--no-part",
-    "--no-mtime",
     url,
   ]);
 
-  console.log("=== gallery-dl DEBUG ===");
   console.log("stdout:", result.stdout);
   console.log("stderr:", result.stderr);
 
   const files = fs.readdirSync(outputDir);
   console.log("output files:", files);
-  console.log("=== END DEBUG ===");
 
   const imgFile = files.find((f) =>
     /\.(jpg|jpeg|png|webp|gif)$/i.test(f)
   );
 
-  if (!imgFile) throw new Error(`NO_FILE: image not found. Files: ${files.join(", ")}`);
+  if (!imgFile) throw new Error(`NO_FILE: Files: ${files.join(", ")}`);
   return { filePath: path.join(outputDir, imgFile) };
 }
-
 
 // onStage is called whenever a meaningful stage transition is detected in stderr.
 async function downloadVideo(
@@ -325,7 +394,7 @@ async function downloadVideo(
     [
       "--no-playlist",
       "--no-warnings",
-      "--concurrent-fragments", "4",   // download HLS segments in parallel
+      "--concurrent-fragments", "4",
       "--format", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/bestvideo+bestaudio/best",
       "--merge-output-format", "mp4",
       "-o", outputTemplate,
@@ -341,22 +410,32 @@ async function downloadVideo(
   );
 
   const preferredPath = `/tmp/pinme-${pinId}.mp4`;
+
   if (fs.existsSync(preferredPath)) {
     const stat = fs.statSync(preferredPath);
+
     if (stat.size < 10_000) {
       fs.unlinkSync(preferredPath);
       throw new Error("NO_VIDEO");
     }
+
     return { filePath: preferredPath };
   }
 
   // Fallback: find any file with this pinId prefix
   const files = fs.readdirSync("/tmp");
+
   for (const f of files) {
-    if (f.startsWith(`pinme-${pinId}.`) && !f.endsWith(".part") && !f.endsWith(".ytdl")) {
+    if (
+      f.startsWith(`pinme-${pinId}.`) &&
+      !f.endsWith(".part") &&
+      !f.endsWith(".ytdl")
+    ) {
       const fp = path.join("/tmp", f);
       const stat = fs.statSync(fp);
+
       if (stat.size >= 10_000) return { filePath: fp };
+
       fs.unlinkSync(fp);
       throw new Error("NO_VIDEO");
     }
@@ -367,20 +446,32 @@ async function downloadVideo(
 
 function buildFilename(title: string | null, filePath: string): string {
   const ext = path.extname(filePath).slice(1) || "mp4";
-  const genericTitles = new Set(["mp4", "mkv", "webm", "video", "watch", "pin", ""]);
+  const genericTitles = new Set([
+    "mp4",
+    "mkv",
+    "webm",
+    "video",
+    "watch",
+    "pin",
+    "",
+  ]);
+
   const cleaned = (title || "")
     .replace(/[^\w\s\-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
+
   if (!cleaned || genericTitles.has(cleaned) || cleaned.length < 3) {
     return `pinme-video-${Date.now()}.${ext}`;
   }
+
   return `${cleaned.slice(0, 60)}.${ext}`;
 }
 
 function getMimeType(filename: string): string {
   const ext = path.extname(filename).toLowerCase();
+
   const types: Record<string, string> = {
     ".mp4": "video/mp4",
     ".webm": "video/webm",
@@ -391,14 +482,36 @@ function getMimeType(filename: string): string {
     ".webp": "image/webp",
     ".gif": "image/gif",
   };
+
   return types[ext] || "application/octet-stream";
 }
 
 function toUserError(msg: string): { status: number; error: string } {
-  if (msg === "NO_VIDEO")    return { status: 400, error: "This pin doesn't contain a video." };
-  if (msg === "UNAVAILABLE") return { status: 404, error: "Couldn't fetch this video. It may be unavailable or private." };
-  if (msg === "TIMEOUT")     return { status: 504, error: "Request timed out. Please try again." };
-  return { status: 500, error: "Couldn't fetch this video. It may be unavailable or private." };
+  if (msg === "NO_VIDEO") {
+    return {
+      status: 400,
+      error: "This pin doesn't contain a video.",
+    };
+  }
+
+  if (msg === "UNAVAILABLE") {
+    return {
+      status: 404,
+      error: "Couldn't fetch this video. It may be unavailable or private.",
+    };
+  }
+
+  if (msg === "TIMEOUT") {
+    return {
+      status: 504,
+      error: "Request timed out. Please try again.",
+    };
+  }
+
+  return {
+    status: 500,
+    error: "Couldn't fetch this video. It may be unavailable or private.",
+  };
 }
 
 // POST /api/get-pin
@@ -411,12 +524,18 @@ router.post("/get-pin", async (req, res) => {
 
   // Validate before opening the SSE stream so we can still return a proper JSON 400.
   if (!url || typeof url !== "string" || !url.trim()) {
-    res.status(400).json({ error: "This doesn't look like a Pinterest link." });
+    res.status(400).json({
+      error: "This doesn't look like a Pinterest link.",
+    });
     return;
   }
+
   const trimmed = url.trim();
+
   if (!isPinterestUrl(trimmed)) {
-    res.status(400).json({ error: "This doesn't look like a Pinterest link." });
+    res.status(400).json({
+      error: "This doesn't look like a Pinterest link.",
+    });
     return;
   }
 
@@ -427,47 +546,89 @@ router.post("/get-pin", async (req, res) => {
   res.flushHeaders();
 
   const send = (data: object) => {
-    if (!res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`);
+    if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    }
   };
 
   try {
     // Stage 1 — metadata
-    send({ type: "stage", label: "Fetching info..." });
+    send({
+      type: "stage",
+      label: "Fetching info...",
+    });
+
     const meta = await getPinMeta(trimmed);
 
     // Stage 2 — download (image or video)
     let filePath: string;
+
     if (meta.isImage) {
-      const img = await downloadImage(trimmed, meta.id, (label) => send({ type: "stage", label }));
+      const img = await downloadImage(
+        trimmed,
+        meta.id,
+        (label) => send({ type: "stage", label }),
+        meta.imageUrl,
+      );
+
       filePath = img.filePath;
     } else {
-      send({ type: "stage", label: "Downloading video..." });
-      const vid = await downloadVideo(trimmed, meta.id, (label) => send({ type: "stage", label }));
+      send({
+        type: "stage",
+        label: "Downloading video...",
+      });
+
+      const vid = await downloadVideo(
+        trimmed,
+        meta.id,
+        (label) => send({ type: "stage", label }),
+      );
+
       filePath = vid.filePath;
     }
 
     // Stage 4 — build token
-    send({ type: "stage", label: "Preparing download..." });
+    send({
+      type: "stage",
+      label: "Preparing download...",
+    });
+
     const filename = buildFilename(meta.title, filePath);
     const expiresAt = Date.now() + DOWNLOAD_TTL_MS;
+
     const token = createDownloadToken({
       url: trimmed,
       pinId: meta.id,
       filename,
       expiresAt,
     });
+
     pendingDownloads.set(token, {
       filePath,
       filename,
       expiresAt,
     });
 
-    send({ type: "ready", token, filename, title: meta.title ?? null });
+    send({
+      type: "ready",
+      token,
+      filename,
+      title: meta.title ?? null,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    req.log?.error({ err: msg, url: trimmed }, "get-pin failed");
+
+    req.log?.error(
+      { err: msg, url: trimmed },
+      "get-pin failed",
+    );
+
     const { error } = toUserError(msg);
-    send({ type: "error", message: error });
+
+    send({
+      type: "error",
+      message: error,
+    });
   } finally {
     res.end();
   }
@@ -480,8 +641,11 @@ router.post("/get-pin", async (req, res) => {
 router.get("/stream/:token", async (req, res): Promise<void> => {
   const { token } = req.params;
   const payload = parseDownloadToken(token);
+
   if (!payload || payload.expiresAt <= Date.now()) {
-    res.status(404).json({ error: "Download link expired. Please try again." });
+    res.status(404).json({
+      error: "Download link expired. Please try again.",
+    });
     return;
   }
 
@@ -494,12 +658,17 @@ router.get("/stream/:token", async (req, res): Promise<void> => {
     filename = entry.filename;
   } else {
     try {
-      req.log?.warn("Prepared download was unavailable; fetching a fresh copy");
+      req.log?.warn(
+        "Prepared download was unavailable; fetching a fresh copy",
+      );
+
       const fresh = await downloadVideo(
         payload.url,
         `retry-${randomBytes(8).toString("hex")}`,
       );
+
       filePath = fresh.filePath;
+
       pendingDownloads.set(token, {
         filePath,
         filename,
@@ -507,8 +676,14 @@ router.get("/stream/:token", async (req, res): Promise<void> => {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      req.log?.error({ err: msg }, "Fresh download retry failed");
+
+      req.log?.error(
+        { err: msg },
+        "Fresh download retry failed",
+      );
+
       const { status, error } = toUserError(msg);
+
       res.status(status).json({ error });
       return;
     }
@@ -516,21 +691,33 @@ router.get("/stream/:token", async (req, res): Promise<void> => {
 
   if (!fs.existsSync(filePath)) {
     pendingDownloads.delete(token);
-    res.status(404).json({ error: "File not found. Please try again." });
+
+    res.status(404).json({
+      error: "File not found. Please try again.",
+    });
+
     return;
   }
 
   let stat: fs.Stats;
+
   try {
     stat = fs.statSync(filePath);
   } catch {
     pendingDownloads.delete(token);
-    res.status(500).json({ error: "Failed to read video file." });
+
+    res.status(500).json({
+      error: "Failed to read video file.",
+    });
+
     return;
   }
 
   res.setHeader("Content-Type", getMimeType(filename));
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${filename}"`,
+  );
   res.setHeader("Content-Length", stat.size);
   res.setHeader("Cache-Control", "no-store");
 
@@ -538,19 +725,32 @@ router.get("/stream/:token", async (req, res): Promise<void> => {
 
   const removeFailedDownload = () => {
     pendingDownloads.delete(token);
-    try { fs.unlinkSync(filePath); } catch { /* best-effort */ }
+
+    try {
+      fs.unlinkSync(filePath);
+    } catch { /* best-effort */ }
   };
 
   // Keep the entry until its expiry so browsers can retry the same download
   // URL (some mobile browsers issue more than one request while starting a
   // download). The interval cleanup above removes it after the valid window.
   fileStream.on("error", (err) => {
-    req.log?.error({ err }, "stream read error");
+    req.log?.error(
+      { err },
+      "stream read error",
+    );
+
     removeFailedDownload();
-    if (!res.headersSent) res.status(500).end();
+
+    if (!res.headersSent) {
+      res.status(500).end();
+    }
   });
+
   res.on("close", () => {
-    if (!res.writableFinished) fileStream.destroy();
+    if (!res.writableFinished) {
+      fileStream.destroy();
+    }
   });
 
   fileStream.pipe(res);
