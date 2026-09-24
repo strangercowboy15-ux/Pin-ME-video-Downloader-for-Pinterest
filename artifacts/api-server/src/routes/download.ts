@@ -370,15 +370,27 @@ async function downloadImage(
   console.log("stdout:", result.stdout);
   console.log("stderr:", result.stderr);
 
-  const files = fs.readdirSync(outputDir);
-  console.log("output files:", files);
+  // Recursively find image file
+  function findImageFile(dir: string): string | null {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isFile() && /\.(jpg|jpeg|png|webp|gif)$/i.test(entry.name)) {
+        return fullPath;
+      }
+      if (entry.isDirectory()) {
+        const found = findImageFile(fullPath);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
 
-  const imgFile = files.find((f) =>
-    /\.(jpg|jpeg|png|webp|gif)$/i.test(f)
-  );
+  const imgFile = findImageFile(outputDir);
+  console.log("found image:", imgFile);
 
-  if (!imgFile) throw new Error(`NO_FILE: Files: ${files.join(", ")}`);
-  return { filePath: path.join(outputDir, imgFile) };
+  if (!imgFile) throw new Error(`NO_FILE: no image in ${outputDir}`);
+  return { filePath: imgFile };
 }
 
 // onStage is called whenever a meaningful stage transition is detected in stderr.
