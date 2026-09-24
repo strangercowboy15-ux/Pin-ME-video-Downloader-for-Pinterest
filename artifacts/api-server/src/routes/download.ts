@@ -175,10 +175,19 @@ async function getPinMeta(url: string): Promise<PinMeta> {
     const e = err as { stderr?: string };
     const errLower = (e.stderr || "").toLowerCase();
     if (
-      errLower.includes("unsupported url") ||
-      errLower.includes("no video") ||
-      errLower.includes("not a video")
-    ) throw new Error("NO_VIDEO");
+  errLower.includes("unsupported url") ||
+  errLower.includes("no video") ||
+  errLower.includes("not a video")
+) {
+  // yt-dlp doesn't handle this URL — likely an image pin.
+  // Return image meta so we use gallery-dl instead.
+  return {
+    id: randomBytes(4).toString("hex"),
+    title: null,
+    hasVideo: false,
+    isImage: true,
+  };
+}
     if (
       errLower.includes("private") ||
       errLower.includes("unavailable") ||
