@@ -62,6 +62,7 @@ function parseDownloadToken(token: string): DownloadTokenPayload | null {
       .update(encodedPayload)
       .digest();
     const providedSignature = Buffer.from(encodedSignature, "base64url");
+
     if (
       providedSignature.length !== expectedSignature.length ||
       !timingSafeEqual(providedSignature, expectedSignature)
@@ -165,6 +166,7 @@ interface PinMeta {
   hasVideo: boolean;
   isImage?: boolean;
 }
+
 async function getPinMeta(url: string): Promise<PinMeta> {
   let stdout: string;
   try {
@@ -212,24 +214,25 @@ async function getPinMeta(url: string): Promise<PinMeta> {
   const hasVideoFormats = formats.some(
     (f) => f.vcodec && f.vcodec !== "none" && f.vcodec !== null
   );
-  const ext = (info.ext as string || "").toLowerCase();
-const isImage = ["jpg", "jpeg", "png", "webp"].includes(ext);
 
-if (!hasVideoFormats && isImage) {
+  const ext = (info.ext as string || "").toLowerCase();
+  const isImage = ["jpg", "jpeg", "png", "webp", "gif"].includes(ext);
+
+  // If no video formats and it's not clearly a video — treat as image
+  if (!hasVideoFormats) {
+    return {
+      id: (info.id as string) || randomBytes(4).toString("hex"),
+      title: (info.title as string) || null,
+      hasVideo: false,
+      isImage: true,
+    };
+  }
+
   return {
     id: (info.id as string) || randomBytes(4).toString("hex"),
     title: (info.title as string) || null,
-    hasVideo: false,
-    isImage: true,
+    hasVideo: true,
   };
-}
-if (!hasVideoFormats) throw new Error("NO_VIDEO");
-
-return {
-  id: (info.id as string) || randomBytes(4).toString("hex"),
-  title: (info.title as string) || null,
-  hasVideo: true,
-};
 }
 
 
@@ -288,6 +291,8 @@ async function downloadImage(
   await runGalleryDl([
     "-d", outputDir,
     "--filename", "{id}.{extension}",
+    "--no-part",
+    "--no-mtime",
     url,
   ]);
 
@@ -367,6 +372,7 @@ function buildFilename(title: string | null, filePath: string): string {
   }
   return `${cleaned.slice(0, 60)}.${ext}`;
 }
+
 function getMimeType(filename: string): string {
   const ext = path.extname(filename).toLowerCase();
   const types: Record<string, string> = {
@@ -420,19 +426,20 @@ router.post("/get-pin", async (req, res) => {
 
   try {
     // Stage 1 — metadata
-send({ type: "stage", label: "Fetching info..." });
-const meta = await getPinMeta(trimmed);
+    send({ type: "stage", label: "Fetching info..." });
+    const meta = await getPinMeta(trimmed);
 
-// Stage 2 — download (image or video)
-let filePath: string;
-if (meta.isImage) {
-  const img = await downloadImage(trimmed, meta.id, (label) => send({ type: "stage", label }));
-  filePath = img.filePath;
-} else {
-  send({ type: "stage", label: "Downloading video..." });
-  const vid = await downloadVideo(trimmed, meta.id, (label) => send({ type: "stage", label }));
-  filePath = vid.filePath;
-}
+    // Stage 2 — download (image or video)
+    let filePath: string;
+    if (meta.isImage) {
+      const img = await downloadImage(trimmed, meta.id, (label) => send({ type: "stage", label }));
+      filePath = img.filePath;
+    } else {
+      send({ type: "stage", label: "Downloading video..." });
+      const vid = await downloadVideo(trimmed, meta.id, (label) => send({ type: "stage", label }));
+      filePath = vid.filePath;
+    }
+
     // Stage 4 — build token
     send({ type: "stage", label: "Preparing download..." });
     const filename = buildFilename(meta.title, filePath);
@@ -443,6 +450,7 @@ if (meta.isImage) {
       filename,
       expiresAt,
     });
+
     pendingDownloads.set(token, {
       filePath,
       filename,
@@ -467,6 +475,7 @@ if (meta.isImage) {
 router.get("/stream/:token", async (req, res): Promise<void> => {
   const { token } = req.params;
   const payload = parseDownloadToken(token);
+
   if (!payload || payload.expiresAt <= Date.now()) {
     res.status(404).json({ error: "Download link expired. Please try again." });
     return;
@@ -487,6 +496,7 @@ router.get("/stream/:token", async (req, res): Promise<void> => {
         `retry-${randomBytes(8).toString("hex")}`,
       );
       filePath = fresh.filePath;
+
       pendingDownloads.set(token, {
         filePath,
         filename,
@@ -536,6 +546,7 @@ router.get("/stream/:token", async (req, res): Promise<void> => {
     removeFailedDownload();
     if (!res.headersSent) res.status(500).end();
   });
+
   res.on("close", () => {
     if (!res.writableFinished) fileStream.destroy();
   });
