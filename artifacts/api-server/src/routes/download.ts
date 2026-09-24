@@ -163,8 +163,8 @@ interface PinMeta {
   id: string;
   title: string | null;
   hasVideo: boolean;
+  isImage?: boolean;
 }
-
 async function getPinMeta(url: string): Promise<PinMeta> {
   let stdout: string;
   try {
@@ -204,15 +204,93 @@ async function getPinMeta(url: string): Promise<PinMeta> {
     (f) => f.vcodec && f.vcodec !== "none" && f.vcodec !== null
   );
   const ext = (info.ext as string || "").toLowerCase();
-  const isImage = ["jpg", "jpeg", "png", "gif", "webp"].includes(ext);
-  if (!hasVideoFormats && isImage) throw new Error("NO_VIDEO");
+const isImage = ["jpg", "jpeg", "png", "webp"].includes(ext);
 
+if (!hasVideoFormats && isImage) {
   return {
     id: (info.id as string) || randomBytes(4).toString("hex"),
     title: (info.title as string) || null,
-    hasVideo: true,
+    hasVideo: false,
+    isImage: true,
   };
 }
+if (!hasVideoFormats) throw new Error("NO_VIDEO");
+
+return {
+  id: (info.id as string) || randomBytes(4).toString("hex"),
+  title: (info.title as string) || null,
+  hasVideo: true,
+};
+}
+
+
+function getGalleryDlCommand(): string {
+  if (process.env.GALLERY_DL_PATH) return process.env.GALLERY_DL_PATH;
+  return "gallery-dl";
+}
+
+function runGalleryDl(
+  args: string[],
+  onStderrLine?: (line: string) => void,
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      proc.kill("SIGKILL");
+      reject(new Error("TIMEOUT"));
+    }, 120_000);
+
+    const proc = spawn(getGalleryDlCommand(), args);
+    let stdout = "";
+    let stderr = "";
+    let stderrBuf = "";
+
+    proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
+    proc.stderr.on("data", (d: Buffer) => {
+      const chunk = d.toString();
+      stderr += chunk;
+      if (onStderrLine) {
+        stderrBuf += chunk;
+        const lines = stderrBuf.split("\n");
+        stderrBuf = lines.pop() ?? "";
+        for (const line of lines) onStderrLine(line);
+      }
+    });
+    proc.on("close", (code: number | null) => {
+      clearTimeout(timeout);
+      if (code !== 0) {
+        reject(Object.assign(new Error(`gallery-dl exit ${code}`), { code, stdout, stderr }));
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+    proc.on("error", (err) => { clearTimeout(timeout); reject(err); });
+  });
+}
+
+async function downloadImage(
+  url: string,
+  pinId: string,
+  onStage?: (label: string) => void,
+): Promise<{ filePath: string }> {
+  const outputDir = `/tmp/pinme-img-${pinId}`;
+  fs.mkdirSync(outputDir, { recursive: true });
+  onStage?.("Downloading image...");
+
+  await runGalleryDl([
+    "-d", outputDir,
+    "--filename", "{id}.{extension}",
+    url,
+  ]);
+
+  const files = fs.readdirSync(outputDir);
+  const imgFile = files.find((f) =>
+    /\.(jpg|jpeg|png|webp|gif)$/i.test(f)
+  );
+
+  if (!imgFile) throw new Error("NO_FILE: image not found after gallery-dl");
+  return { filePath: path.join(outputDir, imgFile) };
+}
+
 
 // onStage is called whenever a meaningful stage transition is detected in stderr.
 async function downloadVideo(
@@ -280,6 +358,20 @@ function buildFilename(title: string | null, filePath: string): string {
   }
   return `${cleaned.slice(0, 60)}.${ext}`;
 }
+function getMimeType(filename: string): string {
+  const ext = path.extname(filename).toLowerCase();
+  const types: Record<string, string> = {
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+  };
+  return types[ext] || "application/octet-stream";
+}
 
 function toUserError(msg: string): { status: number; error: string } {
   if (msg === "NO_VIDEO")    return { status: 400, error: "This pin doesn't contain a video." };
@@ -319,13 +411,19 @@ router.post("/get-pin", async (req, res) => {
 
   try {
     // Stage 1 — metadata
-    send({ type: "stage", label: "Fetching video info..." });
-    const meta = await getPinMeta(trimmed);
+send({ type: "stage", label: "Fetching info..." });
+const meta = await getPinMeta(trimmed);
 
-    // Stage 2 — download (stage 3 "Processing video..." fires from the stderr callback inside downloadVideo)
-    send({ type: "stage", label: "Downloading video..." });
-    const { filePath } = await downloadVideo(trimmed, meta.id, (label) => send({ type: "stage", label }));
-
+// Stage 2 — download (image or video)
+let filePath: string;
+if (meta.isImage) {
+  const img = await downloadImage(trimmed, meta.id, (label) => send({ type: "stage", label }));
+  filePath = img.filePath;
+} else {
+  send({ type: "stage", label: "Downloading video..." });
+  const vid = await downloadVideo(trimmed, meta.id, (label) => send({ type: "stage", label }));
+  filePath = vid.filePath;
+}
     // Stage 4 — build token
     send({ type: "stage", label: "Preparing download..." });
     const filename = buildFilename(meta.title, filePath);
@@ -409,7 +507,7 @@ router.get("/stream/:token", async (req, res): Promise<void> => {
     return;
   }
 
-  res.setHeader("Content-Type", "video/mp4");
+  res.setHeader("Content-Type", getMimeType(filename));
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.setHeader("Content-Length", stat.size);
   res.setHeader("Cache-Control", "no-store");
