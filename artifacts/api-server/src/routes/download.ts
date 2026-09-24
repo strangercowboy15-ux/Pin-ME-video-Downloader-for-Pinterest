@@ -62,7 +62,6 @@ function parseDownloadToken(token: string): DownloadTokenPayload | null {
       .update(encodedPayload)
       .digest();
     const providedSignature = Buffer.from(encodedSignature, "base64url");
-
     if (
       providedSignature.length !== expectedSignature.length ||
       !timingSafeEqual(providedSignature, expectedSignature)
@@ -288,7 +287,7 @@ async function downloadImage(
   fs.mkdirSync(outputDir, { recursive: true });
   onStage?.("Downloading image...");
 
-  await runGalleryDl([
+  const result = await runGalleryDl([
     "-d", outputDir,
     "--filename", "{id}.{extension}",
     "--no-part",
@@ -296,8 +295,13 @@ async function downloadImage(
     url,
   ]);
 
+  console.log("=== gallery-dl DEBUG ===");
+  console.log("stdout:", result.stdout);
+  console.log("stderr:", result.stderr);
+
   const files = fs.readdirSync(outputDir);
-  console.log("gallery-dl output:", files);
+  console.log("output files:", files);
+  console.log("=== END DEBUG ===");
 
   const imgFile = files.find((f) =>
     /\.(jpg|jpeg|png|webp|gif)$/i.test(f)
@@ -369,11 +373,9 @@ function buildFilename(title: string | null, filePath: string): string {
     .replace(/\s+/g, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
-
   if (!cleaned || genericTitles.has(cleaned) || cleaned.length < 3) {
     return `pinme-video-${Date.now()}.${ext}`;
   }
-
   return `${cleaned.slice(0, 60)}.${ext}`;
 }
 
@@ -389,7 +391,6 @@ function getMimeType(filename: string): string {
     ".webp": "image/webp",
     ".gif": "image/gif",
   };
-
   return types[ext] || "application/octet-stream";
 }
 
@@ -413,9 +414,7 @@ router.post("/get-pin", async (req, res) => {
     res.status(400).json({ error: "This doesn't look like a Pinterest link." });
     return;
   }
-
   const trimmed = url.trim();
-
   if (!isPinterestUrl(trimmed)) {
     res.status(400).json({ error: "This doesn't look like a Pinterest link." });
     return;
@@ -438,55 +437,35 @@ router.post("/get-pin", async (req, res) => {
 
     // Stage 2 — download (image or video)
     let filePath: string;
-
     if (meta.isImage) {
-      const img = await downloadImage(
-        trimmed,
-        meta.id,
-        (label) => send({ type: "stage", label }),
-      );
+      const img = await downloadImage(trimmed, meta.id, (label) => send({ type: "stage", label }));
       filePath = img.filePath;
     } else {
       send({ type: "stage", label: "Downloading video..." });
-
-      const vid = await downloadVideo(
-        trimmed,
-        meta.id,
-        (label) => send({ type: "stage", label }),
-      );
-
+      const vid = await downloadVideo(trimmed, meta.id, (label) => send({ type: "stage", label }));
       filePath = vid.filePath;
     }
 
     // Stage 4 — build token
     send({ type: "stage", label: "Preparing download..." });
-
     const filename = buildFilename(meta.title, filePath);
     const expiresAt = Date.now() + DOWNLOAD_TTL_MS;
-
     const token = createDownloadToken({
       url: trimmed,
       pinId: meta.id,
       filename,
       expiresAt,
     });
-
     pendingDownloads.set(token, {
       filePath,
       filename,
       expiresAt,
     });
 
-    send({
-      type: "ready",
-      token,
-      filename,
-      title: meta.title ?? null,
-    });
+    send({ type: "ready", token, filename, title: meta.title ?? null });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     req.log?.error({ err: msg, url: trimmed }, "get-pin failed");
-
     const { error } = toUserError(msg);
     send({ type: "error", message: error });
   } finally {
@@ -501,7 +480,6 @@ router.post("/get-pin", async (req, res) => {
 router.get("/stream/:token", async (req, res): Promise<void> => {
   const { token } = req.params;
   const payload = parseDownloadToken(token);
-
   if (!payload || payload.expiresAt <= Date.now()) {
     res.status(404).json({ error: "Download link expired. Please try again." });
     return;
@@ -517,14 +495,11 @@ router.get("/stream/:token", async (req, res): Promise<void> => {
   } else {
     try {
       req.log?.warn("Prepared download was unavailable; fetching a fresh copy");
-
       const fresh = await downloadVideo(
         payload.url,
         `retry-${randomBytes(8).toString("hex")}`,
       );
-
       filePath = fresh.filePath;
-
       pendingDownloads.set(token, {
         filePath,
         filename,
@@ -533,7 +508,6 @@ router.get("/stream/:token", async (req, res): Promise<void> => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       req.log?.error({ err: msg }, "Fresh download retry failed");
-
       const { status, error } = toUserError(msg);
       res.status(status).json({ error });
       return;
@@ -547,7 +521,6 @@ router.get("/stream/:token", async (req, res): Promise<void> => {
   }
 
   let stat: fs.Stats;
-
   try {
     stat = fs.statSync(filePath);
   } catch {
@@ -565,10 +538,7 @@ router.get("/stream/:token", async (req, res): Promise<void> => {
 
   const removeFailedDownload = () => {
     pendingDownloads.delete(token);
-
-    try {
-      fs.unlinkSync(filePath);
-    } catch { /* best-effort */ }
+    try { fs.unlinkSync(filePath); } catch { /* best-effort */ }
   };
 
   // Keep the entry until its expiry so browsers can retry the same download
@@ -577,10 +547,8 @@ router.get("/stream/:token", async (req, res): Promise<void> => {
   fileStream.on("error", (err) => {
     req.log?.error({ err }, "stream read error");
     removeFailedDownload();
-
     if (!res.headersSent) res.status(500).end();
   });
-
   res.on("close", () => {
     if (!res.writableFinished) fileStream.destroy();
   });
