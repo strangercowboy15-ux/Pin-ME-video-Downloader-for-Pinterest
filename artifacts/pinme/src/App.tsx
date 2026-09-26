@@ -367,22 +367,23 @@ export default function App({
           </main>
 
           {/* Footer */}
-       <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
-  <button
-    type="button"
-    onClick={onOpenPrivacy}
-    className="hover:text-foreground transition-colors"
-  >
-    Privacy Policy
-  </button>
-  <span className="mx-2">·</span>
-  <button
-    type="button"
-    onClick={onOpenTerms}
-    className="hover:text-foreground transition-colors"
-  >
-    Terms &amp; Conditions
-  </button>
+     <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
+  <div className="flex flex-col items-center gap-2">
+    <button
+      type="button"
+      onClick={onOpenPrivacy}
+      className="hover:text-foreground transition-colors"
+    >
+      Privacy Policy
+    </button>
+    <button
+      type="button"
+      onClick={onOpenTerms}
+      className="hover:text-foreground transition-colors"
+    >
+      Terms &amp; Conditions
+    </button>
+  </div>
 </footer>
 
 {/* How it works */}
