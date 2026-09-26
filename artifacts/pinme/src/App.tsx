@@ -367,7 +367,7 @@ export default function App({
           </main>
 
           {/* Footer */}
-     <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
+ <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
   <div className="flex flex-col items-center gap-2">
     <button
       type="button"
