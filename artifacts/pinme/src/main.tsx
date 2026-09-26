@@ -2,16 +2,24 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import Privacy from './Privacy';
+import Terms from './Terms';
 import './index.css';
-import { trackPageView } from './analytics'; // initialises GA4 as a side-effect
+import { trackPageView } from './analytics';
 import { ThemeProvider, ThemeToggle } from './theme';
 
+type View = 'home' | 'privacy' | 'terms';
+
+function getViewFromPath(): View {
+  const path = window.location.pathname;
+  if (path === '/privacy') return 'privacy';
+  if (path === '/terms') return 'terms';
+  return 'home';
+}
+
 function Root() {
-  const [view, setView] = React.useState<'home' | 'privacy'>(
-    () => window.location.pathname === '/privacy' ? 'privacy' : 'home',
-  );
+  const [view, setView] = React.useState<View>(getViewFromPath);
   const [showThemeToggle, setShowThemeToggle] = React.useState(
-    () => window.location.pathname === '/privacy',
+    () => window.location.pathname === '/privacy' || window.location.pathname === '/terms',
   );
 
   const handleSplashComplete = React.useCallback(() => {
@@ -19,20 +27,21 @@ function Root() {
   }, []);
 
   React.useEffect(() => {
-  trackPageView(view === 'privacy' ? '/privacy' : '/');
+    const pathMap: Record<View, string> = {
+      home: '/',
+      privacy: '/privacy',
+      terms: '/terms',
+    };
+    trackPageView(pathMap[view]);
 
-  // Update URL to match the current view
-  const path = view === 'privacy' ? '/privacy' : '/';
-  if (window.location.pathname !== path) {
-    window.history.replaceState(null, '', path);
-  }
+    const path = pathMap[view];
+    if (window.location.pathname !== path) {
+      window.history.replaceState(null, '', path);
+    }
 
-  // Scroll to top whenever the view changes
-  window.scrollTo(0, 0);
-}, [view]);
+    window.scrollTo(0, 0);
+  }, [view]);
 
-  // Keep both views mounted so switching back to the home view does not
-  // remount App and replay its splash screen.
   return (
     <>
       {showThemeToggle && (
@@ -42,17 +51,31 @@ function Root() {
           </div>
         </div>
       )}
+
       <div className={view === 'home' ? 'block' : 'hidden'}>
         <App
           onOpenPrivacy={() => setView('privacy')}
+          onOpenTerms={() => setView('terms')}
           onSplashComplete={handleSplashComplete}
         />
       </div>
+
       <div className={view === 'privacy' ? 'block' : 'hidden'}>
-      <Privacy onClose={() => {
-  window.history.replaceState(null, '', window.location.pathname);
-  setView('home');
-}} />
+        <Privacy
+          onClose={() => {
+            window.history.replaceState(null, '', window.location.pathname);
+            setView('home');
+          }}
+        />
+      </div>
+
+      <div className={view === 'terms' ? 'block' : 'hidden'}>
+        <Terms
+          onClose={() => {
+            window.history.replaceState(null, '', window.location.pathname);
+            setView('home');
+          }}
+        />
       </div>
     </>
   );
