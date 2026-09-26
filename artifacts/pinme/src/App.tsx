@@ -146,9 +146,11 @@ async function* readSSE(response: Response): AsyncGenerator<SSEEvent> {
 
 export default function App({
   onOpenPrivacy,
+  onOpenTerms,
   onSplashComplete,
 }: {
   onOpenPrivacy: () => void;
+  onOpenTerms: () => void;
   onSplashComplete?: () => void;
 }) {
   const serverReady = useServerReady();
@@ -365,15 +367,23 @@ export default function App({
           </main>
 
           {/* Footer */}
-          <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
-            <button
-              type="button"
-              onClick={onOpenPrivacy}
-              className="hover:text-foreground transition-colors"
-            >
-              Privacy Policy
-            </button>
-          </footer>
+       <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
+  <button
+    type="button"
+    onClick={onOpenPrivacy}
+    className="hover:text-foreground transition-colors"
+  >
+    Privacy Policy
+  </button>
+  <span className="mx-2">·</span>
+  <button
+    type="button"
+    onClick={onOpenTerms}
+    className="hover:text-foreground transition-colors"
+  >
+    Terms &amp; Conditions
+  </button>
+</footer>
 
 {/* How it works */}
 <section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
