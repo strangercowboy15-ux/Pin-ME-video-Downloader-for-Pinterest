@@ -9,6 +9,7 @@ import archiver from "archiver";
 const router = Router();
 
 const DOWNLOAD_TTL_MS = 30 * 60 * 1000;
+
 const bundledYtDlpPath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../vendor/yt-dlp",
@@ -25,7 +26,11 @@ type DownloadTokenPayload = {
 // In-memory store: token → { filePath, filename, expiresAt }
 const pendingDownloads = new Map<
   string,
-  { filePath: string; filename: string; expiresAt: number }
+  {
+    filePath: string;
+    filename: string;
+    expiresAt: number;
+  }
 >();
 
 // Clean up expired entries every 2 minutes
@@ -196,6 +201,7 @@ function runYtDlp(
       const timeout =
         setTimeout(() => {
           proc.kill("SIGKILL");
+
           reject(
             new Error("TIMEOUT"),
           );
@@ -224,9 +230,7 @@ function runYtDlp(
             stderrBuf += chunk;
 
             const lines =
-              stderrBuf.split(
-                "\n",
-              );
+              stderrBuf.split("\n");
 
             stderrBuf =
               lines.pop() ?? "";
@@ -375,8 +379,7 @@ async function getPinMeta(
 
       if (
         parsed &&
-        typeof parsed ===
-          "object"
+        typeof parsed === "object"
       ) {
         info = parsed;
         break;
@@ -419,35 +422,45 @@ async function getPinMeta(
     "gif",
   ].includes(ext);
 
-  // Debug info
   console.log(
     "=== getPinMeta DEBUG ===",
   );
-  console.log("ext:", ext);
+
+  console.log(
+    "ext:",
+    ext,
+  );
+
   console.log(
     "isImage:",
     isImage,
   );
+
   console.log(
     "hasVideoFormats:",
     hasVideoFormats,
   );
+
   console.log(
     "info.url:",
     info.url,
   );
+
   console.log(
     "info.thumbnail:",
     info.thumbnail,
   );
+
   console.log(
     "info.ext:",
     info.ext,
   );
+
   console.log(
     "formats count:",
     formats.length,
   );
+
   console.log(
     "=== END getPinMeta DEBUG ===",
   );
@@ -542,6 +555,7 @@ function runGalleryDl(
       const timeout =
         setTimeout(() => {
           proc.kill("SIGKILL");
+
           reject(
             new Error("TIMEOUT"),
           );
@@ -570,9 +584,7 @@ function runGalleryDl(
             stderrBuf += chunk;
 
             const lines =
-              stderrBuf.split(
-                "\n",
-              );
+              stderrBuf.split("\n");
 
             stderrBuf =
               lines.pop() ?? "";
@@ -622,7 +634,58 @@ function runGalleryDl(
   );
 }
 
-async function downloadImage(
+// Find every image recursively.
+// This is outside the downloader so both
+// image and carousel logic can reuse it.
+function findAllImages(
+  dir: string,
+): string[] {
+  const results: string[] = [];
+
+  if (!fs.existsSync(dir)) {
+    return results;
+  }
+
+  const entries =
+    fs.readdirSync(
+      dir,
+      {
+        withFileTypes: true,
+      },
+    );
+
+  for (const entry of entries) {
+    const fullPath =
+      path.join(
+        dir,
+        entry.name,
+      );
+
+    if (entry.isFile()) {
+      if (
+        /\.(jpg|jpeg|png|webp|gif)$/i.test(
+          entry.name,
+        )
+      ) {
+        results.push(
+          fullPath,
+        );
+      }
+    } else if (
+      entry.isDirectory()
+    ) {
+      results.push(
+        ...findAllImages(
+          fullPath,
+        ),
+      );
+    }
+  }
+
+  return results;
+}
+
+async function downloadImageOrCarousel(
   url: string,
   pinId: string,
   onStage?: (
@@ -631,6 +694,7 @@ async function downloadImage(
   imageUrl?: string | null,
 ): Promise<{
   filePath: string;
+  mediaType: "image" | "carousel";
 }> {
   const outputDir =
     `/tmp/pinme-img-${pinId}`;
@@ -646,15 +710,132 @@ async function downloadImage(
     "Downloading image...",
   );
 
-  // Direct image URL fetch
-  if (imageUrl) {
+  // First try gallery-dl.
+  // It handles both single images
+  // and Pinterest carousels.
+  try {
     console.log(
-      "=== Direct image fetch ===",
+      "=== gallery-dl image/carousel ===",
     );
 
+    await runGalleryDl([
+      "-d",
+      outputDir,
+      "--no-part",
+      url,
+    ]);
+
+    const images =
+      findAllImages(
+        outputDir,
+      );
+
     console.log(
-      "imageUrl:",
-      imageUrl,
+      `gallery-dl found ${images.length} image(s)`,
+    );
+
+    // Multiple images = carousel
+    if (
+      images.length > 1
+    ) {
+      onStage?.(
+        "Packaging carousel...",
+      );
+
+      const zipPath =
+        path.join(
+          outputDir,
+          `pinme-carousel-${pinId}.zip`,
+        );
+
+      await new Promise<void>(
+        (resolve, reject) => {
+          const output =
+            fs.createWriteStream(
+              zipPath,
+            );
+
+          const archive =
+            archiver("zip", {
+              zlib: {
+                level: 9,
+              },
+            });
+
+          output.on(
+            "close",
+            () => resolve(),
+          );
+
+          output.on(
+            "error",
+            (err) => reject(err),
+          );
+
+          archive.on(
+            "error",
+            (err) => reject(err),
+          );
+
+          archive.pipe(
+            output,
+          );
+
+          images.forEach(
+            (
+              imgPath,
+              index,
+            ) => {
+              const ext =
+                path.extname(
+                  imgPath,
+                );
+
+              archive.file(
+                imgPath,
+                {
+                  name:
+                    `image-${String(
+                      index + 1,
+                    ).padStart(
+                      2,
+                      "0",
+                    )}${ext}`,
+                },
+              );
+            },
+          );
+
+          archive.finalize();
+        },
+      );
+
+      return {
+        filePath: zipPath,
+        mediaType: "carousel",
+      };
+    }
+
+    // Exactly one image
+    if (
+      images.length === 1
+    ) {
+      return {
+        filePath: images[0],
+        mediaType: "image",
+      };
+    }
+  } catch (err) {
+    console.log(
+      "gallery-dl image/carousel failed:",
+      err,
+    );
+  }
+
+  // Fallback: direct image URL
+  if (imageUrl) {
+    console.log(
+      "=== Direct image fetch fallback ===",
     );
 
     try {
@@ -674,7 +855,7 @@ async function downloadImage(
 
         const ext =
           extMatch
-            ? extMatch[1]
+            ? extMatch[1].toLowerCase()
             : "jpg";
 
         const filePath =
@@ -695,6 +876,7 @@ async function downloadImage(
 
         return {
           filePath,
+          mediaType: "image",
         };
       }
     } catch (err) {
@@ -705,90 +887,9 @@ async function downloadImage(
     }
   }
 
-  // Fallback: gallery-dl
-  console.log(
-    "=== gallery-dl fallback ===",
+  throw new Error(
+    "NO_FILE: no image found for this pin",
   );
-
-  const result =
-    await runGalleryDl([
-      "-d",
-      outputDir,
-      "--no-part",
-      url,
-    ]);
-
-  console.log(
-    "stdout:",
-    result.stdout,
-  );
-
-  console.log(
-    "stderr:",
-    result.stderr,
-  );
-
-  function findImageFile(
-    dir: string,
-  ): string | null {
-    const entries =
-      fs.readdirSync(
-        dir,
-        {
-          withFileTypes: true,
-        },
-      );
-
-    for (const entry of entries) {
-      const fullPath =
-        path.join(
-          dir,
-          entry.name,
-        );
-
-      if (
-        entry.isFile() &&
-        /\.(jpg|jpeg|png|webp|gif)$/i.test(
-          entry.name,
-        )
-      ) {
-        return fullPath;
-      }
-
-      if (entry.isDirectory()) {
-        const found =
-          findImageFile(
-            fullPath,
-          );
-
-        if (found) {
-          return found;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  const imgFile =
-    findImageFile(
-      outputDir,
-    );
-
-  console.log(
-    "found image:",
-    imgFile,
-  );
-
-  if (!imgFile) {
-    throw new Error(
-      `NO_FILE: no image in ${outputDir}`,
-    );
-  }
-
-  return {
-    filePath: imgFile,
-  };
 }
 
 // onStage is called whenever
@@ -914,187 +1015,6 @@ async function downloadVideo(
   throw new Error(
     "NO_FILE: output file not found after yt-dlp succeeded",
   );
-}
-
-// Download all images from a Pinterest
-// carousel and bundle them into a ZIP.
-async function downloadCarousel(
-  url: string,
-  pinId: string,
-  onStage?: (
-    label: string,
-  ) => void,
-): Promise<{
-  filePath: string;
-}> {
-  const outputDir =
-    `/tmp/pinme-carousel-${pinId}`;
-
-  fs.mkdirSync(
-    outputDir,
-    {
-      recursive: true,
-    },
-  );
-
-  onStage?.(
-    "Downloading carousel images...",
-  );
-
-  try {
-    await runGalleryDl([
-      "-d",
-      outputDir,
-      "--no-part",
-      url,
-    ]);
-  } catch (err) {
-    console.log(
-      "gallery-dl carousel failed:",
-      err,
-    );
-  }
-
-  function findAllImages(
-    dir: string,
-  ): string[] {
-    const results: string[] =
-      [];
-
-    const entries =
-      fs.readdirSync(
-        dir,
-        {
-          withFileTypes: true,
-        },
-      );
-
-    for (const entry of entries) {
-      const fullPath =
-        path.join(
-          dir,
-          entry.name,
-        );
-
-      if (
-        entry.isFile() &&
-        /\.(jpg|jpeg|png|webp|gif)$/i.test(
-          entry.name,
-        )
-      ) {
-        results.push(
-          fullPath,
-        );
-      } else if (
-        entry.isDirectory()
-      ) {
-        results.push(
-          ...findAllImages(
-            fullPath,
-          ),
-        );
-      }
-    }
-
-    return results;
-  }
-
-  const images =
-    findAllImages(
-      outputDir,
-    );
-
-  console.log(
-    `Carousel: found ${images.length} images`,
-  );
-
-  if (
-    images.length === 0
-  ) {
-    throw new Error(
-      "NO_FILE: no images in carousel",
-    );
-  }
-
-  if (
-    images.length === 1
-  ) {
-    return {
-      filePath:
-        images[0],
-    };
-  }
-
-  onStage?.(
-    "Packaging carousel...",
-  );
-
-  const zipPath =
-    path.join(
-      outputDir,
-      `pinme-carousel-${pinId}.zip`,
-    );
-
-  await new Promise<void>(
-    (resolve, reject) => {
-      const output =
-        fs.createWriteStream(
-          zipPath,
-        );
-
-      const archive =
-        archiver("zip", {
-          zlib: {
-            level: 9,
-          },
-        });
-
-      output.on(
-        "close",
-        () => resolve(),
-      );
-
-      archive.on(
-        "error",
-        (err) => reject(err),
-      );
-
-      archive.pipe(
-        output,
-      );
-
-      images.forEach(
-        (
-          imgPath,
-          index,
-        ) => {
-          const ext =
-            path.extname(
-              imgPath,
-            );
-
-          archive.file(
-            imgPath,
-            {
-              name:
-                `image-${String(
-                  index + 1,
-                ).padStart(
-                  2,
-                  "0",
-                )}${ext}`,
-            },
-          );
-        },
-      );
-
-      archive.finalize();
-    },
-  );
-
-  return {
-    filePath: zipPath,
-  };
 }
 
 function buildFilename(
@@ -1319,33 +1239,17 @@ router.post(
       // Stage 2 — download
       let filePath: string;
 
-      if (
-        meta.isCarousel
-      ) {
-        send({
-          type: "stage",
-          label:
-            "Downloading carousel...",
-        });
+      let mediaType:
+        | "video"
+        | "image"
+        | "carousel";
 
-        const carousel =
-          await downloadCarousel(
-            trimmed,
-            meta.id,
-            (label) =>
-              send({
-                type: "stage",
-                label,
-              }),
-          );
-
-        filePath =
-          carousel.filePath;
-      } else if (
-        meta.isImage
-      ) {
-        const img =
-          await downloadImage(
+      if (meta.isImage) {
+        // Images and carousels both come through here.
+        // gallery-dl tells us whether there are
+        // one or multiple images.
+        const result =
+          await downloadImageOrCarousel(
             trimmed,
             meta.id,
             (label) =>
@@ -1357,7 +1261,10 @@ router.post(
           );
 
         filePath =
-          img.filePath;
+          result.filePath;
+
+        mediaType =
+          result.mediaType;
       } else {
         send({
           type: "stage",
@@ -1378,6 +1285,9 @@ router.post(
 
         filePath =
           vid.filePath;
+
+        mediaType =
+          "video";
       }
 
       // Stage 4 — build token
@@ -1403,12 +1313,7 @@ router.post(
           pinId: meta.id,
           filename,
           expiresAt,
-          mediaType:
-            meta.isCarousel
-              ? "carousel"
-              : meta.isImage
-                ? "image"
-                : "video",
+          mediaType,
         });
 
       pendingDownloads.set(
@@ -1489,6 +1394,7 @@ router.get(
       );
 
     let filePath: string;
+
     let filename =
       payload.filename;
 
@@ -1519,7 +1425,7 @@ router.get(
           "carousel"
         ) {
           const carousel =
-            await downloadCarousel(
+            await downloadImageOrCarousel(
               payload.url,
               retryPinId,
             );
@@ -1537,7 +1443,7 @@ router.get(
           "image"
         ) {
           const image =
-            await downloadImage(
+            await downloadImageOrCarousel(
               payload.url,
               retryPinId,
             );
