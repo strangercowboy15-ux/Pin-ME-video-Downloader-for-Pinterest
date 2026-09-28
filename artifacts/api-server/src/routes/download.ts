@@ -322,8 +322,6 @@ async function getPinMeta(
         "not a video",
       )
     ) {
-      // yt-dlp doesn't handle this URL —
-      // likely an image pin.
       return {
         id: randomBytes(
           4,
@@ -635,8 +633,6 @@ function runGalleryDl(
 }
 
 // Find every image recursively.
-// This is outside the downloader so both
-// image and carousel logic can reuse it.
 function findAllImages(
   dir: string,
 ): string[] {
@@ -685,6 +681,9 @@ function findAllImages(
   return results;
 }
 
+// Download image or carousel.
+// gallery-dl tells us if there are
+// multiple images.
 async function downloadImageOrCarousel(
   url: string,
   pinId: string,
@@ -695,6 +694,7 @@ async function downloadImageOrCarousel(
 ): Promise<{
   filePath: string;
   mediaType: "image" | "carousel";
+  imageCount: number;
 }> {
   const outputDir =
     `/tmp/pinme-img-${pinId}`;
@@ -813,6 +813,7 @@ async function downloadImageOrCarousel(
       return {
         filePath: zipPath,
         mediaType: "carousel",
+        imageCount: images.length,
       };
     }
 
@@ -823,6 +824,7 @@ async function downloadImageOrCarousel(
       return {
         filePath: images[0],
         mediaType: "image",
+        imageCount: 1,
       };
     }
   } catch (err) {
@@ -877,6 +879,7 @@ async function downloadImageOrCarousel(
         return {
           filePath,
           mediaType: "image",
+          imageCount: 1,
         };
       }
     } catch (err) {
@@ -1244,10 +1247,16 @@ router.post(
         | "image"
         | "carousel";
 
-      if (meta.isImage) {
-        // Images and carousels both come through here.
-        // gallery-dl tells us whether there are
-        // one or multiple images.
+      let imageCount:
+        | number
+        | undefined;
+
+      // Images and carousels both come through
+      // downloadImageOrCarousel().
+      if (
+        meta.isImage ||
+        meta.isCarousel
+      ) {
         const result =
           await downloadImageOrCarousel(
             trimmed,
@@ -1265,6 +1274,9 @@ router.post(
 
         mediaType =
           result.mediaType;
+
+        imageCount =
+          result.imageCount;
       } else {
         send({
           type: "stage",
@@ -1332,6 +1344,8 @@ router.post(
         title:
           meta.title ??
           null,
+        mediaType,
+        imageCount,
       });
     } catch (err) {
       const msg =
