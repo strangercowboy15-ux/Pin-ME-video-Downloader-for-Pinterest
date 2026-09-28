@@ -18,13 +18,24 @@ function useServerReady() {
         const timeout = setTimeout(() => controller.abort(), 6000);
         const res = await fetch('/api/healthz', { signal: controller.signal });
         clearTimeout(timeout);
-        if (res.ok && !cancelled) { setReady('ready'); return; }
-      } catch { /* server still waking */ }
+
+        if (res.ok && !cancelled) {
+          setReady('ready');
+          return;
+        }
+      } catch {
+        /* server still waking */
+      }
+
       if (!cancelled) timer = setTimeout(check, 3000);
     };
 
     check();
-    return () => { cancelled = true; clearTimeout(timer); };
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, []);
 
   return ready;
@@ -50,6 +61,7 @@ function SplashScreen() {
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.45, ease: 'easeOut' }}
       />
+
       <motion.p
         className="text-sm text-muted-foreground tracking-wide"
         initial={{ opacity: 0, y: 6 }}
@@ -66,22 +78,34 @@ function SplashScreen() {
 
 function WakingScreen() {
   const [dots, setDots] = useState('');
+
   useEffect(() => {
-    const id = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 500);
+    const id = setInterval(() => {
+      setDots(d => (d.length >= 3 ? '' : d + '.'));
+    }, 500);
+
     return () => clearInterval(id);
   }, []);
 
   return (
     <div className="min-h-[100dvh] w-full bg-background text-foreground flex flex-col items-center justify-center gap-6 font-sans px-6">
-      <img src="/splash-logo.png" alt="pinME Logo" className="h-20 w-20 object-contain rounded-2xl" />
+      <img
+        src="/splash-logo.png"
+        alt="pinME Logo"
+        className="h-20 w-20 object-contain rounded-2xl"
+      />
+
       <div className="text-center space-y-2">
         <p className="text-lg font-semibold text-foreground">
-          Starting server<span className="inline-block w-6 text-left">{dots}</span>
+          Starting server
+          <span className="inline-block w-6 text-left">{dots}</span>
         </p>
+
         <p className="text-sm text-muted-foreground max-w-xs">
           The server is waking up — this usually takes 20–30 seconds. Hang tight!
         </p>
       </div>
+
       <div className="h-6 w-6 rounded-full border-2 border-foreground/10 border-t-primary animate-spin" />
     </div>
   );
@@ -104,6 +128,7 @@ function ProgressLabel({ label }: { label: string }) {
           {label}
         </motion.p>
       </AnimatePresence>
+
       <div className="css-spinner" />
     </div>
   );
@@ -113,7 +138,14 @@ function ProgressLabel({ label }: { label: string }) {
 
 type SSEEvent =
   | { type: 'stage'; label: string }
-  | { type: 'ready'; token: string; filename: string; title: string | null }
+  | {
+      type: 'ready';
+      token: string;
+      filename: string;
+      title: string | null;
+      mediaType?: 'video' | 'image' | 'carousel';
+      imageCount?: number;
+    }
   | { type: 'error'; message: string };
 
 async function* readSSE(response: Response): AsyncGenerator<SSEEvent> {
@@ -124,17 +156,25 @@ async function* readSSE(response: Response): AsyncGenerator<SSEEvent> {
   try {
     while (true) {
       const { done, value } = await reader.read();
+
       if (done) break;
+
       buffer += decoder.decode(value, { stream: true });
+
       // SSE events are delimited by double newlines
       const parts = buffer.split('\n\n');
       buffer = parts.pop() ?? '';
+
       for (const part of parts) {
         const line = part.trim();
+
         if (!line.startsWith('data: ')) continue;
+
         try {
           yield JSON.parse(line.slice(6)) as SSEEvent;
-        } catch { /* malformed event — skip */ }
+        } catch {
+          /* malformed event — skip */
+        }
       }
     }
   } finally {
@@ -155,11 +195,21 @@ export default function App({
 }) {
   const serverReady = useServerReady();
   const season = useSeason();
+
   const [showSplash, setShowSplash] = useState(true);
   const [url, setUrl] = useState('');
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<
+    'idle' | 'loading' | 'success' | 'error'
+  >('idle');
   const [progressLabel, setProgressLabel] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+
+  // ─── Success information ────────────────────────────────────────────────
+  const [successInfo, setSuccessInfo] = useState<{
+    mediaType?: 'video' | 'image' | 'carousel';
+    imageCount?: number;
+  }>({});
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -167,48 +217,74 @@ export default function App({
       setShowSplash(false);
       onSplashComplete?.();
     }, 1800);
+
     return () => clearTimeout(id);
   }, [onSplashComplete]);
 
   const handlePasteClick = async () => {
     try {
       const text = await navigator.clipboard.readText();
-      if (text) { setUrl(text); triggerDownload(text); }
+
+      if (text) {
+        setUrl(text);
+        triggerDownload(text);
+      }
     } catch (err) {
       console.error('Failed to read clipboard', err);
     }
   };
 
-  const handleNativePaste = (_e: React.ClipboardEvent<HTMLInputElement>) => {
+  const handleNativePaste = (
+    _e: React.ClipboardEvent<HTMLInputElement>
+  ) => {
     setTimeout(() => {
       if (inputRef.current) {
         const value = inputRef.current.value.trim();
-        if (value) { setUrl(value); triggerDownload(value); }
+
+        if (value) {
+          setUrl(value);
+          triggerDownload(value);
+        }
       }
     }, 50);
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (url.trim()) triggerDownload(url.trim());
+
+    if (url.trim()) {
+      triggerDownload(url.trim());
+    }
   };
 
   const triggerDownload = async (targetUrl: string) => {
     setStatus('loading');
     setProgressLabel('Fetching video info...');
     setErrorMsg('');
+    setSuccessInfo({});
 
     try {
-      const response = await fetch('https://pinme-api-server.onrender.com/api/get-pin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: targetUrl }),
-      });
+      const response = await fetch(
+        'https://pinme-api-server.onrender.com/api/get-pin',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: targetUrl,
+          }),
+        }
+      );
 
       // Validation errors (400) are returned as JSON before SSE opens
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Something went wrong. Please check your connection and try again.');
+
+        throw new Error(
+          data.error ||
+            'Something went wrong. Please check your connection and try again.'
+        );
       }
 
       let downloadTriggered = false;
@@ -218,16 +294,36 @@ export default function App({
           setProgressLabel(event.label);
         } else if (event.type === 'ready') {
           setProgressLabel('Starting download...');
+
           const a = document.createElement('a');
+
           a.href = `https://pinme-api-server.onrender.com/api/stream/${event.token}`;
-          a.download = event.filename || 'pinterest-video.mp4';
+
+          a.download =
+            event.filename || 'pinterest-video.mp4';
+
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
+
           trackDownload(); // fire GA4 event — silent if blocked or unconfigured
+
           downloadTriggered = true;
+
+          // Store media information for the success message
+          setSuccessInfo({
+            mediaType: event.mediaType,
+            imageCount: event.imageCount,
+          });
+
           setStatus('success');
-          setTimeout(() => { setUrl(''); setStatus('idle'); setProgressLabel(''); }, 3000);
+
+          setTimeout(() => {
+            setUrl('');
+            setStatus('idle');
+            setProgressLabel('');
+            setSuccessInfo({});
+          }, 3000);
         } else if (event.type === 'error') {
           throw new Error(event.message);
         }
@@ -238,7 +334,11 @@ export default function App({
       }
     } catch (err: any) {
       setStatus('error');
-      setErrorMsg(err.message || 'Something went wrong. Please check your connection and try again.');
+
+      setErrorMsg(
+        err.message ||
+          'Something went wrong. Please check your connection and try again.'
+      );
     }
   };
 
@@ -258,8 +358,13 @@ export default function App({
           <SeasonalBackdrop season={season} />
 
           {/* Header */}
-          <header className="sticky top-0 z-50 flex items-center gap-2 p-6 justify-center sm:justify-start bg-background"> 
-            <img src="/header-logo.png" alt="pinME Logo" className="h-10 w-10 object-contain" />
+          <header className="sticky top-0 z-50 flex items-center gap-2 p-6 justify-center sm:justify-start bg-background">
+            <img
+              src="/header-logo.png"
+              alt="pinME Logo"
+              className="h-10 w-10 object-contain"
+            />
+
             <span className="text-2xl font-bold tracking-tight">
               <span className="text-foreground">pin</span>
               <span className="text-primary">ME</span>
@@ -270,11 +375,19 @@ export default function App({
           <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto">
             <div className="w-full space-y-8">
               <div className="text-center space-y-2">
-                <h1 className="text-3xl font-bold tracking-tight">Download any Pinterest video.</h1>
-                <p className="text-muted-foreground text-sm">Fast, free, and directly to your device.</p>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  Download any Pinterest video.
+                </h1>
+
+                <p className="text-muted-foreground text-sm">
+                  Fast, free, and directly to your device.
+                </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="w-full space-y-4">
+              <form
+                onSubmit={handleSubmit}
+                className="w-full space-y-4"
+              >
                 <div className="relative flex items-center">
                   <input
                     ref={inputRef}
@@ -287,6 +400,7 @@ export default function App({
                     disabled={status === 'loading'}
                     data-testid="input-url"
                   />
+
                   <button
                     type="button"
                     onClick={handlePasteClick}
@@ -295,9 +409,34 @@ export default function App({
                     disabled={status === 'loading'}
                     data-testid="button-paste"
                   >
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                      <rect x="5.5" y="1.5" width="12" height="12" rx="2.5" stroke="currentColor" strokeWidth="1.5"/>
-                      <rect x="1.5" y="6.5" width="12" height="12" rx="2.5" stroke="currentColor" strokeWidth="1.5" fill="var(--color-surface, #1e1e1e)"/>
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      aria-hidden="true"
+                    >
+                      <rect
+                        x="5.5"
+                        y="1.5"
+                        width="12"
+                        height="12"
+                        rx="2.5"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+
+                      <rect
+                        x="1.5"
+                        y="6.5"
+                        width="12"
+                        height="12"
+                        rx="2.5"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        fill="var(--color-surface, #1e1e1e)"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -305,9 +444,18 @@ export default function App({
                 <AnimatePresence mode="wait">
                   {status === 'error' && (
                     <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
+                      initial={{
+                        opacity: 0,
+                        y: -10,
+                      }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                      }}
+                      exit={{
+                        opacity: 0,
+                        y: -10,
+                      }}
                       className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm text-center"
                       data-testid="status-error"
                     >
@@ -322,13 +470,32 @@ export default function App({
                     <ProgressLabel label={progressLabel} />
                   ) : status === 'success' ? (
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="w-full py-4 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2"
+                      initial={{
+                        opacity: 0,
+                        scale: 0.9,
+                      }}
+                      animate={{
+                        opacity: 1,
+                        scale: 1,
+                      }}
+                      className="w-full py-4 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2 px-3"
                       data-testid="status-success"
                     >
-                      <span>Downloaded</span>
-                      <span className="text-lg leading-none">✓</span>
+                      <span className="text-sm sm:text-base">
+                        {successInfo.mediaType === 'carousel'
+                          ? `Carousel downloaded as ZIP${
+                              successInfo.imageCount
+                                ? ` (${successInfo.imageCount} images)`
+                                : ''
+                            }`
+                          : successInfo.mediaType === 'image'
+                            ? 'Image downloaded'
+                            : 'Video downloaded'}
+                      </span>
+
+                      <span className="text-lg leading-none">
+                        ✓
+                      </span>
                     </motion.div>
                   ) : (
                     <button
@@ -348,11 +515,14 @@ export default function App({
               </form>
 
               <p className="text-center text-xs text-muted-foreground leading-relaxed px-4">
-                Video will be saved to your device's Downloads folder (and usually appears in your Gallery/Photos app automatically)
+                Video will be saved to your device&apos;s Downloads folder
+                (and usually appears in your Gallery/Photos app
+                automatically)
               </p>
 
               <p className="text-center text-xs text-muted-foreground pt-4">
-                Made for everyone. If you'd like to buy me a coffee, you can{' '}
+                Made for everyone. If you&apos;d like to buy me a coffee,
+                you can{' '}
                 <a
                   href="https://ko-fi.com/pinmeapp"
                   target="_blank"
@@ -367,66 +537,94 @@ export default function App({
           </main>
 
           {/* Footer */}
- <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
-  <div className="flex flex-col items-center gap-2">
-    <button
-      type="button"
-      onClick={onOpenPrivacy}
-      className="hover:text-foreground transition-colors"
-    >
-      Privacy Policy
-    </button>
-    <button
-      type="button"
-      onClick={onOpenTerms}
-      className="hover:text-foreground transition-colors"
-    >
-      Terms &amp; Conditions
-    </button>
-  </div>
-</footer>
+          <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
+            <div className="flex flex-col items-center gap-2">
+              <button
+                type="button"
+                onClick={onOpenPrivacy}
+                className="hover:text-foreground transition-colors"
+              >
+                Privacy Policy
+              </button>
 
-{/* How it works */}
-<section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
-  <h2 className="text-xl font-bold text-center">How it works?</h2>
-  <ol className="space-y-2 text-sm text-muted-foreground">
-    <li className="flex gap-3">
-      <span className="font-bold text-foreground">1.</span>
-      <span>Copy a Pinterest video link 📎</span>
-    </li>
-    <li className="flex gap-3">
-      <span className="font-bold text-foreground">2.</span>
-      <span>Paste it in the box above 📥</span>
-    </li>
-    <li className="flex gap-3">
-      <span className="font-bold text-foreground">3.</span>
-      <span>Click "Download Video" 📹</span>
-    </li>
-    <li className="flex gap-3">
-      <span className="font-bold text-foreground">4.</span>
-      <span>Your video saves to your device 📱</span>
-    </li>
-  </ol>
-</section>
+              <button
+                type="button"
+                onClick={onOpenTerms}
+                className="hover:text-foreground transition-colors"
+              >
+                Terms &amp; Conditions
+              </button>
+            </div>
+          </footer>
 
-{/* FAQ */}
-<section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
-  <h2 className="text-xl font-bold text-center">Frequently Asked Questions<span className="text-primary">❓</span></h2>
-  <div className="space-y-4 text-sm">
-    <div>
-      <h3 className="font-semibold text-foreground">💯 Is Pin ME free?</h3>
-      <p className="text-muted-foreground">Yes, completely free. No account required.</p>
-    </div>
-    <div>
-      <h3 className="font-semibold text-foreground">🗂️ Where do downloads go?</h3>
-      <p className="text-muted-foreground">Your video saves to your device's Downloads folder.</p>
-    </div>
-    <div>
-      <h3 className="font-semibold text-foreground">🔒 Do you store my links?</h3>
-      <p className="text-muted-foreground">No. Links are processed and deleted immediately.</p>
-    </div>
-  </div>
-</section>
+          {/* How it works */}
+          <section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
+            <h2 className="text-xl font-bold text-center">
+              How it works?
+            </h2>
+
+            <ol className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex gap-3">
+                <span className="font-bold text-foreground">1.</span>
+                <span>Copy a Pinterest video link 📎</span>
+              </li>
+
+              <li className="flex gap-3">
+                <span className="font-bold text-foreground">2.</span>
+                <span>Paste it in the box above 📥</span>
+              </li>
+
+              <li className="flex gap-3">
+                <span className="font-bold text-foreground">3.</span>
+                <span>Click &quot;Download Video&quot; 📹</span>
+              </li>
+
+              <li className="flex gap-3">
+                <span className="font-bold text-foreground">4.</span>
+                <span>Your video saves to your device 📱</span>
+              </li>
+            </ol>
+          </section>
+
+          {/* FAQ */}
+          <section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
+            <h2 className="text-xl font-bold text-center">
+              Frequently Asked Questions
+              <span className="text-primary">❓</span>
+            </h2>
+
+            <div className="space-y-4 text-sm">
+              <div>
+                <h3 className="font-semibold text-foreground">
+                  💯 Is Pin ME free?
+                </h3>
+
+                <p className="text-muted-foreground">
+                  Yes, completely free. No account required.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-foreground">
+                  🗂️ Where do downloads go?
+                </h3>
+
+                <p className="text-muted-foreground">
+                  Your video saves to your device&apos;s Downloads folder.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-foreground">
+                  🔒 Do you store my links?
+                </h3>
+
+                <p className="text-muted-foreground">
+                  No. Links are processed and deleted immediately.
+                </p>
+              </div>
+            </div>
+          </section>
 
           {/* Badge-blend gradient */}
           <div
