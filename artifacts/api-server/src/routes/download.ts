@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath, URL } from "url";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import archiver from "archiver";
 
 const router = Router();
 
@@ -175,9 +176,9 @@ interface PinMeta {
   title: string | null;
   hasVideo: boolean;
   isImage?: boolean;
+  isCarousel?: boolean;
   imageUrl?: string | null;
 }
-
 async function getPinMeta(url: string): Promise<PinMeta> {
   let stdout: string;
 
@@ -248,6 +249,16 @@ async function getPinMeta(url: string): Promise<PinMeta> {
   console.log("info.ext:", info.ext);
   console.log("formats count:", formats.length);
   console.log("=== END getPinMeta DEBUG ===");
+// Check if this is a carousel (multiple entries)
+const entries = info.entries as Array<Record<string, unknown>> | undefined;
+if (Array.isArray(entries) && entries.length > 1) {
+  return {
+    id: (info.id as string) || randomBytes(4).toString("hex"),
+    title: (info.title as string) || null,
+    hasVideo: false,
+    isCarousel: true,
+  };
+}
 
   // If no video formats and it's not clearly a video — treat as image
   if (!hasVideoFormats) {
@@ -454,6 +465,74 @@ async function downloadVideo(
   }
 
   throw new Error("NO_FILE: output file not found after yt-dlp succeeded");
+}
+// Download all images from a Pinterest carousel and bundle them into a ZIP.
+async function downloadCarousel(
+  url: string,
+  pinId: string,
+  onStage?: (label: string) => void,
+): Promise<{ filePath: string }> {
+  const outputDir = `/tmp/pinme-carousel-${pinId}`;
+  fs.mkdirSync(outputDir, { recursive: true });
+  onStage?.("Downloading carousel images...");
+
+  try {
+    await runGalleryDl([
+      "-d", outputDir,
+      "--no-part",
+      url,
+    ]);
+  } catch (err) {
+    console.log("gallery-dl carousel failed:", err);
+  }
+
+  function findAllImages(dir: string): string[] {
+    const results: string[] = [];
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isFile() && /\.(jpg|jpeg|png|webp|gif)$/i.test(entry.name)) {
+        results.push(fullPath);
+      } else if (entry.isDirectory()) {
+        results.push(...findAllImages(fullPath));
+      }
+    }
+    return results;
+  }
+
+  const images = findAllImages(outputDir);
+  console.log(`Carousel: found ${images.length} images`);
+
+  if (images.length === 0) {
+    throw new Error("NO_FILE: no images in carousel");
+  }
+
+  if (images.length === 1) {
+    return { filePath: images[0] };
+  }
+
+  onStage?.("Packaging carousel...");
+
+  const zipPath = path.join(outputDir, `pinme-carousel-${pinId}.zip`);
+
+  await new Promise<void>((resolve, reject) => {
+    const output = fs.createWriteStream(zipPath);
+    const archive = archiver("zip", { zlib: { level: 9 } });
+
+    output.on("close", () => resolve());
+    archive.on("error", (err) => reject(err));
+
+    archive.pipe(output);
+
+    images.forEach((imgPath, index) => {
+      const ext = path.extname(imgPath);
+      archive.file(imgPath, { name: `image-${String(index + 1).padStart(2, "0")}${ext}` });
+    });
+
+    archive.finalize();
+  });
+
+  return { filePath: zipPath };
 }
 
 function buildFilename(title: string | null, filePath: string): string {
@@ -663,8 +742,21 @@ router.get("/stream/:token", async (req, res): Promise<void> => {
 
   const entry = pendingDownloads.get(token);
   let filePath: string;
-  let filename = payload.filename;
 
+if (meta.isCarousel) {
+  send({
+    type: "stage",
+    label: "Downloading carousel...",
+  });
+
+  const carousel = await downloadCarousel(
+    trimmed,
+    meta.id,
+    (label) => send({ type: "stage", label }),
+  );
+
+  filePath = carousel.filePath;
+} else if (meta.isImage) {
   if (entry && fs.existsSync(entry.filePath)) {
     filePath = entry.filePath;
     filename = entry.filename;
