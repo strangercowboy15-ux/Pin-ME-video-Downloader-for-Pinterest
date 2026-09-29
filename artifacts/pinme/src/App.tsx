@@ -539,7 +539,6 @@ export default function App({
 
       for await (const event of readSSE(response)) {
         if (event.type === 'stage') {
-          // Backend decides the correct media-specific message.
           setProgressLabel(event.label);
         } else if (event.type === 'ready') {
           setProgressLabel(
@@ -620,21 +619,28 @@ export default function App({
             />
 
             {/* Header */}
-            <header className="sticky top-0 z-50 flex items-center gap-2 p-6 justify-center sm:justify-start bg-background">
-              <img
-                src="/header-logo.png"
-                alt="pinME Logo"
-                className="h-10 w-10 object-contain"
-              />
+            <header className="sticky top-0 z-50 flex flex-col items-center gap-1 p-6 sm:items-start bg-background">
+              <div className="flex items-center gap-2">
+                <img
+                  src="/header-logo.png"
+                  alt="pinME Logo"
+                  className="h-10 w-10 object-contain"
+                />
 
-              <span className="text-2xl font-bold tracking-tight">
-                <span className="text-foreground">
-                  pin
-                </span>
+                <span className="text-2xl font-bold tracking-tight">
+                  <span className="text-foreground">
+                    pin
+                  </span>
 
-                <span className="text-primary">
-                  ME
+                  <span className="text-primary">
+                    ME
+                  </span>
                 </span>
+              </div>
+
+              {/* Version */}
+              <span className="text-[10px] text-muted-foreground tracking-wider">
+                v2.1.0
               </span>
             </header>
 
