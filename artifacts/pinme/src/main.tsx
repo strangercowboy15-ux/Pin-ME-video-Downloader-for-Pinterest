@@ -3,23 +3,31 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import Privacy from './Privacy';
 import Terms from './Terms';
+import HowItWorks from './HowItWorks';
 import './index.css';
 import { trackPageView } from './analytics';
 import { ThemeProvider, ThemeToggle } from './theme';
 
-type View = 'home' | 'privacy' | 'terms';
+type View = 'home' | 'privacy' | 'terms' | 'how-it-works';
 
 function getViewFromPath(): View {
   const path = window.location.pathname;
+
   if (path === '/privacy') return 'privacy';
   if (path === '/terms') return 'terms';
+  if (path === '/how-it-works') return 'how-it-works';
+
   return 'home';
 }
 
 function Root() {
   const [view, setView] = React.useState<View>(getViewFromPath);
+
   const [showThemeToggle, setShowThemeToggle] = React.useState(
-    () => window.location.pathname === '/privacy' || window.location.pathname === '/terms',
+    () =>
+      window.location.pathname === '/privacy' ||
+      window.location.pathname === '/terms' ||
+      window.location.pathname === '/how-it-works',
   );
 
   const handleSplashComplete = React.useCallback(() => {
@@ -31,10 +39,13 @@ function Root() {
       home: '/',
       privacy: '/privacy',
       terms: '/terms',
+      'how-it-works': '/how-it-works',
     };
+
     trackPageView(pathMap[view]);
 
     const path = pathMap[view];
+
     if (window.location.pathname !== path) {
       window.history.replaceState(null, '', path);
     }
@@ -56,6 +67,7 @@ function Root() {
         <App
           onOpenPrivacy={() => setView('privacy')}
           onOpenTerms={() => setView('terms')}
+          onOpenHowItWorks={() => setView('how-it-works')}
           onSplashComplete={handleSplashComplete}
         />
       </div>
@@ -71,6 +83,15 @@ function Root() {
 
       <div className={view === 'terms' ? 'block' : 'hidden'}>
         <Terms
+          onClose={() => {
+            window.history.replaceState(null, '', window.location.pathname);
+            setView('home');
+          }}
+        />
+      </div>
+
+      <div className={view === 'how-it-works' ? 'block' : 'hidden'}>
+        <HowItWorks
           onClose={() => {
             window.history.replaceState(null, '', window.location.pathname);
             setView('home');
