@@ -165,186 +165,118 @@ function ProgressLabel({ label }: { label: string }) {
   );
 }
 
-// ─── Download travel animation ───────────────────────────────────────────────
+// ─── Cute coffee success animation ───────────────────────────────────────────
+//
+// After every successful download:
+// ☕︎ → small bounce → steam → moves toward the screen → zoom/fade out
+//
+// Used for:
+// - Video
+// - Image
+// - GIF
+// - Carousel
+//
+// ────────────────────────────────────────────────────────────────────────────
 
-function DownloadTravelAnimation() {
+function CoffeeDownloadAnimation() {
   return (
     <div
-      className="relative w-[140px] h-[48px] mx-auto pointer-events-none"
+      className="relative w-[110px] h-[74px] mx-auto pointer-events-none overflow-visible"
       aria-hidden="true"
     >
-      {/* Motion trail */}
+      {/* Coffee cup */}
       <motion.div
         initial={{
-          x: -42,
-          opacity: 0,
-          scaleX: 0.2,
-        }}
-        animate={{
-          x: 8,
-          opacity: [0, 0.45, 0],
-          scaleX: [0.2, 1, 0.5],
-        }}
-        transition={{
-          duration: 0.55,
-          ease: 'easeOut',
-        }}
-        className="absolute left-1/2 top-[24px] w-12 h-[2px] -translate-x-1/2 rounded-full bg-primary/50 origin-left"
-      />
-
-      {/* File */}
-      <motion.div
-        initial={{
-          x: -48,
-          y: 0,
-          scale: 0.65,
+          y: 8,
+          scale: 0.82,
           opacity: 0,
         }}
         animate={{
-          x: 25,
-          y: -1,
-          scale: [0.65, 1, 0.85],
-          opacity: [0, 1, 1],
+          y: [8, -5, 0, -2, 0],
+          scale: [0.82, 1, 1, 1.08, 3.8],
+          opacity: [0, 1, 1, 1, 0],
         }}
         transition={{
-          duration: 0.62,
-          ease: 'easeOut',
+          duration: 1.55,
+          times: [0, 0.18, 0.38, 0.58, 1],
+          ease: 'easeInOut',
         }}
-        className="absolute left-1/2 top-[8px] z-20"
+        className="absolute inset-0 flex items-center justify-center text-4xl leading-none origin-center"
       >
-        <div className="relative w-7 h-8 rounded-md bg-background border border-primary/70 shadow-md flex items-center justify-center">
-          {/* Fold */}
-          <div className="absolute top-0.5 right-0.5 w-2 h-2 border-l border-b border-primary/60 rounded-bl-sm" />
-
-          {/* File lines */}
-          <div className="flex flex-col gap-1">
-            <div className="w-3 h-[2px] rounded-full bg-primary/80" />
-            <div className="w-3 h-[2px] rounded-full bg-primary/40" />
-          </div>
-        </div>
+        ☕︎
       </motion.div>
 
-      {/* Phone */}
-      <motion.div
+      {/* Steam 1 */}
+      <motion.span
         initial={{
-          x: 42,
-          scale: 0.8,
           opacity: 0,
+          y: 8,
+          x: -8,
+          scale: 0.7,
         }}
         animate={{
-          x: 0,
-          scale: 1,
-          opacity: 1,
+          opacity: [0, 0.5, 0.25, 0],
+          y: [8, 2, -5, -14],
+          x: [-8, -10, -6, -9],
+          scale: [0.7, 0.9, 1, 1.1],
         }}
         transition={{
-          duration: 0.35,
+          duration: 1.25,
           delay: 0.12,
           ease: 'easeOut',
         }}
-        className="absolute left-1/2 top-[2px] z-10"
+        className="absolute left-[38px] top-[7px] text-[11px] leading-none"
       >
-        <div className="relative w-9 h-12 rounded-[9px] border-2 border-foreground/60 bg-background shadow-md flex items-center justify-center">
-          {/* Screen */}
-          <div className="w-5 h-7 rounded-sm border border-border bg-primary/5" />
+        ~
+      </motion.span>
 
-          {/* Download arrow */}
-          <motion.div
-            initial={{
-              y: -4,
-              opacity: 0,
-            }}
-            animate={{
-              y: [-4, 3, 0],
-              opacity: [0, 1, 1],
-            }}
-            transition={{
-              duration: 0.48,
-              delay: 0.48,
-              ease: 'easeOut',
-            }}
-            className="absolute"
-          >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-primary"
-            >
-              <path d="M12 3v12" />
-              <path d="m7 10 5 5 5-5" />
-              <path d="M5 21h14" />
-            </svg>
-          </motion.div>
-        </div>
-      </motion.div>
-
-      {/* Impact ring */}
-      <motion.div
-        initial={{
-          x: 32,
-          scale: 0.3,
-          opacity: 0,
-        }}
-        animate={{
-          x: 32,
-          scale: [0.3, 1.15],
-          opacity: [0, 0.45, 0],
-        }}
-        transition={{
-          duration: 0.42,
-          delay: 0.58,
-          ease: 'easeOut',
-        }}
-        className="absolute left-1/2 top-[10px] w-9 h-9 rounded-full border border-primary/60"
-      />
-
-      {/* Tiny particles */}
+      {/* Steam 2 */}
       <motion.span
         initial={{
-          x: 26,
-          y: 22,
           opacity: 0,
-          scale: 0,
+          y: 8,
+          x: 2,
+          scale: 0.7,
         }}
         animate={{
-          x: [26, 18, 34],
-          y: [22, 12, 30],
-          opacity: [0, 0.7, 0],
-          scale: [0, 1, 0],
+          opacity: [0, 0.45, 0.2, 0],
+          y: [8, 1, -7, -16],
+          x: [2, 5, 1, 4],
+          scale: [0.7, 0.9, 1, 1.15],
         }}
         transition={{
-          duration: 0.5,
-          delay: 0.6,
+          duration: 1.35,
+          delay: 0.28,
           ease: 'easeOut',
         }}
-        className="absolute left-1/2 top-0 w-1.5 h-1.5 rounded-full bg-primary"
-      />
+        className="absolute left-[53px] top-[4px] text-[10px] leading-none"
+      >
+        ~
+      </motion.span>
 
+      {/* Steam 3 */}
       <motion.span
         initial={{
-          x: 31,
-          y: 24,
           opacity: 0,
-          scale: 0,
+          y: 7,
+          x: 10,
+          scale: 0.65,
         }}
         animate={{
-          x: [31, 40, 24],
-          y: [24, 17, 34],
-          opacity: [0, 0.55, 0],
-          scale: [0, 0.8, 0],
+          opacity: [0, 0.4, 0.18, 0],
+          y: [7, 0, -6, -15],
+          x: [10, 13, 9, 12],
+          scale: [0.65, 0.85, 1, 1.1],
         }}
         transition={{
-          duration: 0.48,
-          delay: 0.64,
+          duration: 1.2,
+          delay: 0.42,
           ease: 'easeOut',
         }}
-        className="absolute left-1/2 top-0 w-1 h-1 rounded-full bg-primary/70"
-      />
+        className="absolute left-[62px] top-[7px] text-[9px] leading-none"
+      >
+        ~
+      </motion.span>
     </div>
   );
 }
@@ -451,12 +383,15 @@ function CoffeeButton() {
             opacity: 0;
             transform: translateY(5px);
           }
+
           25% {
             opacity: 0.45;
           }
+
           70% {
             opacity: 0.2;
           }
+
           100% {
             opacity: 0;
             transform: translateY(-9px);
@@ -810,7 +745,7 @@ export default function App({
                   </AnimatePresence>
 
                   {/* Download / Success area */}
-                  <div className="pt-2 min-h-[72px] flex justify-center items-center w-full">
+                  <div className="pt-2 min-h-[92px] flex justify-center items-center w-full">
                     <AnimatePresence mode="wait">
                       {status === 'loading' ? (
                         <motion.div
@@ -844,9 +779,9 @@ export default function App({
                           className="w-full flex flex-col items-center"
                           data-testid="status-success"
                         >
-                          {/* Animation ABOVE the success box */}
-                          <div className="h-[48px] w-full flex items-center justify-center overflow-visible">
-                            <DownloadTravelAnimation />
+                          {/* Cute coffee animation */}
+                          <div className="h-[74px] w-full flex items-center justify-center overflow-visible">
+                            <CoffeeDownloadAnimation />
                           </div>
 
                           {/* Success message */}
@@ -860,7 +795,7 @@ export default function App({
                               y: 0,
                             }}
                             transition={{
-                              delay: 0.62,
+                              delay: 1.05,
                               duration: 0.22,
                             }}
                             className="w-full py-4 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2 px-3"
