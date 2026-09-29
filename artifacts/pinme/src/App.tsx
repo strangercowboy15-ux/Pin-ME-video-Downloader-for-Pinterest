@@ -68,7 +68,7 @@ function SplashScreen() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.2 }}
       >
-        pinME — Download any Pinterest video
+        pinME — Download Pinterest videos, images, GIFs &amp; carousels
       </motion.p>
     </motion.div>
   );
@@ -186,10 +186,12 @@ async function* readSSE(response: Response): AsyncGenerator<SSEEvent> {
 export default function App({
   onOpenPrivacy,
   onOpenTerms,
+  onOpenHowItWorks,
   onSplashComplete,
 }: {
   onOpenPrivacy: () => void;
   onOpenTerms: () => void;
+  onOpenHowItWorks: () => void;
   onSplashComplete?: () => void;
 }) {
   const serverReady = useServerReady();
@@ -517,6 +519,14 @@ export default function App({
             <div className="flex flex-col items-center gap-2">
               <button
                 type="button"
+                onClick={onOpenHowItWorks}
+                className="hover:text-foreground transition-colors"
+              >
+                How It Works &amp; FAQ
+              </button>
+
+              <button
+                type="button"
                 onClick={onOpenPrivacy}
                 className="hover:text-foreground transition-colors"
               >
@@ -532,75 +542,6 @@ export default function App({
               </button>
             </div>
           </footer>
-
-          {/* How it works */}
-          <section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
-            <h2 className="text-xl font-bold text-center">
-              How it works?
-            </h2>
-
-            <ol className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex gap-3">
-                <span className="font-bold text-foreground">1.</span>
-                <span>Copy a Pinterest video link 📎</span>
-              </li>
-
-              <li className="flex gap-3">
-                <span className="font-bold text-foreground">2.</span>
-                <span>Paste it in the box above 📥</span>
-              </li>
-
-              <li className="flex gap-3">
-                <span className="font-bold text-foreground">3.</span>
-                <span>Click &quot;Download Now&quot; 📹</span>
-              </li>
-
-              <li className="flex gap-3">
-                <span className="font-bold text-foreground">4.</span>
-                <span>Your video saves to your device 📱</span>
-              </li>
-            </ol>
-          </section>
-
-          {/* FAQ */}
-          <section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
-            <h2 className="text-xl font-bold text-center">
-              Frequently Asked Questions
-              <span className="text-primary">❓</span>
-            </h2>
-
-            <div className="space-y-4 text-sm">
-              <div>
-                <h3 className="font-semibold text-foreground">
-                  💯 Is Pin ME free?
-                </h3>
-
-                <p className="text-muted-foreground">
-                  Yes, completely free. No account required.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-foreground">
-                  🗂️ Where do downloads go?
-                </h3>
-
-                <p className="text-muted-foreground">
-                  Your video saves to your device&apos;s Downloads folder.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-foreground">
-                  🔒 Do you store my links?
-                </h3>
-
-                <p className="text-muted-foreground">
-                  No. Links are processed and deleted immediately.
-                </p>
-              </div>
-            </div>
-          </section>
 
           {/* Badge-blend gradient */}
           <div
