@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath, URL } from "url";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import archiver from "archiver";
+import sharp from "sharp";
 
 const router = Router();
 
@@ -681,6 +682,96 @@ function findAllImages(
   return results;
 }
 
+// Convert a normal static image to
+// a full-colour, lossless PNG.
+//
+// GIF is intentionally excluded because
+// animated GIF -> PNG would lose animation.
+async function convertImageToPng(
+  inputPath: string,
+): Promise<string> {
+  const ext =
+    path.extname(
+      inputPath,
+    ).toLowerCase();
+
+  if (ext === ".gif") {
+    return inputPath;
+  }
+
+  if (ext === ".png") {
+    return inputPath;
+  }
+
+  const pngPath =
+    path.join(
+      path.dirname(inputPath),
+      `${path.basename(
+        inputPath,
+        ext,
+      )}.png`,
+    );
+
+  await sharp(inputPath)
+    .withMetadata()
+    .png({
+      compressionLevel: 9,
+      adaptiveFiltering: true,
+      palette: false,
+    })
+    .toFile(pngPath);
+
+  // Remove original JPG/JPEG/WebP
+  // after successful conversion.
+  try {
+    if (
+      inputPath !== pngPath &&
+      fs.existsSync(inputPath)
+    ) {
+      fs.unlinkSync(inputPath);
+    }
+  } catch {
+    // best-effort
+  }
+
+  return pngPath;
+}
+
+// Convert every static image in a carousel
+// to PNG before creating the ZIP.
+async function convertCarouselImagesToPng(
+  images: string[],
+  onStage?: (
+    label: string,
+  ) => void,
+): Promise<string[]> {
+  const converted: string[] = [];
+
+  for (
+    let i = 0;
+    i < images.length;
+    i++
+  ) {
+    const image =
+      images[i];
+
+    onStage?.(
+      `Processing image ${i + 1} of ${images.length}...`,
+    );
+
+    const convertedPath =
+      await convertImageToPng(
+        image,
+      );
+
+    converted.push(
+      convertedPath,
+    );
+  }
+
+  return converted;
+}
+
 // Download image or carousel.
 // gallery-dl tells us if there are
 // multiple images.
@@ -725,7 +816,7 @@ async function downloadImageOrCarousel(
       url,
     ]);
 
-    const images =
+    let images =
       findAllImages(
         outputDir,
       );
@@ -738,6 +829,16 @@ async function downloadImageOrCarousel(
     if (
       images.length > 1
     ) {
+      onStage?.(
+        "Processing carousel images...",
+      );
+
+      images =
+        await convertCarouselImagesToPng(
+          images,
+          onStage,
+        );
+
       onStage?.(
         "Packaging carousel...",
       );
@@ -821,8 +922,17 @@ async function downloadImageOrCarousel(
     if (
       images.length === 1
     ) {
+      onStage?.(
+        "Processing image...",
+      );
+
+      const pngPath =
+        await convertImageToPng(
+          images[0],
+        );
+
       return {
-        filePath: images[0],
+        filePath: pngPath,
         mediaType: "image",
         imageCount: 1,
       };
@@ -860,21 +970,29 @@ async function downloadImageOrCarousel(
             ? extMatch[1].toLowerCase()
             : "jpg";
 
-        const filePath =
+        const originalPath =
           path.join(
             outputDir,
             `${pinId}.${ext}`,
           );
 
         fs.writeFileSync(
-          filePath,
+          originalPath,
           buffer,
         );
 
         console.log(
           "Saved directly:",
-          filePath,
+          originalPath,
         );
+
+        // Keep animated GIF as GIF.
+        // Convert every other supported
+        // static image to PNG.
+        const filePath =
+          await convertImageToPng(
+            originalPath,
+          );
 
         return {
           filePath,
