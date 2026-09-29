@@ -68,7 +68,7 @@ function SplashScreen() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.2 }}
       >
-        Pin-ME DOWNLOADR
+        pinme.download
       </motion.p>
     </motion.div>
   );
@@ -179,6 +179,74 @@ async function* readSSE(response: Response): AsyncGenerator<SSEEvent> {
   } finally {
     reader.releaseLock();
   }
+}
+
+// ─── Coffee button ───────────────────────────────────────────────────────────
+
+function CoffeeButton() {
+  return (
+    <a
+      href="https://ko-fi.com/pinmeapp"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Buy me a coffee"
+      className="relative flex items-center justify-center w-12 h-12 hover:scale-110 transition-transform duration-200"
+    >
+      {/* Steam */}
+      <span className="pointer-events-none absolute left-[18px] top-[2px] text-[10px] leading-none opacity-0 animate-coffee-steam">
+        ~
+      </span>
+
+      <span
+        className="pointer-events-none absolute left-[24px] top-[0px] text-[9px] leading-none opacity-0 animate-coffee-steam"
+        style={{ animationDelay: '0.45s' }}
+      >
+        ~
+      </span>
+
+      <span
+        className="pointer-events-none absolute left-[29px] top-[3px] text-[8px] leading-none opacity-0 animate-coffee-steam"
+        style={{ animationDelay: '0.9s' }}
+      >
+        ~
+      </span>
+
+      {/* Coffee cup */}
+      <span className="relative z-10 text-3xl leading-none">
+        ☕︎
+      </span>
+
+      <style>{`
+        @keyframes coffeeSteam {
+          0% {
+            opacity: 0;
+            transform: translateY(5px);
+          }
+          25% {
+            opacity: 0.45;
+          }
+          70% {
+            opacity: 0.2;
+          }
+          100% {
+            opacity: 0;
+            transform: translateY(-9px);
+          }
+        }
+
+        .animate-coffee-steam {
+          animation: coffeeSteam 2.4s ease-in-out infinite;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .animate-coffee-steam {
+            animation: none;
+            opacity: 0;
+          }
+        }
+      `}</style>
+    </a>
+  );
 }
 
 // ─── Main app ────────────────────────────────────────────────────────────────
@@ -498,19 +566,10 @@ export default function App({
                 Your download will be saved to your device&apos;s Downloads folder (and usually appears in your Gallery/Photos app automatically).
               </p>
 
-              <p className="text-center text-xs text-muted-foreground pt-4">
-                Made for everyone. If you&apos;d like to buy me a coffee,
-                you can{' '}
-                <a
-                  href="https://ko-fi.com/pinmeapp"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="kofi-rainbow underline underline-offset-2"
-                >
-                  here
-                </a>
-                .
-              </p>
+              {/* Coffee button */}
+              <div className="flex justify-center pt-1">
+                <CoffeeButton />
+              </div>
             </div>
           </main>
 
