@@ -351,8 +351,6 @@ function DownloadTravelAnimation() {
 
 // ─── SSE stream parser ───────────────────────────────────────────────────────
 
-type VideoQuality = 'best' | '1080p' | '4k' | '8k';
-
 type SSEEvent =
   | {
       type: 'stage';
@@ -480,80 +478,6 @@ function CoffeeButton() {
   );
 }
 
-// ─── Video quality selector ──────────────────────────────────────────────────
-
-function VideoQualitySelector({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: VideoQuality;
-  onChange: (value: VideoQuality) => void;
-  disabled: boolean;
-}) {
-  return (
-    <div className="w-full space-y-2">
-      <label
-        htmlFor="video-quality"
-        className="block text-xs font-medium text-muted-foreground px-1"
-      >
-        Video quality
-      </label>
-
-      <div className="relative">
-        <select
-          id="video-quality"
-          value={value}
-          onChange={(e) =>
-            onChange(e.target.value as VideoQuality)
-          }
-          disabled={disabled}
-          className="w-full appearance-none bg-input/50 border border-border rounded-xl py-3.5 pl-4 pr-11 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <option value="best">
-            Best Available
-          </option>
-
-          <option value="1080p">
-            Up to 1080p
-          </option>
-
-          <option value="4k">
-            Up to 4K
-          </option>
-
-          <option value="8k">
-            Up to 8K
-          </option>
-        </select>
-
-        {/* Chevron */}
-        <div
-          className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground"
-          aria-hidden="true"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-        </div>
-      </div>
-
-      <p className="text-[11px] text-muted-foreground px-1 leading-relaxed">
-        Higher options are used only when the Pinterest source provides that quality.
-      </p>
-    </div>
-  );
-}
-
 // ─── Main app ────────────────────────────────────────────────────────────────
 
 export default function App({
@@ -582,9 +506,6 @@ export default function App({
   const [progressLabel, setProgressLabel] = useState('');
 
   const [errorMsg, setErrorMsg] = useState('');
-
-  const [videoQuality, setVideoQuality] =
-    useState<VideoQuality>('best');
 
   const [successInfo, setSuccessInfo] = useState<{
     mediaType?: 'video' | 'image' | 'carousel';
@@ -665,11 +586,6 @@ export default function App({
 
           body: JSON.stringify({
             url: targetUrl,
-
-            // Video quality preference.
-            // Backend uses this for videos.
-            // Images/GIFs/carousels simply ignore it.
-            quality: videoQuality,
           }),
         }
       );
@@ -869,17 +785,6 @@ export default function App({
                       </svg>
                     </button>
                   </div>
-
-                  {/* Video quality */}
-                  <VideoQualitySelector
-                    value={videoQuality}
-                    onChange={
-                      setVideoQuality
-                    }
-                    disabled={
-                      status === 'loading'
-                    }
-                  />
 
                   <AnimatePresence mode="wait">
                     {status === 'error' && (
