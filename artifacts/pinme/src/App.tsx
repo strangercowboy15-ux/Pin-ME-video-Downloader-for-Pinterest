@@ -134,6 +134,132 @@ function ProgressLabel({ label }: { label: string }) {
   );
 }
 
+// ─── Download travel animation ───────────────────────────────────────────────
+
+function DownloadTravelAnimation() {
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 overflow-visible flex items-center justify-center"
+      aria-hidden="true"
+    >
+      {/* Small file */}
+      <motion.div
+        initial={{
+          x: -34,
+          y: 0,
+          scale: 0.7,
+          opacity: 0,
+        }}
+        animate={{
+          x: 0,
+          y: -6,
+          scale: 1,
+          opacity: 1,
+        }}
+        transition={{
+          duration: 0.28,
+          ease: 'easeOut',
+        }}
+        className="absolute z-20"
+      >
+        <div className="relative w-7 h-8 rounded-md bg-background border border-primary/60 shadow-md flex items-center justify-center">
+          <div className="absolute top-1 right-1 w-2 h-2 border-l border-b border-primary/60" />
+          <div className="w-3 h-0.5 rounded-full bg-primary/70" />
+          <div className="absolute bottom-1.5 w-3 h-0.5 rounded-full bg-primary/40" />
+        </div>
+      </motion.div>
+
+      {/* Motion trail */}
+      <motion.div
+        initial={{
+          x: -24,
+          scaleX: 0.2,
+          opacity: 0,
+        }}
+        animate={{
+          x: 0,
+          scaleX: 1,
+          opacity: [0, 0.35, 0],
+        }}
+        transition={{
+          duration: 0.5,
+          ease: 'easeOut',
+        }}
+        className="absolute w-12 h-[2px] rounded-full bg-primary/40"
+      />
+
+      {/* Phone */}
+      <motion.div
+        initial={{
+          x: 32,
+          scale: 0.85,
+          opacity: 0,
+        }}
+        animate={{
+          x: 0,
+          scale: 1,
+          opacity: 1,
+        }}
+        transition={{
+          duration: 0.3,
+          delay: 0.18,
+          ease: 'easeOut',
+        }}
+        className="absolute z-10"
+      >
+        <div className="relative w-9 h-14 rounded-lg border-2 border-foreground/60 bg-background shadow-lg flex items-center justify-center">
+          <div className="w-5 h-8 rounded-sm border border-border bg-primary/5" />
+
+          <motion.div
+            initial={{ y: -5, opacity: 0 }}
+            animate={{
+              y: [ -5, 2, 0 ],
+              opacity: [0, 1, 1],
+            }}
+            transition={{
+              duration: 0.55,
+              delay: 0.28,
+              ease: 'easeOut',
+            }}
+            className="absolute"
+          >
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-primary"
+            >
+              <path d="M12 3v12" />
+              <path d="m7 10 5 5 5-5" />
+              <path d="M5 21h14" />
+            </svg>
+          </motion.div>
+        </div>
+      </motion.div>
+
+      {/* Soft impact ring */}
+      <motion.div
+        initial={{ scale: 0.5, opacity: 0 }}
+        animate={{
+          scale: [0.5, 1.25],
+          opacity: [0, 0.35, 0],
+        }}
+        transition={{
+          duration: 0.55,
+          delay: 0.48,
+          ease: 'easeOut',
+        }}
+        className="absolute w-12 h-12 rounded-full border border-primary/50"
+      />
+    </div>
+  );
+}
+
 // ─── SSE stream parser ───────────────────────────────────────────────────────
 
 type SSEEvent =
@@ -440,7 +566,7 @@ export default function App({
           {/* Main Content */}
           <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto">
             <div className="w-full space-y-8">
-              
+
               {/* Balanced heading */}
               <div className="text-center space-y-2">
                 <h1 className="text-2xl font-bold tracking-tight text-balance max-w-[360px] mx-auto">
@@ -523,44 +649,68 @@ export default function App({
                   )}
                 </AnimatePresence>
 
-                <div className="pt-2 min-h-[72px] flex justify-center items-center w-full">
-                  {status === 'loading' ? (
-                    <ProgressLabel label={progressLabel} />
-                  ) : status === 'success' ? (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="w-full py-4 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2 px-3"
-                      data-testid="status-success"
-                    >
-                      <span className="text-sm sm:text-base">
-                        {successInfo.mediaType === 'carousel'
-                          ? `Carousel downloaded as ZIP${
-                              successInfo.imageCount
-                                ? ` (${successInfo.imageCount} images)`
-                                : ''
-                            }`
-                          : successInfo.mediaType === 'image'
-                            ? 'Image downloaded'
-                            : 'Video downloaded'}
-                      </span>
+                <div className="pt-2 min-h-[72px] flex justify-center items-center w-full relative">
+                  <AnimatePresence mode="wait">
+                    {status === 'loading' ? (
+                      <motion.div
+                        key="loading"
+                        initial={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="w-full"
+                      >
+                        <ProgressLabel label={progressLabel} />
+                      </motion.div>
+                    ) : status === 'success' ? (
+                      <motion.div
+                        key="success"
+                        initial={{ opacity: 0, scale: 0.96 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="w-full relative"
+                        data-testid="status-success"
+                      >
+                        {/* File → phone animation */}
+                        <div className="absolute inset-0 z-30 flex items-center justify-center">
+                          <DownloadTravelAnimation />
+                        </div>
 
-                      <span className="text-lg leading-none">✓</span>
-                    </motion.div>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={!url.trim()}
-                      className={`w-full ${
-                        season === 'default'
-                          ? 'bg-primary hover:bg-primary/90 disabled:hover:bg-primary'
-                          : `seasonal-button seasonal-button-${season}`
-                      } disabled:opacity-50 text-primary-foreground py-4 rounded-xl font-semibold text-lg transition-colors shadow-[0_0_20px_rgba(230,0,35,0.2)]`}
-                      data-testid="button-submit"
-                    >
-                      Download Now
-                    </button>
-                  )}
+                        {/* Existing success message */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.58, duration: 0.22 }}
+                          className="w-full py-4 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2 px-3"
+                        >
+                          <span className="text-sm sm:text-base">
+                            {successInfo.mediaType === 'carousel'
+                              ? `Carousel downloaded as ZIP${
+                                  successInfo.imageCount
+                                    ? ` (${successInfo.imageCount} images)`
+                                    : ''
+                                }`
+                              : successInfo.mediaType === 'image'
+                                ? 'Image downloaded'
+                                : 'Video downloaded'}
+                          </span>
+
+                          <span className="text-lg leading-none">✓</span>
+                        </motion.div>
+                      </motion.div>
+                    ) : (
+                      <motion.button
+                        key="download"
+                        type="submit"
+                        disabled={!url.trim()}
+                        className={`w-full ${
+                          season === 'default'
+                            ? 'bg-primary hover:bg-primary/90 disabled:hover:bg-primary'
+                            : `seasonal-button seasonal-button-${season}`
+                        } disabled:opacity-50 text-primary-foreground py-4 rounded-xl font-semibold text-lg transition-colors shadow-[0_0_20px_rgba(230,0,35,0.2)]`}
+                        data-testid="button-submit"
+                      >
+                        Download Now
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
                 </div>
               </form>
 
