@@ -454,7 +454,10 @@ export default function App({
   const [status, setStatus] = useState<
     'idle' | 'loading' | 'success' | 'error'
   >('idle');
+
+  // Media type is initially unknown.
   const [progressLabel, setProgressLabel] = useState('');
+
   const [errorMsg, setErrorMsg] = useState('');
 
   const [successInfo, setSuccessInfo] = useState<{
@@ -511,7 +514,10 @@ export default function App({
 
   const triggerDownload = async (targetUrl: string) => {
     setStatus('loading');
-    setProgressLabel('Fetching video info...');
+
+    // Do not assume every Pinterest link is a video.
+    setProgressLabel('Checking media type...');
+
     setErrorMsg('');
     setSuccessInfo({});
 
@@ -542,6 +548,7 @@ export default function App({
 
       for await (const event of readSSE(response)) {
         if (event.type === 'stage') {
+          // Backend decides the correct media-specific message.
           setProgressLabel(event.label);
         } else if (event.type === 'ready') {
           setProgressLabel('Starting download...');
@@ -551,7 +558,7 @@ export default function App({
           a.href = `https://pinme-api-server.onrender.com/api/stream/${event.token}`;
 
           a.download =
-            event.filename || 'pinterest-video.mp4';
+            event.filename || 'pinterest-download';
 
           document.body.appendChild(a);
           a.click();
@@ -717,7 +724,9 @@ export default function App({
                         exit={{ opacity: 0 }}
                         className="w-full"
                       >
-                        <ProgressLabel label={progressLabel} />
+                        <ProgressLabel
+                          label={progressLabel || 'Checking media type...'}
+                        />
                       </motion.div>
                     ) : status === 'success' ? (
                       <motion.div
