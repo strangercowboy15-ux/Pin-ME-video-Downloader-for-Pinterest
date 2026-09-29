@@ -68,7 +68,7 @@ function SplashScreen() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.2 }}
       >
-        pinME — Download Pinterest videos, images, GIFs &amp; carousels
+        Pin-ME DOWNLOADR
       </motion.p>
     </motion.div>
   );
