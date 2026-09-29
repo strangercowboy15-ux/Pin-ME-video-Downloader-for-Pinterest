@@ -161,7 +161,6 @@ async function* readSSE(response: Response): AsyncGenerator<SSEEvent> {
 
       buffer += decoder.decode(value, { stream: true });
 
-      // SSE events are delimited by double newlines
       const parts = buffer.split('\n\n');
       buffer = parts.pop() ?? '';
 
@@ -204,7 +203,6 @@ export default function App({
   const [progressLabel, setProgressLabel] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // ─── Success information ────────────────────────────────────────────────
   const [successInfo, setSuccessInfo] = useState<{
     mediaType?: 'video' | 'image' | 'carousel';
     imageCount?: number;
@@ -277,7 +275,6 @@ export default function App({
         }
       );
 
-      // Validation errors (400) are returned as JSON before SSE opens
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
 
@@ -306,11 +303,10 @@ export default function App({
           a.click();
           document.body.removeChild(a);
 
-          trackDownload(); // fire GA4 event — silent if blocked or unconfigured
+          trackDownload();
 
           downloadTriggered = true;
 
-          // Store media information for the success message
           setSuccessInfo({
             mediaType: event.mediaType,
             imageCount: event.imageCount,
@@ -375,7 +371,7 @@ export default function App({
           <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto">
             <div className="w-full space-y-8">
               <div className="text-center space-y-2">
-                <h1 className="text-3xl font-bold tracking-tight">
+                <h1 className="text-2xl font-bold tracking-tight">
                   Download Pinterest videos, images, GIFs &amp; carousels
                 </h1>
 
@@ -444,18 +440,9 @@ export default function App({
                 <AnimatePresence mode="wait">
                   {status === 'error' && (
                     <motion.div
-                      initial={{
-                        opacity: 0,
-                        y: -10,
-                      }}
-                      animate={{
-                        opacity: 1,
-                        y: 0,
-                      }}
-                      exit={{
-                        opacity: 0,
-                        y: -10,
-                      }}
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
                       className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm text-center"
                       data-testid="status-error"
                     >
@@ -464,20 +451,13 @@ export default function App({
                   )}
                 </AnimatePresence>
 
-                {/* Action area — fixed min-height so layout doesn't shift between states */}
                 <div className="pt-2 min-h-[72px] flex justify-center items-center w-full">
                   {status === 'loading' ? (
                     <ProgressLabel label={progressLabel} />
                   ) : status === 'success' ? (
                     <motion.div
-                      initial={{
-                        opacity: 0,
-                        scale: 0.9,
-                      }}
-                      animate={{
-                        opacity: 1,
-                        scale: 1,
-                      }}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
                       className="w-full py-4 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2 px-3"
                       data-testid="status-success"
                     >
@@ -493,9 +473,7 @@ export default function App({
                             : 'Video downloaded'}
                       </span>
 
-                      <span className="text-lg leading-none">
-                        ✓
-                      </span>
+                      <span className="text-lg leading-none">✓</span>
                     </motion.div>
                   ) : (
                     <button
@@ -515,9 +493,7 @@ export default function App({
               </form>
 
               <p className="text-center text-xs text-muted-foreground leading-relaxed px-4">
-                Video will be saved to your device&apos;s Downloads folder
-                (and usually appears in your Gallery/Photos app
-                automatically)
+                Your download will be saved to your device&apos;s Downloads folder (and usually appears in your Gallery/Photos app automatically).
               </p>
 
               <p className="text-center text-xs text-muted-foreground pt-4">
