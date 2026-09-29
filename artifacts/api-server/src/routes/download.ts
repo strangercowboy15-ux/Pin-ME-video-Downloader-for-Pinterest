@@ -16,12 +16,19 @@ const bundledYtDlpPath = path.resolve(
   "../vendor/yt-dlp",
 );
 
+type VideoQuality =
+  | "best"
+  | "1080p"
+  | "4k"
+  | "8k";
+
 type DownloadTokenPayload = {
   url: string;
   pinId: string;
   filename: string;
   expiresAt: number;
   mediaType: "video" | "image" | "carousel";
+  quality: VideoQuality;
 };
 
 // In-memory store: token → { filePath, filename, expiresAt }
@@ -128,6 +135,9 @@ function parseDownloadToken(
       typeof payload.expiresAt !== "number" ||
       !["video", "image", "carousel"].includes(
         payload.mediaType as string,
+      ) ||
+      !["best", "1080p", "4k", "8k"].includes(
+        payload.quality as string,
       )
     ) {
       return null;
@@ -773,8 +783,6 @@ async function convertCarouselImagesToPng(
 }
 
 // Download image or carousel.
-// gallery-dl tells us if there are
-// multiple images.
 async function downloadImageOrCarousel(
   url: string,
   pinId: string,
@@ -802,8 +810,6 @@ async function downloadImageOrCarousel(
   );
 
   // First try gallery-dl.
-  // It handles both single images
-  // and Pinterest carousels.
   try {
     console.log(
       "=== gallery-dl image/carousel ===",
@@ -986,9 +992,6 @@ async function downloadImageOrCarousel(
           originalPath,
         );
 
-        // Keep animated GIF as GIF.
-        // Convert every other supported
-        // static image to PNG.
         const filePath =
           await convertImageToPng(
             originalPath,
@@ -1013,12 +1016,34 @@ async function downloadImageOrCarousel(
   );
 }
 
+// ─── Video quality format ────────────────────────────────────────────────────
+
+function getVideoFormat(
+  quality: VideoQuality,
+): string {
+  switch (quality) {
+    case "1080p":
+      return "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/bestvideo[height<=1080]+bestaudio/best[height<=1080]";
+
+    case "4k":
+      return "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/best[height<=2160][ext=mp4]/bestvideo[height<=2160]+bestaudio/best[height<=2160]";
+
+    case "8k":
+      return "bestvideo[height<=4320][ext=mp4]+bestaudio[ext=m4a]/best[height<=4320][ext=mp4]/bestvideo[height<=4320]+bestaudio/best[height<=4320]";
+
+    case "best":
+    default:
+      return "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/bestvideo+bestaudio/best";
+  }
+}
+
 // onStage is called whenever
 // a meaningful stage transition
 // is detected in stderr.
 async function downloadVideo(
   url: string,
   pinId: string,
+  quality: VideoQuality = "best",
   onStage?: (
     label: string,
   ) => void,
@@ -1031,6 +1056,25 @@ async function downloadVideo(
   let mergeSignalled =
     false;
 
+  const format =
+    getVideoFormat(
+      quality,
+    );
+
+  console.log(
+    "=== Video download ===",
+  );
+
+  console.log(
+    "Selected quality:",
+    quality,
+  );
+
+  console.log(
+    "Selected format:",
+    format,
+  );
+
   await runYtDlp(
     [
       "--no-playlist",
@@ -1038,7 +1082,7 @@ async function downloadVideo(
       "--concurrent-fragments",
       "4",
       "--format",
-      "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/bestvideo+bestaudio/best",
+      format,
       "--merge-output-format",
       "mp4",
       "-o",
@@ -1275,10 +1319,22 @@ function toUserError(
 router.post(
   "/get-pin",
   async (req, res) => {
-    const { url } =
+    const {
+      url,
+      quality = "best",
+    } =
       req.body as {
         url?: string;
+        quality?: VideoQuality;
       };
+
+    // Validate quality.
+    const selectedQuality: VideoQuality =
+      ["best", "1080p", "4k", "8k"].includes(
+        quality as string,
+      )
+        ? quality as VideoQuality
+        : "best";
 
     // Validate before opening
     // the SSE stream.
@@ -1406,6 +1462,7 @@ router.post(
           await downloadVideo(
             trimmed,
             meta.id,
+            selectedQuality,
             (label) =>
               send({
                 type: "stage",
@@ -1444,6 +1501,7 @@ router.post(
           filename,
           expiresAt,
           mediaType,
+          quality: selectedQuality,
         });
 
       pendingDownloads.set(
@@ -1475,6 +1533,7 @@ router.post(
         {
           err: msg,
           url: trimmed,
+          quality: selectedQuality,
         },
         "get-pin failed",
       );
@@ -1593,6 +1652,7 @@ router.get(
             await downloadVideo(
               payload.url,
               retryPinId,
+              payload.quality,
             );
 
           filePath =
@@ -1623,6 +1683,8 @@ router.get(
         req.log?.error(
           {
             err: msg,
+            quality:
+              payload.quality,
           },
           "Fresh download retry failed",
         );
