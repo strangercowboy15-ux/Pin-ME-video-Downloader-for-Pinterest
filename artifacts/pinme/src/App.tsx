@@ -139,60 +139,65 @@ function ProgressLabel({ label }: { label: string }) {
 function DownloadTravelAnimation() {
   return (
     <div
-      className="pointer-events-none absolute inset-0 overflow-visible flex items-center justify-center"
+      className="relative w-[140px] h-[48px] mx-auto pointer-events-none"
       aria-hidden="true"
     >
-      {/* Small file */}
-      <motion.div
-        initial={{
-          x: -34,
-          y: 0,
-          scale: 0.7,
-          opacity: 0,
-        }}
-        animate={{
-          x: 0,
-          y: -6,
-          scale: 1,
-          opacity: 1,
-        }}
-        transition={{
-          duration: 0.28,
-          ease: 'easeOut',
-        }}
-        className="absolute z-20"
-      >
-        <div className="relative w-7 h-8 rounded-md bg-background border border-primary/60 shadow-md flex items-center justify-center">
-          <div className="absolute top-1 right-1 w-2 h-2 border-l border-b border-primary/60" />
-          <div className="w-3 h-0.5 rounded-full bg-primary/70" />
-          <div className="absolute bottom-1.5 w-3 h-0.5 rounded-full bg-primary/40" />
-        </div>
-      </motion.div>
-
       {/* Motion trail */}
       <motion.div
         initial={{
-          x: -24,
+          x: -42,
+          opacity: 0,
           scaleX: 0.2,
+        }}
+        animate={{
+          x: 8,
+          opacity: [0, 0.45, 0],
+          scaleX: [0.2, 1, 0.5],
+        }}
+        transition={{
+          duration: 0.55,
+          ease: 'easeOut',
+        }}
+        className="absolute left-1/2 top-[24px] w-12 h-[2px] -translate-x-1/2 rounded-full bg-primary/50 origin-left"
+      />
+
+      {/* File */}
+      <motion.div
+        initial={{
+          x: -48,
+          y: 0,
+          scale: 0.65,
           opacity: 0,
         }}
         animate={{
-          x: 0,
-          scaleX: 1,
-          opacity: [0, 0.35, 0],
+          x: 25,
+          y: -1,
+          scale: [0.65, 1, 0.85],
+          opacity: [0, 1, 1],
         }}
         transition={{
-          duration: 0.5,
+          duration: 0.62,
           ease: 'easeOut',
         }}
-        className="absolute w-12 h-[2px] rounded-full bg-primary/40"
-      />
+        className="absolute left-1/2 top-[8px] z-20"
+      >
+        <div className="relative w-7 h-8 rounded-md bg-background border border-primary/70 shadow-md flex items-center justify-center">
+          {/* Fold */}
+          <div className="absolute top-0.5 right-0.5 w-2 h-2 border-l border-b border-primary/60 rounded-bl-sm" />
+
+          {/* File lines */}
+          <div className="flex flex-col gap-1">
+            <div className="w-3 h-[2px] rounded-full bg-primary/80" />
+            <div className="w-3 h-[2px] rounded-full bg-primary/40" />
+          </div>
+        </div>
+      </motion.div>
 
       {/* Phone */}
       <motion.div
         initial={{
-          x: 32,
-          scale: 0.85,
+          x: 42,
+          scale: 0.8,
           opacity: 0,
         }}
         animate={{
@@ -201,31 +206,36 @@ function DownloadTravelAnimation() {
           opacity: 1,
         }}
         transition={{
-          duration: 0.3,
-          delay: 0.18,
+          duration: 0.35,
+          delay: 0.12,
           ease: 'easeOut',
         }}
-        className="absolute z-10"
+        className="absolute left-1/2 top-[2px] z-10"
       >
-        <div className="relative w-9 h-14 rounded-lg border-2 border-foreground/60 bg-background shadow-lg flex items-center justify-center">
-          <div className="w-5 h-8 rounded-sm border border-border bg-primary/5" />
+        <div className="relative w-9 h-12 rounded-[9px] border-2 border-foreground/60 bg-background shadow-md flex items-center justify-center">
+          {/* Screen */}
+          <div className="w-5 h-7 rounded-sm border border-border bg-primary/5" />
 
+          {/* Download arrow */}
           <motion.div
-            initial={{ y: -5, opacity: 0 }}
+            initial={{
+              y: -4,
+              opacity: 0,
+            }}
             animate={{
-              y: [ -5, 2, 0 ],
+              y: [-4, 3, 0],
               opacity: [0, 1, 1],
             }}
             transition={{
-              duration: 0.55,
-              delay: 0.28,
+              duration: 0.48,
+              delay: 0.48,
               ease: 'easeOut',
             }}
             className="absolute"
           >
             <svg
-              width="13"
-              height="13"
+              width="12"
+              height="12"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -242,19 +252,67 @@ function DownloadTravelAnimation() {
         </div>
       </motion.div>
 
-      {/* Soft impact ring */}
+      {/* Impact ring */}
       <motion.div
-        initial={{ scale: 0.5, opacity: 0 }}
+        initial={{
+          x: 32,
+          scale: 0.3,
+          opacity: 0,
+        }}
         animate={{
-          scale: [0.5, 1.25],
-          opacity: [0, 0.35, 0],
+          x: 32,
+          scale: [0.3, 1.15],
+          opacity: [0, 0.45, 0],
         }}
         transition={{
-          duration: 0.55,
-          delay: 0.48,
+          duration: 0.42,
+          delay: 0.58,
           ease: 'easeOut',
         }}
-        className="absolute w-12 h-12 rounded-full border border-primary/50"
+        className="absolute left-1/2 top-[10px] w-9 h-9 rounded-full border border-primary/60"
+      />
+
+      {/* Tiny particles */}
+      <motion.span
+        initial={{
+          x: 26,
+          y: 22,
+          opacity: 0,
+          scale: 0,
+        }}
+        animate={{
+          x: [26, 18, 34],
+          y: [22, 12, 30],
+          opacity: [0, 0.7, 0],
+          scale: [0, 1, 0],
+        }}
+        transition={{
+          duration: 0.5,
+          delay: 0.6,
+          ease: 'easeOut',
+        }}
+        className="absolute left-1/2 top-0 w-1.5 h-1.5 rounded-full bg-primary"
+      />
+
+      <motion.span
+        initial={{
+          x: 31,
+          y: 24,
+          opacity: 0,
+          scale: 0,
+        }}
+        animate={{
+          x: [31, 40, 24],
+          y: [24, 17, 34],
+          opacity: [0, 0.55, 0],
+          scale: [0, 0.8, 0],
+        }}
+        transition={{
+          duration: 0.48,
+          delay: 0.64,
+          ease: 'easeOut',
+        }}
+        className="absolute left-1/2 top-0 w-1 h-1 rounded-full bg-primary/70"
       />
     </div>
   );
@@ -649,7 +707,8 @@ export default function App({
                   )}
                 </AnimatePresence>
 
-                <div className="pt-2 min-h-[72px] flex justify-center items-center w-full relative">
+                {/* Download / Success area */}
+                <div className="pt-2 min-h-[72px] flex justify-center items-center w-full">
                   <AnimatePresence mode="wait">
                     {status === 'loading' ? (
                       <motion.div
@@ -665,19 +724,22 @@ export default function App({
                         key="success"
                         initial={{ opacity: 0, scale: 0.96 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="w-full relative"
+                        className="w-full flex flex-col items-center"
                         data-testid="status-success"
                       >
-                        {/* File → phone animation */}
-                        <div className="absolute inset-0 z-30 flex items-center justify-center">
+                        {/* Animation ABOVE the success box */}
+                        <div className="h-[48px] w-full flex items-center justify-center overflow-visible">
                           <DownloadTravelAnimation />
                         </div>
 
-                        {/* Existing success message */}
+                        {/* Success message */}
                         <motion.div
                           initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.58, duration: 0.22 }}
+                          transition={{
+                            delay: 0.62,
+                            duration: 0.22,
+                          }}
                           className="w-full py-4 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2 px-3"
                         >
                           <span className="text-sm sm:text-base">
@@ -692,7 +754,9 @@ export default function App({
                                 : 'Video downloaded'}
                           </span>
 
-                          <span className="text-lg leading-none">✓</span>
+                          <span className="text-lg leading-none">
+                            ✓
+                          </span>
                         </motion.div>
                       </motion.div>
                     ) : (
