@@ -181,7 +181,6 @@ export default function Privacy({ onClose }: { onClose: () => void }) {
               >
                 Google's Privacy Policy
               </a>
-              .
             </p>
           </div>
 
@@ -200,7 +199,6 @@ export default function Privacy({ onClose }: { onClose: () => void }) {
               >
                 pinmevideodownloader@gmail.com
               </a>
-              .
             </p>
           </div>
 
