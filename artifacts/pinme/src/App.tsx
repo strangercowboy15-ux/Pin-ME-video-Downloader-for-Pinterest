@@ -376,7 +376,7 @@ export default function App({
             <div className="w-full space-y-8">
               <div className="text-center space-y-2">
                 <h1 className="text-3xl font-bold tracking-tight">
-                  Download any Pinterest video.
+                  Download Pinterest videos, images, GIFs &amp; carousels
                 </h1>
 
                 <p className="text-muted-foreground text-sm">
