@@ -508,9 +508,8 @@ export default function App({
                       } disabled:opacity-50 text-primary-foreground py-4 rounded-xl font-semibold text-lg transition-colors shadow-[0_0_20px_rgba(230,0,35,0.2)]`}
                       data-testid="button-submit"
                     >
-                      >
-  Download Now
-</button>
+                      Download Now
+                    </button>
                   )}
                 </div>
               </form>
@@ -571,15 +570,13 @@ export default function App({
               </li>
 
               <li className="flex gap-3">
-  <span className="font-bold text-foreground">3.</span>
-  <span>Click &quot;Download Now&quot; 📹</span>
-</li>
+                <span className="font-bold text-foreground">2.</span>
                 <span>Paste it in the box above 📥</span>
               </li>
 
               <li className="flex gap-3">
                 <span className="font-bold text-foreground">3.</span>
-                <span>Click &quot;Download Video&quot; 📹</span>
+                <span>Click &quot;Download Now&quot; 📹</span>
               </li>
 
               <li className="flex gap-3">
