@@ -440,12 +440,14 @@ export default function App({
           {/* Main Content */}
           <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto">
             <div className="w-full space-y-8">
+              
+              {/* Balanced heading */}
               <div className="text-center space-y-2">
-                <h1 className="text-2xl font-bold tracking-tight">
+                <h1 className="text-2xl font-bold tracking-tight text-balance max-w-[360px] mx-auto">
                   Download Pinterest videos, images, GIFs &amp; carousels
                 </h1>
 
-                <p className="text-muted-foreground text-sm">
+                <p className="text-muted-foreground text-sm max-w-[320px] mx-auto">
                   Fast, free, and directly to your device.
                 </p>
               </div>
