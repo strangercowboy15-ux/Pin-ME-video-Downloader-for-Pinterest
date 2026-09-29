@@ -16,7 +16,11 @@ function useServerReady() {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 6000);
-        const res = await fetch('/api/healthz', { signal: controller.signal });
+
+        const res = await fetch('/api/healthz', {
+          signal: controller.signal,
+        });
+
         clearTimeout(timeout);
 
         if (res.ok && !cancelled) {
@@ -27,7 +31,9 @@ function useServerReady() {
         /* server still waking */
       }
 
-      if (!cancelled) timer = setTimeout(check, 3000);
+      if (!cancelled) {
+        timer = setTimeout(check, 3000);
+      }
     };
 
     check();
@@ -59,14 +65,26 @@ function SplashScreen() {
         className="h-24 w-24 object-contain rounded-3xl"
         initial={{ scale: 0.85, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.45, ease: 'easeOut' }}
+        transition={{
+          duration: 0.45,
+          ease: 'easeOut',
+        }}
       />
 
       <motion.p
         className="text-sm text-muted-foreground tracking-wide"
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.2 }}
+        initial={{
+          opacity: 0,
+          y: 6,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.4,
+          delay: 0.2,
+        }}
       >
         pinme.download
       </motion.p>
@@ -81,7 +99,7 @@ function WakingScreen() {
 
   useEffect(() => {
     const id = setInterval(() => {
-      setDots(d => (d.length >= 3 ? '' : d + '.'));
+      setDots((d) => (d.length >= 3 ? '' : d + '.'));
     }, 500);
 
     return () => clearInterval(id);
@@ -98,7 +116,9 @@ function WakingScreen() {
       <div className="text-center space-y-2">
         <p className="text-lg font-semibold text-foreground">
           Starting server
-          <span className="inline-block w-6 text-left">{dots}</span>
+          <span className="inline-block w-6 text-left">
+            {dots}
+          </span>
         </p>
 
         <p className="text-sm text-muted-foreground max-w-xs">
@@ -119,10 +139,21 @@ function ProgressLabel({ label }: { label: string }) {
       <AnimatePresence mode="wait">
         <motion.p
           key={label}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.2 }}
+          initial={{
+            opacity: 0,
+            y: 4,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          exit={{
+            opacity: 0,
+            y: -4,
+          }}
+          transition={{
+            duration: 0.2,
+          }}
           className="text-sm text-muted-foreground text-center"
         >
           {label}
@@ -320,8 +351,13 @@ function DownloadTravelAnimation() {
 
 // ─── SSE stream parser ───────────────────────────────────────────────────────
 
+type VideoQuality = 'best' | '1080p' | '4k' | '8k';
+
 type SSEEvent =
-  | { type: 'stage'; label: string }
+  | {
+      type: 'stage';
+      label: string;
+    }
   | {
       type: 'ready';
       token: string;
@@ -330,9 +366,14 @@ type SSEEvent =
       mediaType?: 'video' | 'image' | 'carousel';
       imageCount?: number;
     }
-  | { type: 'error'; message: string };
+  | {
+      type: 'error';
+      message: string;
+    };
 
-async function* readSSE(response: Response): AsyncGenerator<SSEEvent> {
+async function* readSSE(
+  response: Response
+): AsyncGenerator<SSEEvent> {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -343,7 +384,9 @@ async function* readSSE(response: Response): AsyncGenerator<SSEEvent> {
 
       if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, {
+        stream: true,
+      });
 
       const parts = buffer.split('\n\n');
       buffer = parts.pop() ?? '';
@@ -383,14 +426,18 @@ function CoffeeButton() {
 
       <span
         className="pointer-events-none absolute left-[24px] top-[0px] text-[9px] leading-none opacity-0 animate-coffee-steam"
-        style={{ animationDelay: '0.45s' }}
+        style={{
+          animationDelay: '0.45s',
+        }}
       >
         ~
       </span>
 
       <span
         className="pointer-events-none absolute left-[29px] top-[3px] text-[8px] leading-none opacity-0 animate-coffee-steam"
-        style={{ animationDelay: '0.9s' }}
+        style={{
+          animationDelay: '0.9s',
+        }}
       >
         ~
       </span>
@@ -433,6 +480,80 @@ function CoffeeButton() {
   );
 }
 
+// ─── Video quality selector ──────────────────────────────────────────────────
+
+function VideoQualitySelector({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: VideoQuality;
+  onChange: (value: VideoQuality) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="w-full space-y-2">
+      <label
+        htmlFor="video-quality"
+        className="block text-xs font-medium text-muted-foreground px-1"
+      >
+        Video quality
+      </label>
+
+      <div className="relative">
+        <select
+          id="video-quality"
+          value={value}
+          onChange={(e) =>
+            onChange(e.target.value as VideoQuality)
+          }
+          disabled={disabled}
+          className="w-full appearance-none bg-input/50 border border-border rounded-xl py-3.5 pl-4 pr-11 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <option value="best">
+            Best Available
+          </option>
+
+          <option value="1080p">
+            Up to 1080p
+          </option>
+
+          <option value="4k">
+            Up to 4K
+          </option>
+
+          <option value="8k">
+            Up to 8K
+          </option>
+        </select>
+
+        {/* Chevron */}
+        <div
+          className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-muted-foreground px-1 leading-relaxed">
+        Higher options are used only when the Pinterest source provides that quality.
+      </p>
+    </div>
+  );
+}
+
 // ─── Main app ────────────────────────────────────────────────────────────────
 
 export default function App({
@@ -450,7 +571,9 @@ export default function App({
   const season = useSeason();
 
   const [showSplash, setShowSplash] = useState(true);
+
   const [url, setUrl] = useState('');
+
   const [status, setStatus] = useState<
     'idle' | 'loading' | 'success' | 'error'
   >('idle');
@@ -459,6 +582,9 @@ export default function App({
   const [progressLabel, setProgressLabel] = useState('');
 
   const [errorMsg, setErrorMsg] = useState('');
+
+  const [videoQuality, setVideoQuality] =
+    useState<VideoQuality>('best');
 
   const [successInfo, setSuccessInfo] = useState<{
     mediaType?: 'video' | 'image' | 'carousel';
@@ -485,7 +611,10 @@ export default function App({
         triggerDownload(text);
       }
     } catch (err) {
-      console.error('Failed to read clipboard', err);
+      console.error(
+        'Failed to read clipboard',
+        err
+      );
     }
   };
 
@@ -494,7 +623,8 @@ export default function App({
   ) => {
     setTimeout(() => {
       if (inputRef.current) {
-        const value = inputRef.current.value.trim();
+        const value =
+          inputRef.current.value.trim();
 
         if (value) {
           setUrl(value);
@@ -512,7 +642,9 @@ export default function App({
     }
   };
 
-  const triggerDownload = async (targetUrl: string) => {
+  const triggerDownload = async (
+    targetUrl: string
+  ) => {
     setStatus('loading');
 
     // Do not assume every Pinterest link is a video.
@@ -526,17 +658,25 @@ export default function App({
         'https://pinme-api-server.onrender.com/api/get-pin',
         {
           method: 'POST',
+
           headers: {
             'Content-Type': 'application/json',
           },
+
           body: JSON.stringify({
             url: targetUrl,
+
+            // Video quality preference.
+            // Backend uses this for videos.
+            // Images/GIFs/carousels simply ignore it.
+            quality: videoQuality,
           }),
         }
       );
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
+        const data =
+          await response.json().catch(() => ({}));
 
         throw new Error(
           data.error ||
@@ -551,14 +691,18 @@ export default function App({
           // Backend decides the correct media-specific message.
           setProgressLabel(event.label);
         } else if (event.type === 'ready') {
-          setProgressLabel('Starting download...');
+          setProgressLabel(
+            'Starting download...'
+          );
 
-          const a = document.createElement('a');
+          const a =
+            document.createElement('a');
 
           a.href = `https://pinme-api-server.onrender.com/api/stream/${event.token}`;
 
           a.download =
-            event.filename || 'pinterest-download';
+            event.filename ||
+            'pinterest-download';
 
           document.body.appendChild(a);
           a.click();
@@ -581,13 +725,17 @@ export default function App({
             setProgressLabel('');
             setSuccessInfo({});
           }, 3000);
-        } else if (event.type === 'error') {
+        } else if (
+          event.type === 'error'
+        ) {
           throw new Error(event.message);
         }
       }
 
       if (!downloadTriggered) {
-        throw new Error('Something went wrong. Please try again.');
+        throw new Error(
+          'Something went wrong. Please try again.'
+        );
       }
     } catch (err: any) {
       setStatus('error');
@@ -607,237 +755,306 @@ export default function App({
       </AnimatePresence>
 
       {/* Server-waking */}
-      {!showSplash && serverReady === 'checking' && <WakingScreen />}
+      {!showSplash &&
+        serverReady === 'checking' && (
+          <WakingScreen />
+        )}
 
       {/* Main UI */}
-      {!showSplash && serverReady === 'ready' && (
-        <div className="relative min-h-[100dvh] w-full bg-background text-foreground flex flex-col font-sans">
-          <SeasonalBackdrop season={season} />
-
-          {/* Header */}
-          <header className="sticky top-0 z-50 flex items-center gap-2 p-6 justify-center sm:justify-start bg-background">
-            <img
-              src="/header-logo.png"
-              alt="pinME Logo"
-              className="h-10 w-10 object-contain"
+      {!showSplash &&
+        serverReady === 'ready' && (
+          <div className="relative min-h-[100dvh] w-full bg-background text-foreground flex flex-col font-sans">
+            <SeasonalBackdrop
+              season={season}
             />
 
-            <span className="text-2xl font-bold tracking-tight">
-              <span className="text-foreground">pin</span>
-              <span className="text-primary">ME</span>
-            </span>
-          </header>
+            {/* Header */}
+            <header className="sticky top-0 z-50 flex items-center gap-2 p-6 justify-center sm:justify-start bg-background">
+              <img
+                src="/header-logo.png"
+                alt="pinME Logo"
+                className="h-10 w-10 object-contain"
+              />
 
-          {/* Main Content */}
-          <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto">
-            <div className="w-full space-y-8">
+              <span className="text-2xl font-bold tracking-tight">
+                <span className="text-foreground">
+                  pin
+                </span>
 
-              {/* Balanced heading */}
-              <div className="text-center space-y-2">
-                <h1 className="text-2xl font-bold tracking-tight text-balance max-w-[360px] mx-auto">
-                  Download Pinterest videos, images, GIFs &amp; carousels
-                </h1>
+                <span className="text-primary">
+                  ME
+                </span>
+              </span>
+            </header>
 
-                <p className="text-muted-foreground text-sm max-w-[320px] mx-auto">
-                  Fast, free, and directly to your device.
-                </p>
-              </div>
+            {/* Main Content */}
+            <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto">
+              <div className="w-full space-y-8">
 
-              <form
-                onSubmit={handleSubmit}
-                className="w-full space-y-4"
-              >
-                <div className="relative flex items-center">
-                  <input
-                    ref={inputRef}
-                    type="url"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    onPaste={handleNativePaste}
-                    placeholder="Paste Pinterest link here..."
-                    className="w-full bg-input/50 border border-border rounded-xl py-4 pl-4 pr-14 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner"
-                    disabled={status === 'loading'}
-                    data-testid="input-url"
+                {/* Balanced heading */}
+                <div className="text-center space-y-2">
+                  <h1 className="text-2xl font-bold tracking-tight text-balance max-w-[360px] mx-auto">
+                    Download Pinterest videos, images, GIFs &amp; carousels
+                  </h1>
+
+                  <p className="text-muted-foreground text-sm max-w-[320px] mx-auto">
+                    Fast, free, and directly to your device.
+                  </p>
+                </div>
+
+                <form
+                  onSubmit={handleSubmit}
+                  className="w-full space-y-4"
+                >
+                  {/* URL input */}
+                  <div className="relative flex items-center">
+                    <input
+                      ref={inputRef}
+                      type="url"
+                      value={url}
+                      onChange={(e) =>
+                        setUrl(e.target.value)
+                      }
+                      onPaste={
+                        handleNativePaste
+                      }
+                      placeholder="Paste Pinterest link here..."
+                      className="w-full bg-input/50 border border-border rounded-xl py-4 pl-4 pr-14 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner"
+                      disabled={
+                        status === 'loading'
+                      }
+                      data-testid="input-url"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={
+                        handlePasteClick
+                      }
+                      className="absolute right-2 p-2 text-muted-foreground hover:text-foreground transition-colors"
+                      title="Paste from clipboard"
+                      disabled={
+                        status === 'loading'
+                      }
+                      data-testid="button-paste"
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        aria-hidden="true"
+                      >
+                        <rect
+                          x="5.5"
+                          y="1.5"
+                          width="12"
+                          height="12"
+                          rx="2.5"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                        />
+
+                        <rect
+                          x="1.5"
+                          y="6.5"
+                          width="12"
+                          height="12"
+                          rx="2.5"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          fill="var(--color-surface, #1e1e1e)"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Video quality */}
+                  <VideoQualitySelector
+                    value={videoQuality}
+                    onChange={
+                      setVideoQuality
+                    }
+                    disabled={
+                      status === 'loading'
+                    }
                   />
 
-                  <button
-                    type="button"
-                    onClick={handlePasteClick}
-                    className="absolute right-2 p-2 text-muted-foreground hover:text-foreground transition-colors"
-                    title="Paste from clipboard"
-                    disabled={status === 'loading'}
-                    data-testid="button-paste"
-                  >
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      aria-hidden="true"
-                    >
-                      <rect
-                        x="5.5"
-                        y="1.5"
-                        width="12"
-                        height="12"
-                        rx="2.5"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                      />
-
-                      <rect
-                        x="1.5"
-                        y="6.5"
-                        width="12"
-                        height="12"
-                        rx="2.5"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        fill="var(--color-surface, #1e1e1e)"
-                      />
-                    </svg>
-                  </button>
-                </div>
-
-                <AnimatePresence mode="wait">
-                  {status === 'error' && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm text-center"
-                      data-testid="status-error"
-                    >
-                      {errorMsg}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Download / Success area */}
-                <div className="pt-2 min-h-[72px] flex justify-center items-center w-full">
                   <AnimatePresence mode="wait">
-                    {status === 'loading' ? (
+                    {status === 'error' && (
                       <motion.div
-                        key="loading"
-                        initial={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="w-full"
+                        initial={{
+                          opacity: 0,
+                          y: -10,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                        }}
+                        exit={{
+                          opacity: 0,
+                          y: -10,
+                        }}
+                        className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm text-center"
+                        data-testid="status-error"
                       >
-                        <ProgressLabel
-                          label={progressLabel || 'Checking media type...'}
-                        />
+                        {errorMsg}
                       </motion.div>
-                    ) : status === 'success' ? (
-                      <motion.div
-                        key="success"
-                        initial={{ opacity: 0, scale: 0.96 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="w-full flex flex-col items-center"
-                        data-testid="status-success"
-                      >
-                        {/* Animation ABOVE the success box */}
-                        <div className="h-[48px] w-full flex items-center justify-center overflow-visible">
-                          <DownloadTravelAnimation />
-                        </div>
-
-                        {/* Success message */}
-                        <motion.div
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{
-                            delay: 0.62,
-                            duration: 0.22,
-                          }}
-                          className="w-full py-4 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2 px-3"
-                        >
-                          <span className="text-sm sm:text-base">
-                            {successInfo.mediaType === 'carousel'
-                              ? `Carousel downloaded as ZIP${
-                                  successInfo.imageCount
-                                    ? ` (${successInfo.imageCount} images)`
-                                    : ''
-                                }`
-                              : successInfo.mediaType === 'image'
-                                ? 'Image downloaded'
-                                : 'Video downloaded'}
-                          </span>
-
-                          <span className="text-lg leading-none">
-                            ✓
-                          </span>
-                        </motion.div>
-                      </motion.div>
-                    ) : (
-                      <motion.button
-                        key="download"
-                        type="submit"
-                        disabled={!url.trim()}
-                        className={`w-full ${
-                          season === 'default'
-                            ? 'bg-primary hover:bg-primary/90 disabled:hover:bg-primary'
-                            : `seasonal-button seasonal-button-${season}`
-                        } disabled:opacity-50 text-primary-foreground py-4 rounded-xl font-semibold text-lg transition-colors shadow-[0_0_20px_rgba(230,0,35,0.2)]`}
-                        data-testid="button-submit"
-                      >
-                        Download Now
-                      </motion.button>
                     )}
                   </AnimatePresence>
+
+                  {/* Download / Success area */}
+                  <div className="pt-2 min-h-[72px] flex justify-center items-center w-full">
+                    <AnimatePresence mode="wait">
+                      {status === 'loading' ? (
+                        <motion.div
+                          key="loading"
+                          initial={{
+                            opacity: 1,
+                          }}
+                          exit={{
+                            opacity: 0,
+                          }}
+                          className="w-full"
+                        >
+                          <ProgressLabel
+                            label={
+                              progressLabel ||
+                              'Checking media type...'
+                            }
+                          />
+                        </motion.div>
+                      ) : status === 'success' ? (
+                        <motion.div
+                          key="success"
+                          initial={{
+                            opacity: 0,
+                            scale: 0.96,
+                          }}
+                          animate={{
+                            opacity: 1,
+                            scale: 1,
+                          }}
+                          className="w-full flex flex-col items-center"
+                          data-testid="status-success"
+                        >
+                          {/* Animation ABOVE the success box */}
+                          <div className="h-[48px] w-full flex items-center justify-center overflow-visible">
+                            <DownloadTravelAnimation />
+                          </div>
+
+                          {/* Success message */}
+                          <motion.div
+                            initial={{
+                              opacity: 0,
+                              y: 6,
+                            }}
+                            animate={{
+                              opacity: 1,
+                              y: 0,
+                            }}
+                            transition={{
+                              delay: 0.62,
+                              duration: 0.22,
+                            }}
+                            className="w-full py-4 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2 px-3"
+                          >
+                            <span className="text-sm sm:text-base">
+                              {successInfo.mediaType ===
+                              'carousel'
+                                ? `Carousel downloaded as ZIP${
+                                    successInfo.imageCount
+                                      ? ` (${successInfo.imageCount} images)`
+                                      : ''
+                                  }`
+                                : successInfo.mediaType ===
+                                    'image'
+                                  ? 'Image downloaded'
+                                  : 'Video downloaded'}
+                            </span>
+
+                            <span className="text-lg leading-none">
+                              ✓
+                            </span>
+                          </motion.div>
+                        </motion.div>
+                      ) : (
+                        <motion.button
+                          key="download"
+                          type="submit"
+                          disabled={!url.trim()}
+                          className={`w-full ${
+                            season === 'default'
+                              ? 'bg-primary hover:bg-primary/90 disabled:hover:bg-primary'
+                              : `seasonal-button seasonal-button-${season}`
+                          } disabled:opacity-50 text-primary-foreground py-4 rounded-xl font-semibold text-lg transition-colors shadow-[0_0_20px_rgba(230,0,35,0.2)]`}
+                          data-testid="button-submit"
+                        >
+                          Download Now
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </form>
+
+                <p className="text-center text-xs text-muted-foreground leading-relaxed px-4">
+                  Your download will be saved to your device&apos;s Downloads folder (and usually appears in your Gallery/Photos app automatically).
+                </p>
+
+                {/* Coffee button */}
+                <div className="flex justify-center pt-1">
+                  <CoffeeButton />
                 </div>
-              </form>
-
-              <p className="text-center text-xs text-muted-foreground leading-relaxed px-4">
-                Your download will be saved to your device&apos;s Downloads folder (and usually appears in your Gallery/Photos app automatically).
-              </p>
-
-              {/* Coffee button */}
-              <div className="flex justify-center pt-1">
-                <CoffeeButton />
               </div>
-            </div>
-          </main>
+            </main>
 
-          {/* Footer */}
-          <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
-            <div className="flex flex-col items-center gap-2">
-              <button
-                type="button"
-                onClick={onOpenHowItWorks}
-                className="hover:text-foreground transition-colors"
-              >
-                How It Works &amp; FAQ
-              </button>
+            {/* Footer */}
+            <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
+              <div className="flex flex-col items-center gap-2">
+                <button
+                  type="button"
+                  onClick={
+                    onOpenHowItWorks
+                  }
+                  className="hover:text-foreground transition-colors"
+                >
+                  How It Works &amp; FAQ
+                </button>
 
-              <button
-                type="button"
-                onClick={onOpenPrivacy}
-                className="hover:text-foreground transition-colors"
-              >
-                Privacy Policy
-              </button>
+                <button
+                  type="button"
+                  onClick={
+                    onOpenPrivacy
+                  }
+                  className="hover:text-foreground transition-colors"
+                >
+                  Privacy Policy
+                </button>
 
-              <button
-                type="button"
-                onClick={onOpenTerms}
-                className="hover:text-foreground transition-colors"
-              >
-                Terms &amp; Conditions
-              </button>
-            </div>
-          </footer>
+                <button
+                  type="button"
+                  onClick={
+                    onOpenTerms
+                  }
+                  className="hover:text-foreground transition-colors"
+                >
+                  Terms &amp; Conditions
+                </button>
+              </div>
+            </footer>
 
-          {/* Badge-blend gradient */}
-          <div
-            aria-hidden="true"
-            className="badge-blend fixed bottom-0 right-0 pointer-events-none"
-            style={{
-              width: 220,
-              height: 100,
-            }}
-          />
-        </div>
-      )}
+            {/* Badge-blend gradient */}
+            <div
+              aria-hidden="true"
+              className="badge-blend fixed bottom-0 right-0 pointer-events-none"
+              style={{
+                width: 220,
+                height: 100,
+              }}
+            />
+          </div>
+        )}
     </>
   );
 }
