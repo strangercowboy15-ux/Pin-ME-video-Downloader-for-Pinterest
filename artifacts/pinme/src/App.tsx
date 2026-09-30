@@ -399,6 +399,33 @@ export default function App({
     }
   };
 
+  const handleShare = async () => {
+    const shareUrl = 'https://pinme.download/';
+    const shareData = {
+      title: 'pinME Downloader',
+      text: 'Download Pinterest videos, images, GIFs & carousels with Pin-ME.',
+      url: shareUrl,
+    };
+
+    try {
+      if (
+        typeof navigator !== 'undefined' &&
+        navigator.share
+      ) {
+        await navigator.share(shareData);
+      } else if (
+        typeof navigator !== 'undefined' &&
+        navigator.clipboard
+      ) {
+        await navigator.clipboard.writeText(shareUrl);
+      }
+    } catch (err) {
+      if ((err as DOMException)?.name !== 'AbortError') {
+        console.error('Share failed:', err);
+      }
+    }
+  };
+
   const triggerDownload = async (targetUrl: string) => {
     setStatus('loading');
     setProgressLabel('Checking media type...');
@@ -699,6 +726,23 @@ export default function App({
                 className="hover:text-foreground transition-colors"
               >
                 Terms &amp; Conditions
+              </button>
+
+              <span
+                aria-hidden="true"
+                className="text-muted-foreground/60 text-sm leading-none"
+              >
+                &
+              </span>
+
+              <button
+                type="button"
+                onClick={handleShare}
+                aria-label="Share Pin-ME"
+                title="Share Pin-ME"
+                className="text-red-500 hover:text-red-400 hover:scale-110 transition-all duration-200 text-2xl leading-none p-1"
+              >
+                ➦
               </button>
             </div>
           </footer>
