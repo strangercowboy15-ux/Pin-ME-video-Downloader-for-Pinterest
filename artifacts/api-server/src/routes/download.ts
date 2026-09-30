@@ -5,23 +5,36 @@ import path from "path";
 import { fileURLToPath, URL } from "url";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import archiver from "archiver";
-import sharp from "sharp";
 
 const router = Router();
 
 const DOWNLOAD_TTL_MS = 30 * 60 * 1000;
 
-// Fast-download tuning.
-// These improve our processing/download path but cannot
-// override Pinterest source speed or Render network limits.
+// ============================================================
+// SPEED TUNING
+// ============================================================
+
 const YTDLP_TIMEOUT_MS = 90_000;
+
+// More parallel fragments for video downloads.
+// Actual speed still depends on Pinterest/Render/network.
 const YTDLP_CONCURRENT_FRAGMENTS = 8;
-const FILE_STREAM_HIGH_WATER_MARK = 1024 * 1024;
+
+// Larger file-stream buffer for server -> phone delivery.
+const FILE_STREAM_HIGH_WATER_MARK = 2 * 1024 * 1024;
+
+// ============================================================
+// PATHS
+// ============================================================
 
 const bundledYtDlpPath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../vendor/yt-dlp",
 );
+
+// ============================================================
+// DOWNLOAD TOKEN
+// ============================================================
 
 type DownloadTokenPayload = {
   url: string;
@@ -31,7 +44,7 @@ type DownloadTokenPayload = {
   mediaType: "video" | "image" | "carousel";
 };
 
-// In-memory store: token → { filePath, filename, expiresAt }
+// token → temporary prepared file
 const pendingDownloads = new Map<
   string,
   {
@@ -41,7 +54,10 @@ const pendingDownloads = new Map<
   }
 >();
 
-// Clean up expired entries every 2 minutes.
+// ============================================================
+// CLEANUP
+// ============================================================
+
 setInterval(() => {
   const now = Date.now();
 
@@ -52,13 +68,17 @@ setInterval(() => {
           fs.unlinkSync(entry.filePath);
         }
       } catch {
-        // best-effort
+        // best-effort cleanup
       }
 
       pendingDownloads.delete(token);
     }
   }
 }, 2 * 60 * 1000);
+
+// ============================================================
+// TOKEN HELPERS
+// ============================================================
 
 function getTokenSecret(): string {
   const secret = process.env.SESSION_SECRET;
@@ -90,7 +110,8 @@ function createDownloadToken(
 function parseDownloadToken(
   token: string,
 ): DownloadTokenPayload | null {
-  const [encodedPayload, encodedSignature] = token.split(".");
+  const [encodedPayload, encodedSignature] =
+    token.split(".");
 
   if (!encodedPayload || !encodedSignature) {
     return null;
@@ -110,7 +131,8 @@ function parseDownloadToken(
     );
 
     if (
-      providedSignature.length !== expectedSignature.length ||
+      providedSignature.length !==
+        expectedSignature.length ||
       !timingSafeEqual(
         providedSignature,
         expectedSignature,
@@ -144,6 +166,10 @@ function parseDownloadToken(
   }
 }
 
+// ============================================================
+// PINTEREST URL CHECK
+// ============================================================
+
 function isPinterestUrl(
   rawUrl: string,
 ): boolean {
@@ -173,6 +199,10 @@ function isPinterestUrl(
   }
 }
 
+// ============================================================
+// YT-DLP
+// ============================================================
+
 function getYtDlpCommand(): string {
   if (process.env.YT_DLP_PATH) {
     return process.env.YT_DLP_PATH;
@@ -185,8 +215,6 @@ function getYtDlpCommand(): string {
   return "yt-dlp";
 }
 
-// Spawn yt-dlp, optionally calling onStderrLine
-// for each stderr line.
 function runYtDlp(
   args: string[],
   onStderrLine?: (
@@ -290,6 +318,10 @@ function runYtDlp(
   );
 }
 
+// ============================================================
+// PIN META
+// ============================================================
+
 interface PinMeta {
   id: string;
   title: string | null;
@@ -371,7 +403,7 @@ async function getPinMeta(
         break;
       }
     } catch {
-      // skip
+      // skip malformed lines
     }
   }
 
@@ -406,36 +438,12 @@ async function getPinMeta(
     "gif",
   ].includes(ext);
 
-  console.log(
-    "=== getPinMeta DEBUG ===",
-  );
-
-  console.log("ext:", ext);
-  console.log("isImage:", isImage);
-  console.log(
-    "hasVideoFormats:",
-    hasVideoFormats,
-  );
-  console.log("info.url:", info.url);
-  console.log(
-    "info.thumbnail:",
-    info.thumbnail,
-  );
-  console.log("info.ext:", info.ext);
-  console.log(
-    "formats count:",
-    formats.length,
-  );
-
-  console.log(
-    "=== END getPinMeta DEBUG ===",
-  );
-
   const entries =
     info.entries as
       | Array<Record<string, unknown>>
       | undefined;
 
+  // Carousel
   if (
     Array.isArray(entries) &&
     entries.length > 1
@@ -452,7 +460,8 @@ async function getPinMeta(
     };
   }
 
-  if (!hasVideoFormats) {
+  // Single image
+  if (!hasVideoFormats || isImage) {
     return {
       id:
         (info.id as string) ||
@@ -468,6 +477,7 @@ async function getPinMeta(
     };
   }
 
+  // Video
   return {
     id:
       (info.id as string) ||
@@ -478,6 +488,10 @@ async function getPinMeta(
     hasVideo: true,
   };
 }
+
+// ============================================================
+// GALLERY-DL
+// ============================================================
 
 function getGalleryDlCommand(): string {
   if (process.env.GALLERY_DL_PATH) {
@@ -591,7 +605,10 @@ function runGalleryDl(
   );
 }
 
-// Find every image recursively.
+// ============================================================
+// IMAGE HELPERS
+// ============================================================
+
 function findAllImages(
   dir: string,
 ): string[] {
@@ -638,95 +655,122 @@ function findAllImages(
   return results;
 }
 
-// Convert a normal static image to PNG.
+// ============================================================
+// DIRECT SINGLE IMAGE DOWNLOAD
+// ============================================================
 //
-// GIF and PNG are kept as-is.
-// Compression is reduced from level 9 to 6
-// to improve processing speed while retaining
-// lossless PNG output.
-async function convertImageToPng(
-  inputPath: string,
-): Promise<string> {
-  const ext =
-    path.extname(
-      inputPath,
+// IMPORTANT:
+// For a normal single image, do NOT:
+// gallery-dl -> sharp -> PNG
+//
+// Instead:
+// Pinterest metadata -> direct image URL -> file
+//
+// This avoids unnecessary processing and preserves
+// the original image format/quality.
+//
+
+async function downloadDirectImage(
+  imageUrl: string,
+  outputDir: string,
+  pinId: string,
+): Promise<{
+  filePath: string;
+}> {
+  const response =
+    await fetch(
+      imageUrl,
+      {
+        redirect: "follow",
+      },
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `IMAGE_FETCH_${response.status}`,
+    );
+  }
+
+  const contentType =
+    (
+      response.headers.get(
+        "content-type",
+      ) || ""
     ).toLowerCase();
 
-  if (ext === ".gif") {
-    return inputPath;
-  }
+  let ext = "jpg";
 
-  if (ext === ".png") {
-    return inputPath;
-  }
+  if (
+    contentType.includes(
+      "image/png",
+    )
+  ) {
+    ext = "png";
+  } else if (
+    contentType.includes(
+      "image/webp",
+    )
+  ) {
+    ext = "webp";
+  } else if (
+    contentType.includes(
+      "image/gif",
+    )
+  ) {
+    ext = "gif";
+  } else if (
+    contentType.includes(
+      "image/jpeg",
+    )
+  ) {
+    ext = "jpg";
+  } else {
+    const urlExt =
+      imageUrl.match(
+        /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i,
+      );
 
-  const pngPath =
-    path.join(
-      path.dirname(inputPath),
-      `${path.basename(
-        inputPath,
-        ext,
-      )}.png`,
-    );
+    if (urlExt) {
+      ext =
+        urlExt[1].toLowerCase();
 
-  await sharp(inputPath)
-    .withMetadata()
-    .png({
-      compressionLevel: 6,
-      adaptiveFiltering: true,
-      palette: false,
-    })
-    .toFile(pngPath);
-
-  try {
-    if (
-      inputPath !== pngPath &&
-      fs.existsSync(inputPath)
-    ) {
-      fs.unlinkSync(inputPath);
+      if (ext === "jpeg") {
+        ext = "jpg";
+      }
     }
-  } catch {
-    // best-effort
   }
 
-  return pngPath;
-}
-
-// Convert carousel images in parallel.
-// This reduces total waiting time for carousels,
-// especially when several independent images are present.
-async function convertCarouselImagesToPng(
-  images: string[],
-  onStage?: (
-    label: string,
-  ) => void,
-): Promise<string[]> {
-  if (images.length === 0) {
-    return [];
-  }
-
-  onStage?.(
-    `Processing ${images.length} carousel images...`,
-  );
-
-  const converted =
-    await Promise.all(
-      images.map(
-        (image) =>
-          convertImageToPng(
-            image,
-          ),
-      ),
+  const buffer =
+    Buffer.from(
+      await response.arrayBuffer(),
     );
 
-  onStage?.(
-    "Carousel images ready.",
+  if (buffer.length < 100) {
+    throw new Error(
+      "EMPTY_IMAGE",
+    );
+  }
+
+  const filePath =
+    path.join(
+      outputDir,
+      `${pinId}.${ext}`,
+    );
+
+  fs.writeFileSync(
+    filePath,
+    buffer,
   );
 
-  return converted;
+  return {
+    filePath,
+  };
 }
 
-// Download image or carousel.
+// ============================================================
+// IMAGE / CAROUSEL DOWNLOAD
+// ============================================================
+
 async function downloadImageOrCarousel(
   url: string,
   pinId: string,
@@ -749,6 +793,50 @@ async function downloadImageOrCarousel(
     },
   );
 
+  // ========================================================
+  // FAST PATH: SINGLE IMAGE
+  // ========================================================
+
+  if (imageUrl) {
+    try {
+      onStage?.(
+        "Downloading image...",
+      );
+
+      console.log(
+        "=== FAST DIRECT IMAGE FETCH ===",
+      );
+
+      const direct =
+        await downloadDirectImage(
+          imageUrl,
+          outputDir,
+          pinId,
+        );
+
+      console.log(
+        "Direct image download complete:",
+        direct.filePath,
+      );
+
+      return {
+        filePath:
+          direct.filePath,
+        mediaType: "image",
+        imageCount: 1,
+      };
+    } catch (err) {
+      console.log(
+        "Direct image fetch failed, falling back to gallery-dl:",
+        err,
+      );
+    }
+  }
+
+  // ========================================================
+  // FALLBACK / CAROUSEL PATH: GALLERY-DL
+  // ========================================================
+
   onStage?.(
     "Downloading image...",
   );
@@ -765,7 +853,7 @@ async function downloadImageOrCarousel(
       url,
     ]);
 
-    let images =
+    const images =
       findAllImages(
         outputDir,
       );
@@ -774,19 +862,11 @@ async function downloadImageOrCarousel(
       `gallery-dl found ${images.length} image(s)`,
     );
 
-    if (
-      images.length > 1
-    ) {
-      onStage?.(
-        "Processing carousel images...",
-      );
+    // ======================================================
+    // CAROUSEL
+    // ======================================================
 
-      images =
-        await convertCarouselImagesToPng(
-          images,
-          onStage,
-        );
-
+    if (images.length > 1) {
       onStage?.(
         "Packaging carousel...",
       );
@@ -809,11 +889,10 @@ async function downloadImageOrCarousel(
 
           const archive =
             archiver("zip", {
-              // Level 6 gives a good balance
-              // between speed and ZIP size.
-              zlib: {
-                level: 6,
-              },
+              // Images are already compressed.
+              // Store them instead of spending CPU
+              // recompressing them.
+              store: true,
             });
 
           output.on(
@@ -867,24 +946,18 @@ async function downloadImageOrCarousel(
       return {
         filePath: zipPath,
         mediaType: "carousel",
-        imageCount: images.length,
+        imageCount:
+          images.length,
       };
     }
 
-    if (
-      images.length === 1
-    ) {
-      onStage?.(
-        "Processing image...",
-      );
+    // ======================================================
+    // SINGLE IMAGE FROM GALLERY-DL FALLBACK
+    // ======================================================
 
-      const pngPath =
-        await convertImageToPng(
-          images[0],
-        );
-
+    if (images.length === 1) {
       return {
-        filePath: pngPath,
+        filePath: images[0],
         mediaType: "image",
         imageCount: 1,
       };
@@ -896,87 +969,21 @@ async function downloadImageOrCarousel(
     );
   }
 
-  // Direct image URL fallback.
-  if (imageUrl) {
-    console.log(
-      "=== Direct image fetch fallback ===",
-    );
-
-    try {
-      const res =
-        await fetch(
-          imageUrl,
-        );
-
-      if (res.ok) {
-        const buffer =
-          Buffer.from(
-            await res.arrayBuffer(),
-          );
-
-        const extMatch =
-          imageUrl.match(
-            /\.(jpg|jpeg|png|webp|gif)/i,
-          );
-
-        const ext =
-          extMatch
-            ? extMatch[1].toLowerCase()
-            : "jpg";
-
-        const originalPath =
-          path.join(
-            outputDir,
-            `${pinId}.${ext}`,
-          );
-
-        fs.writeFileSync(
-          originalPath,
-          buffer,
-        );
-
-        console.log(
-          "Saved directly:",
-          originalPath,
-        );
-
-        const filePath =
-          await convertImageToPng(
-            originalPath,
-          );
-
-        return {
-          filePath,
-          mediaType: "image",
-          imageCount: 1,
-        };
-      }
-    } catch (err) {
-      console.log(
-        "Direct fetch failed:",
-        err,
-      );
-    }
-  }
-
   throw new Error(
     "NO_FILE: no image found for this pin",
   );
 }
 
-// Download video using the highest
-// quality available from the source.
+// ============================================================
+// VIDEO DOWNLOAD
+// ============================================================
 //
-// No quality selector is exposed to users.
-// yt-dlp automatically chooses the best
-// available video + best available audio.
+// BEST AVAILABLE native quality.
+// No resolution cap.
+// No artificial upscaling.
+// No user quality selector.
 //
-// SPEED MODE:
-// - 8 concurrent fragments
-// - retry only a small number of times
-// - socket timeout
-// - larger buffer
-// - no artificial resolution cap
+
 async function downloadVideo(
   url: string,
   pinId: string,
@@ -1001,7 +1008,7 @@ async function downloadVideo(
   );
 
   console.log(
-    "Speed mode: JET",
+    "Speed mode: OPTIMIZED",
   );
 
   await runYtDlp(
@@ -1009,14 +1016,14 @@ async function downloadVideo(
       "--no-playlist",
       "--no-warnings",
 
-      // SPEED OPTIMIZATION
+      // Parallel video fragments.
       "--concurrent-fragments",
       String(
         YTDLP_CONCURRENT_FRAGMENTS,
       ),
 
-      // Avoid wasting too much time on a
-      // temporary network failure.
+      // Keep retries limited so failed requests
+      // don't hang for too long.
       "--retries",
       "2",
 
@@ -1026,22 +1033,11 @@ async function downloadVideo(
       "--socket-timeout",
       "15",
 
-      // Larger internal buffer.
-      "--buffer-size",
-      "16K",
-
-      // BEST AVAILABLE native quality.
-      //
-      // No resolution cap.
-      // 720p source -> 720p.
-      // 1080p source -> 1080p.
-      // 4K source -> 4K.
-      // 8K source -> 8K.
+      // Best available native quality.
       "--format",
       "bestvideo+bestaudio/best",
 
-      // Merge separate video/audio streams
-      // into MP4.
+      // MP4 output.
       "--merge-output-format",
       "mp4",
 
@@ -1065,6 +1061,7 @@ async function downloadVideo(
     },
   );
 
+  // Preferred MP4.
   const preferredPath =
     `/tmp/pinme-${pinId}.mp4`;
 
@@ -1096,6 +1093,7 @@ async function downloadVideo(
     };
   }
 
+  // Fallback: find actual output.
   const files =
     fs.readdirSync(
       "/tmp",
@@ -1126,7 +1124,11 @@ async function downloadVideo(
         };
       }
 
-      fs.unlinkSync(fp);
+      try {
+        fs.unlinkSync(fp);
+      } catch {
+        // best-effort
+      }
 
       throw new Error(
         "NO_VIDEO",
@@ -1138,6 +1140,10 @@ async function downloadVideo(
     "NO_FILE: output file not found after yt-dlp succeeded",
   );
 }
+
+// ============================================================
+// FILENAME
+// ============================================================
 
 function buildFilename(
   title: string | null,
@@ -1198,6 +1204,10 @@ function buildFilename(
   )}.${ext}`;
 }
 
+// ============================================================
+// MIME
+// ============================================================
+
 function getMimeType(
   filename: string,
 ): string {
@@ -1226,6 +1236,10 @@ function getMimeType(
     "application/octet-stream"
   );
 }
+
+// ============================================================
+// USER ERRORS
+// ============================================================
 
 function toUserError(
   msg: string,
@@ -1270,7 +1284,10 @@ function toUserError(
   };
 }
 
+// ============================================================
 // POST /api/get-pin
+// ============================================================
+
 router.post(
   "/get-pin",
   async (req, res) => {
@@ -1310,7 +1327,10 @@ router.post(
       return;
     }
 
-    // SSE stream.
+    // ========================================================
+    // SSE
+    // ========================================================
+
     res.setHeader(
       "Content-Type",
       "text/event-stream",
@@ -1343,7 +1363,10 @@ router.post(
     };
 
     try {
-      // Stage 1.
+      // ======================================================
+      // STEP 1
+      // ======================================================
+
       send({
         type: "stage",
         label:
@@ -1365,6 +1388,10 @@ router.post(
       let imageCount:
         | number
         | undefined;
+
+      // ======================================================
+      // IMAGE / CAROUSEL
+      // ======================================================
 
       if (
         meta.isImage ||
@@ -1390,7 +1417,13 @@ router.post(
 
         imageCount =
           result.imageCount;
-      } else {
+      }
+
+      // ======================================================
+      // VIDEO
+      // ======================================================
+
+      else {
         send({
           type: "stage",
           label:
@@ -1414,6 +1447,10 @@ router.post(
         mediaType =
           "video";
       }
+
+      // ======================================================
+      // PREPARE TOKEN
+      // ======================================================
 
       send({
         type: "stage",
@@ -1448,6 +1485,10 @@ router.post(
           expiresAt,
         },
       );
+
+      // ======================================================
+      // READY
+      // ======================================================
 
       send({
         type: "ready",
@@ -1486,7 +1527,10 @@ router.post(
   },
 );
 
+// ============================================================
 // GET /api/stream/:token
+// ============================================================
+
 router.get(
   "/stream/:token",
   async (
@@ -1524,6 +1568,10 @@ router.get(
     let filename =
       payload.filename;
 
+    // ========================================================
+    // USE PREPARED FILE
+    // ========================================================
+
     if (
       entry &&
       fs.existsSync(
@@ -1535,7 +1583,13 @@ router.get(
 
       filename =
         entry.filename;
-    } else {
+    }
+
+    // ========================================================
+    // FALLBACK FRESH DOWNLOAD
+    // ========================================================
+
+    else {
       try {
         req.log?.warn(
           "Prepared download was unavailable; fetching a fresh copy",
@@ -1637,6 +1691,10 @@ router.get(
       }
     }
 
+    // ========================================================
+    // FILE CHECK
+    // ========================================================
+
     if (
       !fs.existsSync(
         filePath,
@@ -1674,6 +1732,10 @@ router.get(
       return;
     }
 
+    // ========================================================
+    // RESPONSE HEADERS
+    // ========================================================
+
     res.setHeader(
       "Content-Type",
       getMimeType(
@@ -1696,6 +1758,10 @@ router.get(
       "no-store",
     );
 
+    // ========================================================
+    // FAST FILE STREAM
+    // ========================================================
+
     const fileStream =
       fs.createReadStream(
         filePath,
@@ -1712,9 +1778,15 @@ router.get(
         );
 
         try {
-          fs.unlinkSync(
-            filePath,
-          );
+          if (
+            fs.existsSync(
+              filePath,
+            )
+          ) {
+            fs.unlinkSync(
+              filePath,
+            );
+          }
         } catch {
           // best-effort
         }
@@ -1742,6 +1814,8 @@ router.get(
       },
     );
 
+    // If client disconnects during download,
+    // stop reading the temporary file.
     res.on(
       "close",
       () => {
@@ -1749,6 +1823,31 @@ router.get(
           !res.writableFinished
         ) {
           fileStream.destroy();
+        }
+      },
+    );
+
+    // Once response finishes successfully,
+    // delete the temporary file.
+    res.on(
+      "finish",
+      () => {
+        pendingDownloads.delete(
+          token,
+        );
+
+        try {
+          if (
+            fs.existsSync(
+              filePath,
+            )
+          ) {
+            fs.unlinkSync(
+              filePath,
+            );
+          }
+        } catch {
+          // best-effort
         }
       },
     );
