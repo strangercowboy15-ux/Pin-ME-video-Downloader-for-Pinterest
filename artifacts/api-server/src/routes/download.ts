@@ -11,6 +11,13 @@ const router = Router();
 
 const DOWNLOAD_TTL_MS = 30 * 60 * 1000;
 
+// Fast-download tuning.
+// These improve our processing/download path but cannot
+// override Pinterest source speed or Render network limits.
+const YTDLP_TIMEOUT_MS = 90_000;
+const YTDLP_CONCURRENT_FRAGMENTS = 8;
+const FILE_STREAM_HIGH_WATER_MARK = 1024 * 1024;
+
 const bundledYtDlpPath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../vendor/yt-dlp",
@@ -34,7 +41,7 @@ const pendingDownloads = new Map<
   }
 >();
 
-// Clean up expired entries every 2 minutes
+// Clean up expired entries every 2 minutes.
 setInterval(() => {
   const now = Date.now();
 
@@ -83,8 +90,7 @@ function createDownloadToken(
 function parseDownloadToken(
   token: string,
 ): DownloadTokenPayload | null {
-  const [encodedPayload, encodedSignature] =
-    token.split(".");
+  const [encodedPayload, encodedSignature] = token.split(".");
 
   if (!encodedPayload || !encodedSignature) {
     return null;
@@ -104,8 +110,7 @@ function parseDownloadToken(
     );
 
     if (
-      providedSignature.length !==
-        expectedSignature.length ||
+      providedSignature.length !== expectedSignature.length ||
       !timingSafeEqual(
         providedSignature,
         expectedSignature,
@@ -144,8 +149,7 @@ function isPinterestUrl(
 ): boolean {
   try {
     const parsed = new URL(rawUrl);
-    const host =
-      parsed.hostname.toLowerCase();
+    const host = parsed.hostname.toLowerCase();
 
     return (
       host === "pin.it" ||
@@ -197,16 +201,22 @@ function runYtDlp(
       const proc = spawn(
         getYtDlpCommand(),
         args,
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "pipe",
+          ],
+        },
       );
 
-      const timeout =
-        setTimeout(() => {
-          proc.kill("SIGKILL");
+      const timeout = setTimeout(() => {
+        proc.kill("SIGKILL");
 
-          reject(
-            new Error("TIMEOUT"),
-          );
-        }, 120_000);
+        reject(
+          new Error("TIMEOUT"),
+        );
+      }, YTDLP_TIMEOUT_MS);
 
       let stdout = "";
       let stderr = "";
@@ -222,8 +232,7 @@ function runYtDlp(
       proc.stderr.on(
         "data",
         (d: Buffer) => {
-          const chunk =
-            d.toString();
+          const chunk = d.toString();
 
           stderr += chunk;
 
@@ -309,24 +318,15 @@ async function getPinMeta(
     };
 
     const errLower =
-      (e.stderr || "")
-        .toLowerCase();
+      (e.stderr || "").toLowerCase();
 
     if (
-      errLower.includes(
-        "unsupported url",
-      ) ||
-      errLower.includes(
-        "no video",
-      ) ||
-      errLower.includes(
-        "not a video",
-      )
+      errLower.includes("unsupported url") ||
+      errLower.includes("no video") ||
+      errLower.includes("not a video")
     ) {
       return {
-        id: randomBytes(
-          4,
-        ).toString("hex"),
+        id: randomBytes(4).toString("hex"),
         title: null,
         hasVideo: false,
         isImage: true,
@@ -335,22 +335,12 @@ async function getPinMeta(
 
     if (
       errLower.includes("private") ||
-      errLower.includes(
-        "unavailable",
-      ) ||
-      errLower.includes(
-        "not available",
-      ) ||
-      errLower.includes(
-        "not exist",
-      ) ||
-      errLower.includes(
-        "login required",
-      )
+      errLower.includes("unavailable") ||
+      errLower.includes("not available") ||
+      errLower.includes("not exist") ||
+      errLower.includes("login required")
     ) {
-      throw new Error(
-        "UNAVAILABLE",
-      );
+      throw new Error("UNAVAILABLE");
     }
 
     throw err;
@@ -360,10 +350,7 @@ async function getPinMeta(
     stdout.trim().split("\n");
 
   let info:
-    Record<
-      string,
-      unknown
-    > | null = null;
+    Record<string, unknown> | null = null;
 
   for (
     let i = lines.length - 1;
@@ -389,9 +376,7 @@ async function getPinMeta(
   }
 
   if (!info) {
-    throw new Error(
-      "PARSE_ERROR",
-    );
+    throw new Error("PARSE_ERROR");
   }
 
   const formats =
@@ -425,36 +410,18 @@ async function getPinMeta(
     "=== getPinMeta DEBUG ===",
   );
 
-  console.log(
-    "ext:",
-    ext,
-  );
-
-  console.log(
-    "isImage:",
-    isImage,
-  );
-
+  console.log("ext:", ext);
+  console.log("isImage:", isImage);
   console.log(
     "hasVideoFormats:",
     hasVideoFormats,
   );
-
-  console.log(
-    "info.url:",
-    info.url,
-  );
-
+  console.log("info.url:", info.url);
   console.log(
     "info.thumbnail:",
     info.thumbnail,
   );
-
-  console.log(
-    "info.ext:",
-    info.ext,
-  );
-
+  console.log("info.ext:", info.ext);
   console.log(
     "formats count:",
     formats.length,
@@ -464,13 +431,9 @@ async function getPinMeta(
     "=== END getPinMeta DEBUG ===",
   );
 
-  // Check if this is a carousel
-  // (multiple entries)
   const entries =
     info.entries as
-      | Array<
-          Record<string, unknown>
-        >
+      | Array<Record<string, unknown>>
       | undefined;
 
   if (
@@ -480,9 +443,7 @@ async function getPinMeta(
     return {
       id:
         (info.id as string) ||
-        randomBytes(
-          4,
-        ).toString("hex"),
+        randomBytes(4).toString("hex"),
       title:
         (info.title as string) ||
         null,
@@ -491,16 +452,11 @@ async function getPinMeta(
     };
   }
 
-  // If no video formats and
-  // it's not clearly a video —
-  // treat as image
   if (!hasVideoFormats) {
     return {
       id:
         (info.id as string) ||
-        randomBytes(
-          4,
-        ).toString("hex"),
+        randomBytes(4).toString("hex"),
       title:
         (info.title as string) ||
         null,
@@ -515,9 +471,7 @@ async function getPinMeta(
   return {
     id:
       (info.id as string) ||
-      randomBytes(
-        4,
-      ).toString("hex"),
+      randomBytes(4).toString("hex"),
     title:
       (info.title as string) ||
       null,
@@ -526,9 +480,7 @@ async function getPinMeta(
 }
 
 function getGalleryDlCommand(): string {
-  if (
-    process.env.GALLERY_DL_PATH
-  ) {
+  if (process.env.GALLERY_DL_PATH) {
     return process.env.GALLERY_DL_PATH;
   }
 
@@ -549,6 +501,13 @@ function runGalleryDl(
       const proc = spawn(
         getGalleryDlCommand(),
         args,
+        {
+          stdio: [
+            "ignore",
+            "pipe",
+            "pipe",
+          ],
+        },
       );
 
       const timeout =
@@ -558,7 +517,7 @@ function runGalleryDl(
           reject(
             new Error("TIMEOUT"),
           );
-        }, 120_000);
+        }, YTDLP_TIMEOUT_MS);
 
       let stdout = "";
       let stderr = "";
@@ -574,8 +533,7 @@ function runGalleryDl(
       proc.stderr.on(
         "data",
         (d: Buffer) => {
-          const chunk =
-            d.toString();
+          const chunk = d.toString();
 
           stderr += chunk;
 
@@ -664,9 +622,7 @@ function findAllImages(
           entry.name,
         )
       ) {
-        results.push(
-          fullPath,
-        );
+        results.push(fullPath);
       }
     } else if (
       entry.isDirectory()
@@ -682,11 +638,12 @@ function findAllImages(
   return results;
 }
 
-// Convert a normal static image to
-// a full-colour, lossless PNG.
+// Convert a normal static image to PNG.
 //
-// GIF is intentionally excluded because
-// animated GIF -> PNG would lose animation.
+// GIF and PNG are kept as-is.
+// Compression is reduced from level 9 to 6
+// to improve processing speed while retaining
+// lossless PNG output.
 async function convertImageToPng(
   inputPath: string,
 ): Promise<string> {
@@ -715,14 +672,12 @@ async function convertImageToPng(
   await sharp(inputPath)
     .withMetadata()
     .png({
-      compressionLevel: 9,
+      compressionLevel: 6,
       adaptiveFiltering: true,
       palette: false,
     })
     .toFile(pngPath);
 
-  // Remove original JPG/JPEG/WebP
-  // after successful conversion.
   try {
     if (
       inputPath !== pngPath &&
@@ -737,37 +692,36 @@ async function convertImageToPng(
   return pngPath;
 }
 
-// Convert every static image in a carousel
-// to PNG before creating the ZIP.
+// Convert carousel images in parallel.
+// This reduces total waiting time for carousels,
+// especially when several independent images are present.
 async function convertCarouselImagesToPng(
   images: string[],
   onStage?: (
     label: string,
   ) => void,
 ): Promise<string[]> {
-  const converted: string[] = [];
-
-  for (
-    let i = 0;
-    i < images.length;
-    i++
-  ) {
-    const image =
-      images[i];
-
-    onStage?.(
-      `Processing image ${i + 1} of ${images.length}...`,
-    );
-
-    const convertedPath =
-      await convertImageToPng(
-        image,
-      );
-
-    converted.push(
-      convertedPath,
-    );
+  if (images.length === 0) {
+    return [];
   }
+
+  onStage?.(
+    `Processing ${images.length} carousel images...`,
+  );
+
+  const converted =
+    await Promise.all(
+      images.map(
+        (image) =>
+          convertImageToPng(
+            image,
+          ),
+      ),
+    );
+
+  onStage?.(
+    "Carousel images ready.",
+  );
 
   return converted;
 }
@@ -799,7 +753,6 @@ async function downloadImageOrCarousel(
     "Downloading image...",
   );
 
-  // First try gallery-dl.
   try {
     console.log(
       "=== gallery-dl image/carousel ===",
@@ -821,7 +774,6 @@ async function downloadImageOrCarousel(
       `gallery-dl found ${images.length} image(s)`,
     );
 
-    // Multiple images = carousel
     if (
       images.length > 1
     ) {
@@ -846,7 +798,10 @@ async function downloadImageOrCarousel(
         );
 
       await new Promise<void>(
-        (resolve, reject) => {
+        (
+          resolve,
+          reject,
+        ) => {
           const output =
             fs.createWriteStream(
               zipPath,
@@ -854,8 +809,10 @@ async function downloadImageOrCarousel(
 
           const archive =
             archiver("zip", {
+              // Level 6 gives a good balance
+              // between speed and ZIP size.
               zlib: {
-                level: 9,
+                level: 6,
               },
             });
 
@@ -914,7 +871,6 @@ async function downloadImageOrCarousel(
       };
     }
 
-    // Exactly one image
     if (
       images.length === 1
     ) {
@@ -940,7 +896,7 @@ async function downloadImageOrCarousel(
     );
   }
 
-  // Fallback: direct image URL
+  // Direct image URL fallback.
   if (imageUrl) {
     console.log(
       "=== Direct image fetch fallback ===",
@@ -948,7 +904,9 @@ async function downloadImageOrCarousel(
 
     try {
       const res =
-        await fetch(imageUrl);
+        await fetch(
+          imageUrl,
+        );
 
       if (res.ok) {
         const buffer =
@@ -1012,6 +970,13 @@ async function downloadImageOrCarousel(
 // No quality selector is exposed to users.
 // yt-dlp automatically chooses the best
 // available video + best available audio.
+//
+// SPEED MODE:
+// - 8 concurrent fragments
+// - retry only a small number of times
+// - socket timeout
+// - larger buffer
+// - no artificial resolution cap
 async function downloadVideo(
   url: string,
   pinId: string,
@@ -1035,22 +1000,48 @@ async function downloadVideo(
     "Quality mode: BEST AVAILABLE",
   );
 
+  console.log(
+    "Speed mode: JET",
+  );
+
   await runYtDlp(
     [
       "--no-playlist",
       "--no-warnings",
-      "--concurrent-fragments",
-      "4",
 
-      // Highest available native video
-      // + highest available audio.
+      // SPEED OPTIMIZATION
+      "--concurrent-fragments",
+      String(
+        YTDLP_CONCURRENT_FRAGMENTS,
+      ),
+
+      // Avoid wasting too much time on a
+      // temporary network failure.
+      "--retries",
+      "2",
+
+      "--fragment-retries",
+      "2",
+
+      "--socket-timeout",
+      "15",
+
+      // Larger internal buffer.
+      "--buffer-size",
+      "16K",
+
+      // BEST AVAILABLE native quality.
       //
-      // No artificial resolution cap.
+      // No resolution cap.
+      // 720p source -> 720p.
+      // 1080p source -> 1080p.
+      // 4K source -> 4K.
+      // 8K source -> 8K.
       "--format",
       "bestvideo+bestaudio/best",
 
-      // When separate video/audio streams
-      // are selected, merge them into MP4.
+      // Merge separate video/audio streams
+      // into MP4.
       "--merge-output-format",
       "mp4",
 
@@ -1062,9 +1053,7 @@ async function downloadVideo(
     (line) => {
       if (
         !mergeSignalled &&
-        line.includes(
-          "[Merger]",
-        )
+        line.includes("[Merger]")
       ) {
         mergeSignalled =
           true;
@@ -1107,8 +1096,6 @@ async function downloadVideo(
     };
   }
 
-  // Fallback: find any file
-  // with this pinId prefix.
   const files =
     fs.readdirSync(
       "/tmp",
@@ -1162,10 +1149,8 @@ function buildFilename(
     ).slice(1) ||
     "mp4";
 
-  // Carousel ZIP filename
   if (
-    ext.toLowerCase() ===
-    "zip"
+    ext.toLowerCase() === "zip"
   ) {
     return `pinme-carousel-${Date.now()}.zip`;
   }
@@ -1296,12 +1281,9 @@ router.post(
         url?: string;
       };
 
-    // Validate before opening
-    // the SSE stream.
     if (
       !url ||
-      typeof url !==
-        "string" ||
+      typeof url !== "string" ||
       !url.trim()
     ) {
       res.status(400).json({
@@ -1328,7 +1310,7 @@ router.post(
       return;
     }
 
-    // Open SSE stream
+    // SSE stream.
     res.setHeader(
       "Content-Type",
       "text/event-stream",
@@ -1361,7 +1343,7 @@ router.post(
     };
 
     try {
-      // Stage 1 — metadata
+      // Stage 1.
       send({
         type: "stage",
         label:
@@ -1373,7 +1355,6 @@ router.post(
           trimmed,
         );
 
-      // Stage 2 — download
       let filePath: string;
 
       let mediaType:
@@ -1385,8 +1366,6 @@ router.post(
         | number
         | undefined;
 
-      // Images and carousels both come through
-      // downloadImageOrCarousel().
       if (
         meta.isImage ||
         meta.isCarousel
@@ -1418,8 +1397,6 @@ router.post(
             "Downloading video...",
         });
 
-        // No quality argument here.
-        // Backend always uses best available.
         const vid =
           await downloadVideo(
             trimmed,
@@ -1438,7 +1415,6 @@ router.post(
           "video";
       }
 
-      // Stage 4 — build token
       send({
         type: "stage",
         label:
@@ -1607,8 +1583,6 @@ router.get(
               filePath,
             );
         } else {
-          // Retry also automatically uses
-          // the highest available quality.
           const fresh =
             await downloadVideo(
               payload.url,
@@ -1725,6 +1699,10 @@ router.get(
     const fileStream =
       fs.createReadStream(
         filePath,
+        {
+          highWaterMark:
+            FILE_STREAM_HIGH_WATER_MARK,
+        },
       );
 
     const removeFailedDownload =
