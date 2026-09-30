@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trackDownload } from './analytics';
 import { SeasonalBackdrop, useSeason } from './seasonal';
+import { useLanguage } from './useLanguage';
 
 // ─── Server-ready hook ───────────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ function SplashScreen() {
 // ─── Server-waking screen ────────────────────────────────────────────────────
 
 function WakingScreen() {
+  const { t } = useLanguage();
   const [dots, setDots] = useState('');
 
   useEffect(() => {
@@ -106,12 +108,12 @@ function WakingScreen() {
 
       <div className="text-center space-y-2">
         <p className="text-lg font-semibold text-foreground">
-          Starting server
+          {t('serverStarting')}
           <span className="inline-block w-6 text-left">{dots}</span>
         </p>
 
         <p className="text-sm text-muted-foreground max-w-xs">
-          The server is waking up — this usually takes 20–30 seconds. Hang tight!
+          {t('serverWakingText')}
         </p>
       </div>
 
@@ -329,16 +331,15 @@ function CoffeeButton() {
 export default function App({
   onOpenPrivacy,
   onOpenTerms,
-  onOpenHowItWorks,
   onSplashComplete,
 }: {
   onOpenPrivacy: () => void;
   onOpenTerms: () => void;
-  onOpenHowItWorks: () => void;
   onSplashComplete?: () => void;
 }) {
   const serverReady = useServerReady();
   const season = useSeason();
+  const { t } = useLanguage();
 
   const [showSplash, setShowSplash] = useState(true);
   const [url, setUrl] = useState('');
@@ -399,36 +400,9 @@ export default function App({
     }
   };
 
-  const handleShare = async () => {
-    const shareUrl = 'https://pinme.download/';
-    const shareData = {
-      title: 'pinME Downloader',
-      text: 'Download Pinterest videos, images, GIFs & carousels with Pin-ME.',
-      url: shareUrl,
-    };
-
-    try {
-      if (
-        typeof navigator !== 'undefined' &&
-        navigator.share
-      ) {
-        await navigator.share(shareData);
-      } else if (
-        typeof navigator !== 'undefined' &&
-        navigator.clipboard
-      ) {
-        await navigator.clipboard.writeText(shareUrl);
-      }
-    } catch (err) {
-      if ((err as DOMException)?.name !== 'AbortError') {
-        console.error('Share failed:', err);
-      }
-    }
-  };
-
   const triggerDownload = async (targetUrl: string) => {
     setStatus('loading');
-    setProgressLabel('Checking media type...');
+    setProgressLabel(t('checkingMedia'));
     setErrorMsg('');
     setSuccessInfo({});
 
@@ -449,10 +423,7 @@ export default function App({
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
 
-        throw new Error(
-          data.error ||
-            'Something went wrong. Please check your connection and try again.'
-        );
+        throw new Error(data.error || t('errorGeneric'));
       }
 
       let downloadTriggered = false;
@@ -461,7 +432,7 @@ export default function App({
         if (event.type === 'stage') {
           setProgressLabel(event.label);
         } else if (event.type === 'ready') {
-          setProgressLabel('Starting download...');
+          setProgressLabel(t('startingDownload'));
 
           const a = document.createElement('a');
 
@@ -496,15 +467,11 @@ export default function App({
       }
 
       if (!downloadTriggered) {
-        throw new Error('Something went wrong. Please try again.');
+        throw new Error(t('errorGeneric'));
       }
     } catch (err: any) {
       setStatus('error');
-
-      setErrorMsg(
-        err.message ||
-          'Something went wrong. Please check your connection and try again.'
-      );
+      setErrorMsg(err.message || t('errorGeneric'));
     }
   };
 
@@ -548,11 +515,11 @@ export default function App({
             <div className="w-full space-y-8">
               <div className="text-center space-y-2">
                 <h1 className="text-2xl font-bold tracking-tight text-balance max-w-[360px] mx-auto">
-                  Download Pinterest videos, images, GIFs &amp; carousels
+                  {t('heading')}
                 </h1>
 
                 <p className="text-muted-foreground text-sm max-w-[320px] mx-auto">
-                  Fast, free, and directly to your device.
+                  {t('subtitle')}
                 </p>
               </div>
 
@@ -564,7 +531,7 @@ export default function App({
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     onPaste={handleNativePaste}
-                    placeholder="Paste Pinterest link here..."
+                    placeholder={t('placeholder')}
                     className="w-full bg-input/50 border border-border rounded-xl py-4 pl-4 pr-14 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner"
                     disabled={status === 'loading'}
                     data-testid="input-url"
@@ -634,9 +601,7 @@ export default function App({
                         className="w-full"
                       >
                         <ProgressLabel
-                          label={
-                            progressLabel || 'Checking media type...'
-                          }
+                          label={progressLabel || t('checkingMedia')}
                         />
                       </motion.div>
                     ) : status === 'success' ? (
@@ -659,14 +624,14 @@ export default function App({
                         >
                           <span className="text-sm sm:text-base">
                             {successInfo.mediaType === 'carousel'
-                              ? `Carousel downloaded as ZIP${
+                              ? `${t('carouselDownloaded')}${
                                   successInfo.imageCount
-                                    ? ` (${successInfo.imageCount} images)`
+                                    ? ` (${successInfo.imageCount} ${t('imagesCount')})`
                                     : ''
                                 }`
                               : successInfo.mediaType === 'image'
-                                ? 'Image downloaded'
-                                : 'Video downloaded'}
+                                ? t('imageDownloaded')
+                                : t('videoDownloaded')}
                           </span>
 
                           <span className="text-lg leading-none">✓</span>
@@ -684,7 +649,7 @@ export default function App({
                         } disabled:opacity-50 text-primary-foreground py-4 rounded-xl font-semibold text-lg transition-colors shadow-[0_0_20px_rgba(230,0,35,0.2)]`}
                         data-testid="button-submit"
                       >
-                        Download Now
+                        {t('downloadNow')}
                       </motion.button>
                     )}
                   </AnimatePresence>
@@ -692,7 +657,7 @@ export default function App({
               </form>
 
               <p className="text-center text-xs text-muted-foreground leading-relaxed px-4">
-                Your download will be saved to your device&apos;s Downloads folder (and usually appears in your Gallery/Photos app automatically).
+                {t('infoText')}
               </p>
 
               <div className="flex justify-center pt-1">
@@ -706,18 +671,10 @@ export default function App({
             <div className="flex flex-col items-center gap-2">
               <button
                 type="button"
-                onClick={onOpenHowItWorks}
-                className="hover:text-foreground transition-colors"
-              >
-                How It Works &amp; FAQ
-              </button>
-
-              <button
-                type="button"
                 onClick={onOpenPrivacy}
                 className="hover:text-foreground transition-colors"
               >
-                Privacy Policy
+                {t('privacyPolicy')}
               </button>
 
               <button
@@ -725,32 +682,82 @@ export default function App({
                 onClick={onOpenTerms}
                 className="hover:text-foreground transition-colors"
               >
-                Terms &amp; Conditions
-              </button>
-
-              <span
-                aria-hidden="true"
-                className="text-muted-foreground/60 text-sm leading-none"
-              >
-                &
-              </span>
-
-              <button
-                type="button"
-                onClick={handleShare}
-                aria-label="Share Pin-ME"
-                title="Share Pin-ME"
-                className="text-red-500 hover:text-red-400 hover:scale-110 transition-all duration-200 text-2xl leading-none p-1"
-              >
-                ➦
+                {t('termsConditions')}
               </button>
             </div>
           </footer>
 
+          {/* How it works */}
+          <section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
+            <h2 className="text-xl font-bold text-center">
+              {t('howItWorks')}
+            </h2>
+
+            <ol className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex gap-3">
+                <span className="font-bold text-foreground">1.</span>
+                <span>{t('step1')}</span>
+              </li>
+
+              <li className="flex gap-3">
+                <span className="font-bold text-foreground">2.</span>
+                <span>{t('step2')}</span>
+              </li>
+
+              <li className="flex gap-3">
+                <span className="font-bold text-foreground">3.</span>
+                <span>{t('step3')}</span>
+              </li>
+
+              <li className="flex gap-3">
+                <span className="font-bold text-foreground">4.</span>
+                <span>{t('step4')}</span>
+              </li>
+            </ol>
+          </section>
+
+          {/* FAQ */}
+          <section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
+            <h2 className="text-xl font-bold text-center">
+              {t('faq')}
+              <span className="text-primary">❓</span>
+            </h2>
+
+            <div className="space-y-4 text-sm">
+              <div>
+                <h3 className="font-semibold text-foreground">
+                  💯 {t('faq1Q')}
+                </h3>
+
+                <p className="text-muted-foreground">{t('faq1A')}</p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-foreground">
+                  🗂️ {t('faq2Q')}
+                </h3>
+
+                <p className="text-muted-foreground">{t('faq2A')}</p>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-foreground">
+                  🔒 {t('faq3Q')}
+                </h3>
+
+                <p className="text-muted-foreground">{t('faq3A')}</p>
+              </div>
+            </div>
+          </section>
+
+          {/* Badge-blend gradient */}
           <div
             aria-hidden="true"
             className="badge-blend fixed bottom-0 right-0 pointer-events-none"
-            style={{ width: 220, height: 100 }}
+            style={{
+              width: 220,
+              height: 100,
+            }}
           />
         </div>
       )}
