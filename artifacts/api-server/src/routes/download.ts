@@ -16,12 +16,10 @@ const DOWNLOAD_TTL_MS = 30 * 60 * 1000;
 
 const YTDLP_TIMEOUT_MS = 90_000;
 
-// More parallel fragments for video downloads.
-// Actual speed still depends on Pinterest/Render/network.
 const YTDLP_CONCURRENT_FRAGMENTS = 8;
 
-// Larger file-stream buffer for server -> phone delivery.
-const FILE_STREAM_HIGH_WATER_MARK = 2 * 1024 * 1024;
+const FILE_STREAM_HIGH_WATER_MARK =
+  2 * 1024 * 1024;
 
 // ============================================================
 // PATHS
@@ -44,7 +42,6 @@ type DownloadTokenPayload = {
   mediaType: "video" | "image" | "carousel";
 };
 
-// token → temporary prepared file
 const pendingDownloads = new Map<
   string,
   {
@@ -443,7 +440,10 @@ async function getPinMeta(
       | Array<Record<string, unknown>>
       | undefined;
 
-  // Carousel
+  // ========================================================
+  // CAROUSEL
+  // ========================================================
+
   if (
     Array.isArray(entries) &&
     entries.length > 1
@@ -460,7 +460,10 @@ async function getPinMeta(
     };
   }
 
-  // Single image
+  // ========================================================
+  // SINGLE IMAGE
+  // ========================================================
+
   if (!hasVideoFormats || isImage) {
     return {
       id:
@@ -477,7 +480,10 @@ async function getPinMeta(
     };
   }
 
-  // Video
+  // ========================================================
+  // VIDEO
+  // ========================================================
+
   return {
     id:
       (info.id as string) ||
@@ -658,17 +664,6 @@ function findAllImages(
 // ============================================================
 // DIRECT SINGLE IMAGE DOWNLOAD
 // ============================================================
-//
-// IMPORTANT:
-// For a normal single image, do NOT:
-// gallery-dl -> sharp -> PNG
-//
-// Instead:
-// Pinterest metadata -> direct image URL -> file
-//
-// This avoids unnecessary processing and preserves
-// the original image format/quality.
-//
 
 async function downloadDirectImage(
   imageUrl: string,
@@ -890,8 +885,7 @@ async function downloadImageOrCarousel(
           const archive =
             archiver("zip", {
               // Images are already compressed.
-              // Store them instead of spending CPU
-              // recompressing them.
+              // Store them instead of recompressing.
               store: true,
             });
 
@@ -952,7 +946,7 @@ async function downloadImageOrCarousel(
     }
 
     // ======================================================
-    // SINGLE IMAGE FROM GALLERY-DL FALLBACK
+    // SINGLE IMAGE FALLBACK
     // ======================================================
 
     if (images.length === 1) {
@@ -1022,8 +1016,7 @@ async function downloadVideo(
         YTDLP_CONCURRENT_FRAGMENTS,
       ),
 
-      // Keep retries limited so failed requests
-      // don't hang for too long.
+      // Limited retries.
       "--retries",
       "2",
 
@@ -1061,7 +1054,10 @@ async function downloadVideo(
     },
   );
 
-  // Preferred MP4.
+  // ========================================================
+  // PREFERRED MP4
+  // ========================================================
+
   const preferredPath =
     `/tmp/pinme-${pinId}.mp4`;
 
@@ -1093,7 +1089,10 @@ async function downloadVideo(
     };
   }
 
-  // Fallback: find actual output.
+  // ========================================================
+  // FALLBACK OUTPUT SEARCH
+  // ========================================================
+
   const files =
     fs.readdirSync(
       "/tmp",
@@ -1814,8 +1813,6 @@ router.get(
       },
     );
 
-    // If client disconnects during download,
-    // stop reading the temporary file.
     res.on(
       "close",
       () => {
@@ -1827,8 +1824,6 @@ router.get(
       },
     );
 
-    // Once response finishes successfully,
-    // delete the temporary file.
     res.on(
       "finish",
       () => {
