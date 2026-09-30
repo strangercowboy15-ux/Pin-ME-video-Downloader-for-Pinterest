@@ -326,6 +326,38 @@ function CoffeeButton() {
   );
 }
 
+// ─── Translate backend SSE stages ────────────────────────────────────────────
+
+function getTranslatedStage(
+  label: string,
+  t: (key: any) => string
+): string {
+  const normalized = label.trim().toLowerCase();
+
+  switch (normalized) {
+    case 'checking media type...':
+      return t('checkingMedia');
+
+    case 'fetching video info...':
+      return t('fetchingInfo');
+
+    case 'downloading video...':
+      return t('downloadingVideo');
+
+    case 'processing video...':
+      return t('processingVideo');
+
+    case 'preparing download...':
+      return t('preparingDownload');
+
+    case 'starting download...':
+      return t('startingDownload');
+
+    default:
+      return label;
+  }
+}
+
 // ─── Main app ────────────────────────────────────────────────────────────────
 
 export default function App({
@@ -430,7 +462,7 @@ export default function App({
 
       for await (const event of readSSE(response)) {
         if (event.type === 'stage') {
-          setProgressLabel(event.label);
+          setProgressLabel(getTranslatedStage(event.label, t));
         } else if (event.type === 'ready') {
           setProgressLabel(t('startingDownload'));
 
@@ -462,7 +494,7 @@ export default function App({
             setSuccessInfo({});
           }, 3000);
         } else if (event.type === 'error') {
-          throw new Error(event.message);
+          throw new Error(event.message || t('errorGeneric'));
         }
       }
 
@@ -626,7 +658,9 @@ export default function App({
                             {successInfo.mediaType === 'carousel'
                               ? `${t('carouselDownloaded')}${
                                   successInfo.imageCount
-                                    ? ` (${successInfo.imageCount} ${t('imagesCount')})`
+                                    ? ` (${successInfo.imageCount} ${t(
+                                        'imagesCount'
+                                      )})`
                                     : ''
                                 }`
                               : successInfo.mediaType === 'image'
