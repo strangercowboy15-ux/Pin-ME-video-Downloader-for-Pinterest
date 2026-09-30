@@ -3,12 +3,18 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath, URL } from "url";
-import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import {
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from "crypto";
 import archiver from "archiver";
+import sharp from "sharp";
 
 const router = Router();
 
-const DOWNLOAD_TTL_MS = 30 * 60 * 1000;
+const DOWNLOAD_TTL_MS =
+  30 * 60 * 1000;
 
 // ============================================================
 // SPEED TUNING
@@ -22,11 +28,27 @@ const FILE_STREAM_HIGH_WATER_MARK =
   2 * 1024 * 1024;
 
 // ============================================================
+// IMAGE FORMAT
+// ============================================================
+
+type ImageFormat = "png" | "svg";
+
+function normalizeImageFormat(
+  value: unknown,
+): ImageFormat {
+  return value === "svg"
+    ? "svg"
+    : "png";
+}
+
+// ============================================================
 // PATHS
 // ============================================================
 
 const bundledYtDlpPath = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
+  path.dirname(
+    fileURLToPath(import.meta.url),
+  ),
   "../vendor/yt-dlp",
 );
 
@@ -39,7 +61,11 @@ type DownloadTokenPayload = {
   pinId: string;
   filename: string;
   expiresAt: number;
-  mediaType: "video" | "image" | "carousel";
+  mediaType:
+    | "video"
+    | "image"
+    | "carousel";
+  imageFormat?: ImageFormat;
 };
 
 const pendingDownloads = new Map<
@@ -58,17 +84,30 @@ const pendingDownloads = new Map<
 setInterval(() => {
   const now = Date.now();
 
-  for (const [token, entry] of pendingDownloads.entries()) {
-    if (entry.expiresAt < now) {
+  for (
+    const [token, entry] of
+    pendingDownloads.entries()
+  ) {
+    if (
+      entry.expiresAt < now
+    ) {
       try {
-        if (fs.existsSync(entry.filePath)) {
-          fs.unlinkSync(entry.filePath);
+        if (
+          fs.existsSync(
+            entry.filePath,
+          )
+        ) {
+          fs.unlinkSync(
+            entry.filePath,
+          );
         }
       } catch {
         // best-effort cleanup
       }
 
-      pendingDownloads.delete(token);
+      pendingDownloads.delete(
+        token,
+      );
     }
   }
 }, 2 * 60 * 1000);
@@ -78,10 +117,13 @@ setInterval(() => {
 // ============================================================
 
 function getTokenSecret(): string {
-  const secret = process.env.SESSION_SECRET;
+  const secret =
+    process.env.SESSION_SECRET;
 
   if (!secret) {
-    throw new Error("SESSION_SECRET_UNAVAILABLE");
+    throw new Error(
+      "SESSION_SECRET_UNAVAILABLE",
+    );
   }
 
   return secret;
@@ -90,16 +132,24 @@ function getTokenSecret(): string {
 function createDownloadToken(
   payload: DownloadTokenPayload,
 ): string {
-  const encodedPayload = Buffer.from(
-    JSON.stringify(payload),
-  ).toString("base64url");
+  const encodedPayload =
+    Buffer.from(
+      JSON.stringify(payload),
+    ).toString(
+      "base64url",
+    );
 
-  const signature = createHmac(
-    "sha256",
-    getTokenSecret(),
-  )
-    .update(encodedPayload)
-    .digest("base64url");
+  const signature =
+    createHmac(
+      "sha256",
+      getTokenSecret(),
+    )
+      .update(
+        encodedPayload,
+      )
+      .digest(
+        "base64url",
+      );
 
   return `${encodedPayload}.${signature}`;
 }
@@ -107,25 +157,34 @@ function createDownloadToken(
 function parseDownloadToken(
   token: string,
 ): DownloadTokenPayload | null {
-  const [encodedPayload, encodedSignature] =
-    token.split(".");
+  const [
+    encodedPayload,
+    encodedSignature,
+  ] = token.split(".");
 
-  if (!encodedPayload || !encodedSignature) {
+  if (
+    !encodedPayload ||
+    !encodedSignature
+  ) {
     return null;
   }
 
   try {
-    const expectedSignature = createHmac(
-      "sha256",
-      getTokenSecret(),
-    )
-      .update(encodedPayload)
-      .digest();
+    const expectedSignature =
+      createHmac(
+        "sha256",
+        getTokenSecret(),
+      )
+        .update(
+          encodedPayload,
+        )
+        .digest();
 
-    const providedSignature = Buffer.from(
-      encodedSignature,
-      "base64url",
-    );
+    const providedSignature =
+      Buffer.from(
+        encodedSignature,
+        "base64url",
+      );
 
     if (
       providedSignature.length !==
@@ -138,26 +197,43 @@ function parseDownloadToken(
       return null;
     }
 
-    const payload = JSON.parse(
-      Buffer.from(
-        encodedPayload,
-        "base64url",
-      ).toString("utf8"),
-    ) as Partial<DownloadTokenPayload>;
+    const payload =
+      JSON.parse(
+        Buffer.from(
+          encodedPayload,
+          "base64url",
+        ).toString(
+          "utf8",
+        ),
+      ) as Partial<DownloadTokenPayload>;
 
     if (
-      typeof payload.url !== "string" ||
-      typeof payload.pinId !== "string" ||
-      typeof payload.filename !== "string" ||
-      typeof payload.expiresAt !== "number" ||
-      !["video", "image", "carousel"].includes(
+      typeof payload.url !==
+        "string" ||
+      typeof payload.pinId !==
+        "string" ||
+      typeof payload.filename !==
+        "string" ||
+      typeof payload.expiresAt !==
+        "number" ||
+      ![
+        "video",
+        "image",
+        "carousel",
+      ].includes(
         payload.mediaType as string,
       )
     ) {
       return null;
     }
 
-    return payload as DownloadTokenPayload;
+    return {
+      ...payload,
+      imageFormat:
+        normalizeImageFormat(
+          payload.imageFormat,
+        ),
+    } as DownloadTokenPayload;
   } catch {
     return null;
   }
@@ -171,25 +247,54 @@ function isPinterestUrl(
   rawUrl: string,
 ): boolean {
   try {
-    const parsed = new URL(rawUrl);
-    const host = parsed.hostname.toLowerCase();
+    const parsed =
+      new URL(rawUrl);
+
+    const host =
+      parsed.hostname.toLowerCase();
 
     return (
       host === "pin.it" ||
       host === "pinterest.com" ||
-      host.endsWith(".pinterest.com") ||
-      host.endsWith(".pinterest.ca") ||
-      host.endsWith(".pinterest.co.uk") ||
-      host.endsWith(".pinterest.fr") ||
-      host.endsWith(".pinterest.de") ||
-      host.endsWith(".pinterest.it") ||
-      host.endsWith(".pinterest.es") ||
-      host.endsWith(".pinterest.se") ||
-      host.endsWith(".pinterest.pt") ||
-      host.endsWith(".pinterest.nz") ||
-      host.endsWith(".pinterest.at") ||
-      host.endsWith(".pinterest.mx") ||
-      host.endsWith(".pinterest.jp")
+      host.endsWith(
+        ".pinterest.com",
+      ) ||
+      host.endsWith(
+        ".pinterest.ca",
+      ) ||
+      host.endsWith(
+        ".pinterest.co.uk",
+      ) ||
+      host.endsWith(
+        ".pinterest.fr",
+      ) ||
+      host.endsWith(
+        ".pinterest.de",
+      ) ||
+      host.endsWith(
+        ".pinterest.it",
+      ) ||
+      host.endsWith(
+        ".pinterest.es",
+      ) ||
+      host.endsWith(
+        ".pinterest.se",
+      ) ||
+      host.endsWith(
+        ".pinterest.pt",
+      ) ||
+      host.endsWith(
+        ".pinterest.nz",
+      ) ||
+      host.endsWith(
+        ".pinterest.at",
+      ) ||
+      host.endsWith(
+        ".pinterest.mx",
+      ) ||
+      host.endsWith(
+        ".pinterest.jp",
+      )
     );
   } catch {
     return false;
@@ -201,11 +306,17 @@ function isPinterestUrl(
 // ============================================================
 
 function getYtDlpCommand(): string {
-  if (process.env.YT_DLP_PATH) {
+  if (
+    process.env.YT_DLP_PATH
+  ) {
     return process.env.YT_DLP_PATH;
   }
 
-  if (fs.existsSync(bundledYtDlpPath)) {
+  if (
+    fs.existsSync(
+      bundledYtDlpPath,
+    )
+  ) {
     return bundledYtDlpPath;
   }
 
@@ -222,26 +333,38 @@ function runYtDlp(
   stderr: string;
 }> {
   return new Promise(
-    (resolve, reject) => {
-      const proc = spawn(
-        getYtDlpCommand(),
-        args,
-        {
-          stdio: [
-            "ignore",
-            "pipe",
-            "pipe",
-          ],
-        },
-      );
-
-      const timeout = setTimeout(() => {
-        proc.kill("SIGKILL");
-
-        reject(
-          new Error("TIMEOUT"),
+    (
+      resolve,
+      reject,
+    ) => {
+      const proc =
+        spawn(
+          getYtDlpCommand(),
+          args,
+          {
+            stdio: [
+              "ignore",
+              "pipe",
+              "pipe",
+            ],
+          },
         );
-      }, YTDLP_TIMEOUT_MS);
+
+      const timeout =
+        setTimeout(
+          () => {
+            proc.kill(
+              "SIGKILL",
+            );
+
+            reject(
+              new Error(
+                "TIMEOUT",
+              ),
+            );
+          },
+          YTDLP_TIMEOUT_MS,
+        );
 
       let stdout = "";
       let stderr = "";
@@ -249,29 +372,46 @@ function runYtDlp(
 
       proc.stdout.on(
         "data",
-        (d: Buffer) => {
-          stdout += d.toString();
+        (
+          d: Buffer,
+        ) => {
+          stdout +=
+            d.toString();
         },
       );
 
       proc.stderr.on(
         "data",
-        (d: Buffer) => {
-          const chunk = d.toString();
+        (
+          d: Buffer,
+        ) => {
+          const chunk =
+            d.toString();
 
           stderr += chunk;
 
-          if (onStderrLine) {
-            stderrBuf += chunk;
+          if (
+            onStderrLine
+          ) {
+            stderrBuf +=
+              chunk;
 
             const lines =
-              stderrBuf.split("\n");
+              stderrBuf.split(
+                "\n",
+              );
 
             stderrBuf =
-              lines.pop() ?? "";
+              lines.pop() ??
+              "";
 
-            for (const line of lines) {
-              onStderrLine(line);
+            for (
+              const line of
+              lines
+            ) {
+              onStderrLine(
+                line,
+              );
             }
           }
         },
@@ -279,10 +419,16 @@ function runYtDlp(
 
       proc.on(
         "close",
-        (code: number | null) => {
-          clearTimeout(timeout);
+        (
+          code: number | null,
+        ) => {
+          clearTimeout(
+            timeout,
+          );
 
-          if (code !== 0) {
+          if (
+            code !== 0
+          ) {
             reject(
               Object.assign(
                 new Error(
@@ -307,7 +453,10 @@ function runYtDlp(
       proc.on(
         "error",
         (err) => {
-          clearTimeout(timeout);
+          clearTimeout(
+            timeout,
+          );
+
           reject(err);
         },
       );
@@ -334,7 +483,9 @@ async function getPinMeta(
   let stdout: string;
 
   try {
-    ({ stdout } =
+    ({
+      stdout,
+    } =
       await runYtDlp([
         "--dump-json",
         "--no-playlist",
@@ -342,20 +493,32 @@ async function getPinMeta(
         url,
       ]));
   } catch (err) {
-    const e = err as {
-      stderr?: string;
-    };
+    const e =
+      err as {
+        stderr?: string;
+      };
 
     const errLower =
-      (e.stderr || "").toLowerCase();
+      (
+        e.stderr ||
+        ""
+      ).toLowerCase();
 
     if (
-      errLower.includes("unsupported url") ||
-      errLower.includes("no video") ||
-      errLower.includes("not a video")
+      errLower.includes(
+        "unsupported url",
+      ) ||
+      errLower.includes(
+        "no video",
+      ) ||
+      errLower.includes(
+        "not a video",
+      )
     ) {
       return {
-        id: randomBytes(4).toString("hex"),
+        id: randomBytes(
+          4,
+        ).toString("hex"),
         title: null,
         hasVideo: false,
         isImage: true,
@@ -363,26 +526,45 @@ async function getPinMeta(
     }
 
     if (
-      errLower.includes("private") ||
-      errLower.includes("unavailable") ||
-      errLower.includes("not available") ||
-      errLower.includes("not exist") ||
-      errLower.includes("login required")
+      errLower.includes(
+        "private",
+      ) ||
+      errLower.includes(
+        "unavailable",
+      ) ||
+      errLower.includes(
+        "not available",
+      ) ||
+      errLower.includes(
+        "not exist",
+      ) ||
+      errLower.includes(
+        "login required",
+      )
     ) {
-      throw new Error("UNAVAILABLE");
+      throw new Error(
+        "UNAVAILABLE",
+      );
     }
 
     throw err;
   }
 
   const lines =
-    stdout.trim().split("\n");
+    stdout
+      .trim()
+      .split("\n");
 
   let info:
-    Record<string, unknown> | null = null;
+    | Record<
+        string,
+        unknown
+      >
+    | null = null;
 
   for (
-    let i = lines.length - 1;
+    let i =
+      lines.length - 1;
     i >= 0;
     i--
   ) {
@@ -394,9 +576,11 @@ async function getPinMeta(
 
       if (
         parsed &&
-        typeof parsed === "object"
+        typeof parsed ===
+          "object"
       ) {
-        info = parsed;
+        info =
+          parsed;
         break;
       }
     } catch {
@@ -405,7 +589,9 @@ async function getPinMeta(
   }
 
   if (!info) {
-    throw new Error("PARSE_ERROR");
+    throw new Error(
+      "PARSE_ERROR",
+    );
   }
 
   const formats =
@@ -417,7 +603,8 @@ async function getPinMeta(
     formats.some(
       (f) =>
         f.vcodec &&
-        f.vcodec !== "none" &&
+        f.vcodec !==
+          "none" &&
         f.vcodec !== null,
     );
 
@@ -437,7 +624,12 @@ async function getPinMeta(
 
   const entries =
     info.entries as
-      | Array<Record<string, unknown>>
+      | Array<
+          Record<
+            string,
+            unknown
+          >
+        >
       | undefined;
 
   // ========================================================
@@ -445,13 +637,17 @@ async function getPinMeta(
   // ========================================================
 
   if (
-    Array.isArray(entries) &&
+    Array.isArray(
+      entries,
+    ) &&
     entries.length > 1
   ) {
     return {
       id:
         (info.id as string) ||
-        randomBytes(4).toString("hex"),
+        randomBytes(
+          4,
+        ).toString("hex"),
       title:
         (info.title as string) ||
         null,
@@ -464,11 +660,16 @@ async function getPinMeta(
   // SINGLE IMAGE
   // ========================================================
 
-  if (!hasVideoFormats || isImage) {
+  if (
+    !hasVideoFormats ||
+    isImage
+  ) {
     return {
       id:
         (info.id as string) ||
-        randomBytes(4).toString("hex"),
+        randomBytes(
+          4,
+        ).toString("hex"),
       title:
         (info.title as string) ||
         null,
@@ -487,7 +688,9 @@ async function getPinMeta(
   return {
     id:
       (info.id as string) ||
-      randomBytes(4).toString("hex"),
+      randomBytes(
+        4,
+      ).toString("hex"),
     title:
       (info.title as string) ||
       null,
@@ -500,7 +703,9 @@ async function getPinMeta(
 // ============================================================
 
 function getGalleryDlCommand(): string {
-  if (process.env.GALLERY_DL_PATH) {
+  if (
+    process.env.GALLERY_DL_PATH
+  ) {
     return process.env.GALLERY_DL_PATH;
   }
 
@@ -517,27 +722,38 @@ function runGalleryDl(
   stderr: string;
 }> {
   return new Promise(
-    (resolve, reject) => {
-      const proc = spawn(
-        getGalleryDlCommand(),
-        args,
-        {
-          stdio: [
-            "ignore",
-            "pipe",
-            "pipe",
-          ],
-        },
-      );
+    (
+      resolve,
+      reject,
+    ) => {
+      const proc =
+        spawn(
+          getGalleryDlCommand(),
+          args,
+          {
+            stdio: [
+              "ignore",
+              "pipe",
+              "pipe",
+            ],
+          },
+        );
 
       const timeout =
-        setTimeout(() => {
-          proc.kill("SIGKILL");
+        setTimeout(
+          () => {
+            proc.kill(
+              "SIGKILL",
+            );
 
-          reject(
-            new Error("TIMEOUT"),
-          );
-        }, YTDLP_TIMEOUT_MS);
+            reject(
+              new Error(
+                "TIMEOUT",
+              ),
+            );
+          },
+          YTDLP_TIMEOUT_MS,
+        );
 
       let stdout = "";
       let stderr = "";
@@ -545,29 +761,46 @@ function runGalleryDl(
 
       proc.stdout.on(
         "data",
-        (d: Buffer) => {
-          stdout += d.toString();
+        (
+          d: Buffer,
+        ) => {
+          stdout +=
+            d.toString();
         },
       );
 
       proc.stderr.on(
         "data",
-        (d: Buffer) => {
-          const chunk = d.toString();
+        (
+          d: Buffer,
+        ) => {
+          const chunk =
+            d.toString();
 
           stderr += chunk;
 
-          if (onStderrLine) {
-            stderrBuf += chunk;
+          if (
+            onStderrLine
+          ) {
+            stderrBuf +=
+              chunk;
 
             const lines =
-              stderrBuf.split("\n");
+              stderrBuf.split(
+                "\n",
+              );
 
             stderrBuf =
-              lines.pop() ?? "";
+              lines.pop() ??
+              "";
 
-            for (const line of lines) {
-              onStderrLine(line);
+            for (
+              const line of
+              lines
+            ) {
+              onStderrLine(
+                line,
+              );
             }
           }
         },
@@ -575,10 +808,16 @@ function runGalleryDl(
 
       proc.on(
         "close",
-        (code: number | null) => {
-          clearTimeout(timeout);
+        (
+          code: number | null,
+        ) => {
+          clearTimeout(
+            timeout,
+          );
 
-          if (code !== 0) {
+          if (
+            code !== 0
+          ) {
             reject(
               Object.assign(
                 new Error(
@@ -603,7 +842,10 @@ function runGalleryDl(
       proc.on(
         "error",
         (err) => {
-          clearTimeout(timeout);
+          clearTimeout(
+            timeout,
+          );
+
           reject(err);
         },
       );
@@ -618,9 +860,14 @@ function runGalleryDl(
 function findAllImages(
   dir: string,
 ): string[] {
-  const results: string[] = [];
+  const results: string[] =
+    [];
 
-  if (!fs.existsSync(dir)) {
+  if (
+    !fs.existsSync(
+      dir,
+    )
+  ) {
     return results;
   }
 
@@ -628,24 +875,32 @@ function findAllImages(
     fs.readdirSync(
       dir,
       {
-        withFileTypes: true,
+        withFileTypes:
+          true,
       },
     );
 
-  for (const entry of entries) {
+  for (
+    const entry of
+    entries
+  ) {
     const fullPath =
       path.join(
         dir,
         entry.name,
       );
 
-    if (entry.isFile()) {
+    if (
+      entry.isFile()
+    ) {
       if (
         /\.(jpg|jpeg|png|webp|gif)$/i.test(
           entry.name,
         )
       ) {
-        results.push(fullPath);
+        results.push(
+          fullPath,
+        );
       }
     } else if (
       entry.isDirectory()
@@ -659,6 +914,239 @@ function findAllImages(
   }
 
   return results;
+}
+
+// ============================================================
+// IMAGE FORMAT HELPERS
+// ============================================================
+
+function escapeXml(
+  value: string,
+): string {
+  return value
+    .replace(
+      /&/g,
+      "&amp;",
+    )
+    .replace(
+      /"/g,
+      "&quot;",
+    )
+    .replace(
+      /</g,
+      "&lt;",
+    )
+    .replace(
+      />/g,
+      "&gt;",
+    );
+}
+
+function getImageMimeType(
+  filePath: string,
+): string {
+  const ext =
+    path.extname(
+      filePath,
+    ).toLowerCase();
+
+  if (
+    ext === ".png"
+  ) {
+    return "image/png";
+  }
+
+  if (
+    ext === ".webp"
+  ) {
+    return "image/webp";
+  }
+
+  if (
+    ext === ".gif"
+  ) {
+    return "image/gif";
+  }
+
+  return "image/jpeg";
+}
+
+// ============================================================
+// PNG CONVERSION
+// ============================================================
+
+async function convertImageToPng(
+  inputPath: string,
+): Promise<string> {
+  const outputPath =
+    path.join(
+      path.dirname(
+        inputPath,
+      ),
+      `${path.basename(
+        inputPath,
+        path.extname(
+          inputPath,
+        ),
+      )}.png`,
+    );
+
+  await sharp(
+    inputPath,
+    {
+      animated: false,
+    },
+  )
+    .png({
+      compressionLevel: 6,
+      adaptiveFiltering: true,
+    })
+    .toFile(
+      outputPath,
+    );
+
+  if (
+    inputPath !==
+    outputPath &&
+    fs.existsSync(
+      inputPath,
+    )
+  ) {
+    fs.unlinkSync(
+      inputPath,
+    );
+  }
+
+  return outputPath;
+}
+
+// ============================================================
+// SVG CONVERSION
+// ============================================================
+//
+// IMPORTANT:
+// This creates a valid SVG container containing the original
+// raster image. It does NOT trace a photo into true vectors.
+// The original pixels remain embedded in the SVG.
+//
+
+async function convertImageToSvg(
+  inputPath: string,
+): Promise<string> {
+  const buffer =
+    fs.readFileSync(
+      inputPath,
+    );
+
+  const metadata =
+    await sharp(
+      inputPath,
+      {
+        animated: false,
+      },
+    ).metadata();
+
+  const width =
+    metadata.width ||
+    1;
+
+  const height =
+    metadata.height ||
+    1;
+
+  const mime =
+    getImageMimeType(
+      inputPath,
+    );
+
+  const base64 =
+    buffer.toString(
+      "base64",
+    );
+
+  const outputPath =
+    path.join(
+      path.dirname(
+        inputPath,
+      ),
+      `${path.basename(
+        inputPath,
+        path.extname(
+          inputPath,
+        ),
+      )}.svg`,
+    );
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="${width}"
+     height="${height}"
+     viewBox="0 0 ${width} ${height}">
+  <image
+    width="${width}"
+    height="${height}"
+    preserveAspectRatio="none"
+    href="data:${escapeXml(
+      mime,
+    )};base64,${base64}"
+  />
+</svg>
+`;
+
+  fs.writeFileSync(
+    outputPath,
+    svg,
+    "utf8",
+  );
+
+  if (
+    inputPath !==
+      outputPath &&
+    fs.existsSync(
+      inputPath,
+    )
+  ) {
+    fs.unlinkSync(
+      inputPath,
+    );
+  }
+
+  return outputPath;
+}
+
+// ============================================================
+// CONVERT IMAGE
+// ============================================================
+
+async function convertImage(
+  inputPath: string,
+  format: ImageFormat,
+): Promise<string> {
+  const ext =
+    path.extname(
+      inputPath,
+    ).toLowerCase();
+
+  // GIF is preserved because converting an animated GIF
+  // to a normal PNG/SVG would lose the animation.
+  if (
+    ext === ".gif"
+  ) {
+    return inputPath;
+  }
+
+  if (
+    format === "svg"
+  ) {
+    return convertImageToSvg(
+      inputPath,
+    );
+  }
+
+  return convertImageToPng(
+    inputPath,
+  );
 }
 
 // ============================================================
@@ -680,7 +1168,9 @@ async function downloadDirectImage(
       },
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       `IMAGE_FETCH_${response.status}`,
     );
@@ -693,7 +1183,8 @@ async function downloadDirectImage(
       ) || ""
     ).toLowerCase();
 
-  let ext = "jpg";
+  let ext =
+    "jpg";
 
   if (
     contentType.includes(
@@ -729,7 +1220,9 @@ async function downloadDirectImage(
       ext =
         urlExt[1].toLowerCase();
 
-      if (ext === "jpeg") {
+      if (
+        ext === "jpeg"
+      ) {
         ext = "jpg";
       }
     }
@@ -740,7 +1233,9 @@ async function downloadDirectImage(
       await response.arrayBuffer(),
     );
 
-  if (buffer.length < 100) {
+  if (
+    buffer.length < 100
+  ) {
     throw new Error(
       "EMPTY_IMAGE",
     );
@@ -773,9 +1268,12 @@ async function downloadImageOrCarousel(
     label: string,
   ) => void,
   imageUrl?: string | null,
+  imageFormat: ImageFormat = "png",
 ): Promise<{
   filePath: string;
-  mediaType: "image" | "carousel";
+  mediaType:
+    | "image"
+    | "carousel";
   imageCount: number;
 }> {
   const outputDir =
@@ -792,7 +1290,9 @@ async function downloadImageOrCarousel(
   // FAST PATH: SINGLE IMAGE
   // ========================================================
 
-  if (imageUrl) {
+  if (
+    imageUrl
+  ) {
     try {
       onStage?.(
         "Downloading image...",
@@ -814,10 +1314,41 @@ async function downloadImageOrCarousel(
         direct.filePath,
       );
 
+      const ext =
+        path.extname(
+          direct.filePath,
+        ).toLowerCase();
+
+      // Preserve animated GIF.
+      if (
+        ext === ".gif"
+      ) {
+        return {
+          filePath:
+            direct.filePath,
+          mediaType:
+            "image",
+          imageCount: 1,
+        };
+      }
+
+      onStage?.(
+        imageFormat === "svg"
+          ? "Converting image to SVG..."
+          : "Converting image to PNG...",
+      );
+
+      const converted =
+        await convertImage(
+          direct.filePath,
+          imageFormat,
+        );
+
       return {
         filePath:
-          direct.filePath,
-        mediaType: "image",
+          converted,
+        mediaType:
+          "image",
         imageCount: 1,
       };
     } catch (err) {
@@ -829,7 +1360,7 @@ async function downloadImageOrCarousel(
   }
 
   // ========================================================
-  // FALLBACK / CAROUSEL PATH: GALLERY-DL
+  // FALLBACK / CAROUSEL PATH
   // ========================================================
 
   onStage?.(
@@ -848,7 +1379,7 @@ async function downloadImageOrCarousel(
       url,
     ]);
 
-    const images =
+    let images =
       findAllImages(
         outputDir,
       );
@@ -861,7 +1392,51 @@ async function downloadImageOrCarousel(
     // CAROUSEL
     // ======================================================
 
-    if (images.length > 1) {
+    if (
+      images.length > 1
+    ) {
+      onStage?.(
+        imageFormat === "svg"
+          ? "Converting carousel to SVG..."
+          : "Converting carousel to PNG...",
+      );
+
+      const convertedImages:
+        string[] = [];
+
+      for (
+        const imagePath of
+        images
+      ) {
+        const ext =
+          path.extname(
+            imagePath,
+          ).toLowerCase();
+
+        // Preserve GIF files.
+        if (
+          ext === ".gif"
+        ) {
+          convertedImages.push(
+            imagePath,
+          );
+          continue;
+        }
+
+        const converted =
+          await convertImage(
+            imagePath,
+            imageFormat,
+          );
+
+        convertedImages.push(
+          converted,
+        );
+      }
+
+      images =
+        convertedImages;
+
       onStage?.(
         "Packaging carousel...",
       );
@@ -883,11 +1458,14 @@ async function downloadImageOrCarousel(
             );
 
           const archive =
-            archiver("zip", {
-              // Images are already compressed.
-              // Store them instead of recompressing.
-              store: true,
-            });
+            archiver(
+              "zip",
+              {
+                // Already-compressed image files
+                // don't need another compression pass.
+                store: true,
+              },
+            );
 
           output.on(
             "close",
@@ -896,12 +1474,18 @@ async function downloadImageOrCarousel(
 
           output.on(
             "error",
-            (err) => reject(err),
+            (
+              err,
+            ) =>
+              reject(err),
           );
 
           archive.on(
             "error",
-            (err) => reject(err),
+            (
+              err,
+            ) =>
+              reject(err),
           );
 
           archive.pipe(
@@ -938,8 +1522,10 @@ async function downloadImageOrCarousel(
       );
 
       return {
-        filePath: zipPath,
-        mediaType: "carousel",
+        filePath:
+          zipPath,
+        mediaType:
+          "carousel",
         imageCount:
           images.length,
       };
@@ -949,10 +1535,47 @@ async function downloadImageOrCarousel(
     // SINGLE IMAGE FALLBACK
     // ======================================================
 
-    if (images.length === 1) {
+    if (
+      images.length === 1
+    ) {
+      const single =
+        images[0];
+
+      const ext =
+        path.extname(
+          single,
+        ).toLowerCase();
+
+      // Preserve GIF.
+      if (
+        ext === ".gif"
+      ) {
+        return {
+          filePath:
+            single,
+          mediaType:
+            "image",
+          imageCount: 1,
+        };
+      }
+
+      onStage?.(
+        imageFormat === "svg"
+          ? "Converting image to SVG..."
+          : "Converting image to PNG...",
+      );
+
+      const converted =
+        await convertImage(
+          single,
+          imageFormat,
+        );
+
       return {
-        filePath: images[0],
-        mediaType: "image",
+        filePath:
+          converted,
+        mediaType:
+          "image",
         imageCount: 1,
       };
     }
@@ -1010,13 +1633,11 @@ async function downloadVideo(
       "--no-playlist",
       "--no-warnings",
 
-      // Parallel video fragments.
       "--concurrent-fragments",
       String(
         YTDLP_CONCURRENT_FRAGMENTS,
       ),
 
-      // Limited retries.
       "--retries",
       "2",
 
@@ -1026,11 +1647,9 @@ async function downloadVideo(
       "--socket-timeout",
       "15",
 
-      // Best available native quality.
       "--format",
       "bestvideo+bestaudio/best",
 
-      // MP4 output.
       "--merge-output-format",
       "mp4",
 
@@ -1042,7 +1661,9 @@ async function downloadVideo(
     (line) => {
       if (
         !mergeSignalled &&
-        line.includes("[Merger]")
+        line.includes(
+          "[Merger]",
+        )
       ) {
         mergeSignalled =
           true;
@@ -1053,10 +1674,6 @@ async function downloadVideo(
       }
     },
   );
-
-  // ========================================================
-  // PREFERRED MP4
-  // ========================================================
 
   const preferredPath =
     `/tmp/pinme-${pinId}.mp4`;
@@ -1089,22 +1706,24 @@ async function downloadVideo(
     };
   }
 
-  // ========================================================
-  // FALLBACK OUTPUT SEARCH
-  // ========================================================
-
   const files =
     fs.readdirSync(
       "/tmp",
     );
 
-  for (const f of files) {
+  for (
+    const f of files
+  ) {
     if (
       f.startsWith(
         `pinme-${pinId}.`,
       ) &&
-      !f.endsWith(".part") &&
-      !f.endsWith(".ytdl")
+      !f.endsWith(
+        ".part",
+      ) &&
+      !f.endsWith(
+        ".ytdl",
+      )
     ) {
       const fp =
         path.join(
@@ -1116,15 +1735,19 @@ async function downloadVideo(
         fs.statSync(fp);
 
       if (
-        stat.size >= 10_000
+        stat.size >=
+        10_000
       ) {
         return {
-          filePath: fp,
+          filePath:
+            fp,
         };
       }
 
       try {
-        fs.unlinkSync(fp);
+        fs.unlinkSync(
+          fp,
+        );
       } catch {
         // best-effort
       }
@@ -1155,7 +1778,8 @@ function buildFilename(
     "mp4";
 
   if (
-    ext.toLowerCase() === "zip"
+    ext.toLowerCase() ===
+    "zip"
   ) {
     return `pinme-carousel-${Date.now()}.zip`;
   }
@@ -1219,15 +1843,26 @@ function getMimeType(
     string,
     string
   > = {
-    ".mp4": "video/mp4",
-    ".webm": "video/webm",
-    ".mov": "video/quicktime",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".webp": "image/webp",
-    ".gif": "image/gif",
-    ".zip": "application/zip",
+    ".mp4":
+      "video/mp4",
+    ".webm":
+      "video/webm",
+    ".mov":
+      "video/quicktime",
+    ".jpg":
+      "image/jpeg",
+    ".jpeg":
+      "image/jpeg",
+    ".png":
+      "image/png",
+    ".webp":
+      "image/webp",
+    ".gif":
+      "image/gif",
+    ".svg":
+      "image/svg+xml",
+    ".zip":
+      "application/zip",
   };
 
   return (
@@ -1289,17 +1924,23 @@ function toUserError(
 
 router.post(
   "/get-pin",
-  async (req, res) => {
+  async (
+    req,
+    res,
+  ) => {
     const {
       url,
+      imageFormat,
     } =
       req.body as {
         url?: string;
+        imageFormat?: ImageFormat;
       };
 
     if (
       !url ||
-      typeof url !== "string" ||
+      typeof url !==
+        "string" ||
       !url.trim()
     ) {
       res.status(400).json({
@@ -1325,6 +1966,11 @@ router.post(
 
       return;
     }
+
+    const selectedImageFormat =
+      normalizeImageFormat(
+        imageFormat,
+      );
 
     // ========================================================
     // SSE
@@ -1400,12 +2046,15 @@ router.post(
           await downloadImageOrCarousel(
             trimmed,
             meta.id,
-            (label) =>
+            (
+              label,
+            ) =>
               send({
                 type: "stage",
                 label,
               }),
             meta.imageUrl,
+            selectedImageFormat,
           );
 
         filePath =
@@ -1433,7 +2082,9 @@ router.post(
           await downloadVideo(
             trimmed,
             meta.id,
-            (label) =>
+            (
+              label,
+            ) =>
               send({
                 type: "stage",
                 label,
@@ -1449,7 +2100,7 @@ router.post(
 
       // ======================================================
       // PREPARE TOKEN
-      // ======================================================
+      // ========================================================
 
       send({
         type: "stage",
@@ -1474,6 +2125,8 @@ router.post(
           filename,
           expiresAt,
           mediaType,
+          imageFormat:
+            selectedImageFormat,
         });
 
       pendingDownloads.set(
@@ -1498,6 +2151,8 @@ router.post(
           null,
         mediaType,
         imageCount,
+        imageFormat:
+          selectedImageFormat,
       });
     } catch (err) {
       const msg =
@@ -1513,7 +2168,9 @@ router.post(
         "get-pin failed",
       );
 
-      const { error } =
+      const {
+        error,
+      } =
         toUserError(msg);
 
       send({
@@ -1536,8 +2193,9 @@ router.get(
     req,
     res,
   ): Promise<void> => {
-    const { token } =
-      req.params;
+    const {
+      token,
+    } = req.params;
 
     const payload =
       parseDownloadToken(
@@ -1607,6 +2265,11 @@ router.get(
             await downloadImageOrCarousel(
               payload.url,
               retryPinId,
+              undefined,
+              undefined,
+              normalizeImageFormat(
+                payload.imageFormat,
+              ),
             );
 
           filePath =
@@ -1625,6 +2288,11 @@ router.get(
             await downloadImageOrCarousel(
               payload.url,
               retryPinId,
+              undefined,
+              undefined,
+              normalizeImageFormat(
+                payload.imageFormat,
+              ),
             );
 
           filePath =
@@ -1847,7 +2515,9 @@ router.get(
       },
     );
 
-    fileStream.pipe(res);
+    fileStream.pipe(
+      res,
+    );
   },
 );
 
