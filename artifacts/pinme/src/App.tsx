@@ -509,6 +509,35 @@ export default function App({
     }
   };
 
+  // ─── Share Pin-ME ─────────────────────────────────────────────────────────
+
+  const handleShare = async () => {
+    const shareUrl = 'https://pinme.download/';
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'pinME Downloader',
+          text: 'Fast & simple Pinterest downloader',
+          url: shareUrl,
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(shareUrl);
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+      } catch (clipboardErr) {
+        console.error('Failed to share Pin-ME', clipboardErr);
+      }
+    }
+  };
+
   return (
     <>
       {/* Splash */}
@@ -733,6 +762,24 @@ export default function App({
                 className="hover:text-foreground transition-colors"
               >
                 {t('termsConditions')}
+              </button>
+
+              {/* Share */}
+              <span
+                aria-hidden="true"
+                className="leading-none text-muted-foreground/70"
+              >
+                &
+              </span>
+
+              <button
+                type="button"
+                onClick={handleShare}
+                aria-label="Share Pin-ME"
+                title="Share Pin-ME"
+                className="text-red-500 hover:text-red-400 hover:scale-110 transition-all duration-200 text-3xl leading-none"
+              >
+                ➦
               </button>
             </div>
           </footer>
