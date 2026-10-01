@@ -215,7 +215,7 @@ function CoffeeDownloadAnimation() {
           times: [0, 0.2, 0.4, 0.75, 1],
           ease: 'easeInOut',
         }}
-        className="absolute left-1/2 top-[18px] -translate-x-1/2 text-5xl leading-none origin-bottom text-white"
+        className="absolute left-1/2 top-[18px] -translate-x-1/2 text-5xl leading-none origin-bottom text-[#f87171]"
       >
         ☕︎
       </motion.div>
@@ -238,7 +238,7 @@ function CoffeeDownloadAnimation() {
           times: [0, 0.18, 0.35, 0.7, 1],
           ease: 'easeInOut',
         }}
-        className="absolute left-1/2 top-[54px] -translate-x-1/2 w-[7px] h-[42px] rounded-full bg-[#8B4513] origin-top"
+        className="absolute left-1/2 top-[54px] -translate-x-1/2 w-[7px] h-[42px] rounded-full bg-[#f87171] origin-top"
       />
 
       {/* Coffee stream glow */}
@@ -253,7 +253,7 @@ function CoffeeDownloadAnimation() {
           delay: 0.78,
           ease: 'easeOut',
         }}
-        className="absolute left-1/2 top-[56px] -translate-x-1/2 w-[13px] h-[40px] rounded-full bg-[#D2691E] blur-[3px] origin-top"
+        className="absolute left-1/2 top-[56px] -translate-x-1/2 w-[13px] h-[40px] rounded-full bg-[#fca5a5] blur-[3px] origin-top"
       />
 
       {/* Splash */}
@@ -268,7 +268,7 @@ function CoffeeDownloadAnimation() {
           delay: 1.35,
           ease: 'easeOut',
         }}
-        className="absolute left-1/2 top-[94px] -translate-x-1/2 w-10 h-2 rounded-full bg-[#8B4513]"
+        className="absolute left-1/2 top-[94px] -translate-x-1/2 w-10 h-2 rounded-full bg-[#f87171]"
       />
 
       <motion.span
@@ -284,7 +284,7 @@ function CoffeeDownloadAnimation() {
           delay: 1.35,
           ease: 'easeOut',
         }}
-        className="absolute left-1/2 top-[91px] w-1.5 h-1.5 rounded-full bg-[#8B4513]"
+        className="absolute left-1/2 top-[91px] w-1.5 h-1.5 rounded-full bg-[#f87171]"
       />
 
       <motion.span
@@ -300,7 +300,7 @@ function CoffeeDownloadAnimation() {
           delay: 1.4,
           ease: 'easeOut',
         }}
-        className="absolute left-1/2 top-[91px] w-1.5 h-1.5 rounded-full bg-[#8B4513]"
+        className="absolute left-1/2 top-[91px] w-1.5 h-1.5 rounded-full bg-[#f87171]"
       />
     </div>
   );
@@ -382,22 +382,9 @@ function CoffeeButton() {
         ~
       </span>
 
-      <motion.span
-        className="relative z-10 text-3xl leading-none"
-        animate={{
-          color: ['#ffffff', '#ffffff', '#ef4444', '#ef4444', '#ffffff'],
-          y: [0, -1, 0, -1, 0],
-          scale: [1, 1.04, 1, 1.04, 1],
-        }}
-        transition={{
-          duration: 3.2,
-          times: [0, 0.2, 0.45, 0.7, 1],
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      >
+      <span className="relative z-10 text-3xl leading-none text-[#f87171]">
         ☕︎
-      </motion.span>
+      </span>
 
       <style>{`
         @keyframes coffeeSteam {
