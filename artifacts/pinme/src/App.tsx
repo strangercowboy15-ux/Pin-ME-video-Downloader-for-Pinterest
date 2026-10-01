@@ -765,13 +765,6 @@ export default function App({
               </button>
 
               {/* Share */}
-              <span
-                aria-hidden="true"
-                className="leading-none text-muted-foreground/70"
-              >
-                &
-              </span>
-
               <button
                 type="button"
                 onClick={handleShare}
