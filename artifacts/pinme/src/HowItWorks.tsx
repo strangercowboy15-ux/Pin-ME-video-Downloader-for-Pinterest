@@ -1,6 +1,9 @@
 import React from 'react';
+import { useLanguage } from './useLanguage';
 
 export default function HowItWorks({ onClose }: { onClose: () => void }) {
+  const { t } = useLanguage();
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
@@ -8,7 +11,7 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close How It Works and FAQ and return to the home page"
+          aria-label={t('howItWorksClose')}
           className="h-11 w-11 flex items-center justify-center rounded-lg text-2xl leading-none text-primary hover:bg-primary/10 transition-colors"
         >
           ✘
@@ -21,7 +24,7 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
             onClose();
           }}
           className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-          aria-label="Return to the home page"
+          aria-label={t('howItWorksHome')}
         >
           <img
             src="/header-logo.png"
@@ -36,9 +39,12 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
 
       {/* Content */}
       <main className="max-w-2xl mx-auto px-6 py-12">
-        <h1 className="text-3xl font-bold mb-2">How It Works &amp; FAQ</h1>
+        <h1 className="text-3xl font-bold mb-2">
+          {t('howItWorksPageTitle')}
+        </h1>
+
         <p className="text-sm text-muted-foreground mb-10">
-          Learn how to use pinME and find answers to common questions.
+          {t('howItWorksPageSubtitle')}
         </p>
 
         <section className="space-y-10 text-foreground leading-relaxed">
@@ -46,35 +52,43 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
           {/* How It Works */}
           <div>
             <h2 className="text-lg font-semibold text-foreground mb-4">
-              How It Works
+              {t('howItWorksSectionTitle')}
             </h2>
 
             <div className="space-y-4">
               <div>
-                <p className="font-medium">1. Copy a Pinterest link 📎</p>
+                <p className="font-medium">
+                  {t('howStep1Title')}
+                </p>
                 <p className="text-muted-foreground mt-1">
-                  Copy the Pinterest link containing the video, image, GIF, or carousel you want to download.
+                  {t('howStep1Description')}
                 </p>
               </div>
 
               <div>
-                <p className="font-medium">2. Paste it in the box above 📥</p>
+                <p className="font-medium">
+                  {t('howStep2Title')}
+                </p>
                 <p className="text-muted-foreground mt-1">
-                  Paste the copied Pinterest link into the download box on pinME.
+                  {t('howStep2Description')}
                 </p>
               </div>
 
               <div>
-                <p className="font-medium">3. Click "Download Now" ⬇️</p>
+                <p className="font-medium">
+                  {t('howStep3Title')}
+                </p>
                 <p className="text-muted-foreground mt-1">
-                  Start the download and let pinME process the requested media.
+                  {t('howStep3Description')}
                 </p>
               </div>
 
               <div>
-                <p className="font-medium">4. Your download saves to your device 📱</p>
+                <p className="font-medium">
+                  {t('howStep4Title')}
+                </p>
                 <p className="text-muted-foreground mt-1">
-                  The downloaded file is sent directly to your device.
+                  {t('howStep4Description')}
                 </p>
               </div>
             </div>
@@ -83,80 +97,91 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
           {/* Supported Downloads */}
           <div>
             <h2 className="text-lg font-semibold text-foreground mb-4">
-              Supported Downloads
+              {t('supportedDownloadsTitle')}
             </h2>
 
             <div className="space-y-3">
-              <p>🎬 <span className="font-medium">Videos</span></p>
-              <p>🖼️ <span className="font-medium">Single Images</span></p>
-              <p>🎞️ <span className="font-medium">GIFs</span></p>
-              <p>🖼️🖼️ <span className="font-medium">Carousels</span> — downloaded as a ZIP file</p>
+              <p>
+                🎬 <span className="font-medium">{t('supportedVideos')}</span>
+              </p>
+
+              <p>
+                🖼️ <span className="font-medium">{t('supportedImages')}</span>
+              </p>
+
+              <p>
+                🎞️ <span className="font-medium">{t('supportedGifs')}</span>
+              </p>
+
+              <p>
+                🖼️🖼️{' '}
+                <span className="font-medium">
+                  {t('supportedCarousels')}
+                </span>{' '}
+                — {t('supportedCarouselsDescription')}
+              </p>
             </div>
           </div>
 
           {/* FAQ */}
           <div>
             <h2 className="text-lg font-semibold text-foreground mb-4">
-              Frequently Asked Questions ❓
+              {t('faqPageTitle')} ❓
             </h2>
 
             <div className="space-y-7">
 
               <div>
                 <h3 className="font-semibold mb-1">
-                  💯 Is pinME free?
+                  {t('faqPage1Question')}
                 </h3>
                 <p>
-                  Yes. pinME is completely free to use and does not require an account.
+                  {t('faqPage1Answer')}
                 </p>
               </div>
 
               <div>
                 <h3 className="font-semibold mb-1">
-                  🗂️ Where do downloads go?
+                  {t('faqPage2Question')}
                 </h3>
                 <p>
-                  Your downloaded file is saved to your device's Downloads folder.
-                  Depending on your device, it may also appear in your Gallery or Photos app.
+                  {t('faqPage2Answer')}
                 </p>
               </div>
 
               <div>
                 <h3 className="font-semibold mb-1">
-                  🔒 Do you store my Pinterest links?
+                  {t('faqPage3Question')}
                 </h3>
                 <p>
-                  No. Pinterest links are processed only to provide the requested download
-                  and are not permanently stored.
+                  {t('faqPage3Answer')}
                 </p>
               </div>
 
               <div>
                 <h3 className="font-semibold mb-1">
-                  👤 Do I need an account?
+                  {t('faqPage4Question')}
                 </h3>
                 <p>
-                  No. You can use pinME without creating an account or signing in.
+                  {t('faqPage4Answer')}
                 </p>
               </div>
 
               <div>
                 <h3 className="font-semibold mb-1">
-                  📦 How are carousel downloads delivered?
+                  {t('faqPage5Question')}
                 </h3>
                 <p>
-                  Carousel images are collected and provided together as a ZIP file
-                  containing the images.
+                  {t('faqPage5Answer')}
                 </p>
               </div>
 
               <div>
                 <h3 className="font-semibold mb-1">
-                  🔗 Is pinME affiliated with Pinterest?
+                  {t('faqPage6Question')}
                 </h3>
                 <p>
-                  No. pinME is an independent service and is not affiliated with,
-                  sponsored by, or officially connected with Pinterest.
+                  {t('faqPage6Answer')}
                 </p>
               </div>
 
@@ -177,7 +202,7 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
           }}
           className="hover:text-foreground transition-colors"
         >
-          Home
+          {t('howItWorksHomeFooter')}
         </button>
       </footer>
     </div>
