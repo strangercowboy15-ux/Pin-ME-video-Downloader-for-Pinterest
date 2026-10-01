@@ -96,7 +96,7 @@ export const translations = {
     faqPage6Answer:
       'No. pinME is an independent service and is not affiliated with, sponsored by, or officially connected with Pinterest.',
 
-    howItWorksHomeFooter: 'Home',
+    howItWorksHomeFooter: 'How It Works & FAQ',
   },
 
   zh: {
@@ -191,7 +191,7 @@ export const translations = {
     faqPage6Answer:
       '没有。pinME 是独立服务，与 Pinterest 没有官方关联，也不是由 Pinterest 赞助或运营的。',
 
-    howItWorksHomeFooter: '主页',
+    howItWorksHomeFooter: '使用方法与常见问题',
   },
 
   ja: {
@@ -287,7 +287,7 @@ export const translations = {
     faqPage6Answer:
       'いいえ。pinME は独立したサービスであり、Pinterest と提携、スポンサー関係、または公式な関係はありません。',
 
-    howItWorksHomeFooter: 'ホーム',
+    howItWorksHomeFooter: '使い方とよくある質問',
   },
 
   es: {
@@ -385,7 +385,7 @@ export const translations = {
     faqPage6Answer:
       'No. pinME es un servicio independiente y no está afiliado, patrocinado ni conectado oficialmente con Pinterest.',
 
-    howItWorksHomeFooter: 'Inicio',
+    howItWorksHomeFooter: 'Cómo funciona y FAQ',
   },
 
   pt: {
@@ -483,7 +483,7 @@ export const translations = {
     faqPage6Answer:
       'Não. O pinME é um serviço independente e não é afiliado, patrocinado ou oficialmente conectado ao Pinterest.',
 
-    howItWorksHomeFooter: 'Início',
+    howItWorksHomeFooter: 'Como funciona e FAQ',
   },
 
   bg: {
@@ -582,7 +582,7 @@ export const translations = {
     faqPage6Answer:
       'Не. pinME е независима услуга и не е свързана, спонсорирана или официално свързана с Pinterest.',
 
-    howItWorksHomeFooter: 'Начало',
+    howItWorksHomeFooter: 'Как работи и ЧЗВ',
   },
 
   de: {
@@ -680,7 +680,7 @@ export const translations = {
     faqPage6Answer:
       'Nein. pinME ist ein unabhängiger Dienst und weder mit Pinterest verbunden noch von Pinterest gesponsert oder offiziell unterstützt.',
 
-    howItWorksHomeFooter: 'Startseite',
+    howItWorksHomeFooter: 'Wie es funktioniert & FAQ',
   },
 } as const;
 
