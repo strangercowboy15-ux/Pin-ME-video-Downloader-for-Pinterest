@@ -647,7 +647,7 @@ export default function App({
           <SeasonalBackdrop season={season} />
 
           {/* Header */}
-          <header className="sticky top-0 z-50 flex items-center justify-between p-6 bg-background">
+          <header className="sticky top-0 z-50 flex flex-col items-center gap-1 p-6 bg-background">
             <div className="flex items-center gap-2">
               <img
                 src="/header-logo.png"
