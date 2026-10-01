@@ -363,10 +363,12 @@ function getTranslatedStage(
 export default function App({
   onOpenPrivacy,
   onOpenTerms,
+  onOpenHowItWorks,
   onSplashComplete,
 }: {
   onOpenPrivacy: () => void;
   onOpenTerms: () => void;
+  onOpenHowItWorks?: () => void;
   onSplashComplete?: () => void;
 }) {
   const serverReady = useServerReady();
@@ -703,6 +705,19 @@ export default function App({
           {/* Footer */}
           <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
             <div className="flex flex-col items-center gap-2">
+              {/* How It Works & FAQ */}
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.hash = 'how-it-works';
+                  onOpenHowItWorks?.();
+                }}
+                className="hover:text-foreground transition-colors"
+              >
+                {t('howItWorksHomeFooter')}
+              </button>
+
+              {/* Privacy Policy */}
               <button
                 type="button"
                 onClick={onOpenPrivacy}
@@ -711,6 +726,7 @@ export default function App({
                 {t('privacyPolicy')}
               </button>
 
+              {/* Terms & Conditions */}
               <button
                 type="button"
                 onClick={onOpenTerms}
@@ -720,69 +736,6 @@ export default function App({
               </button>
             </div>
           </footer>
-
-          {/* How it works */}
-          <section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
-            <h2 className="text-xl font-bold text-center">
-              {t('howItWorks')}
-            </h2>
-
-            <ol className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex gap-3">
-                <span className="font-bold text-foreground">1.</span>
-                <span>{t('step1')}</span>
-              </li>
-
-              <li className="flex gap-3">
-                <span className="font-bold text-foreground">2.</span>
-                <span>{t('step2')}</span>
-              </li>
-
-              <li className="flex gap-3">
-                <span className="font-bold text-foreground">3.</span>
-                <span>{t('step3')}</span>
-              </li>
-
-              <li className="flex gap-3">
-                <span className="font-bold text-foreground">4.</span>
-                <span>{t('step4')}</span>
-              </li>
-            </ol>
-          </section>
-
-          {/* FAQ */}
-          <section className="w-full max-w-md mx-auto px-6 pb-8 space-y-4">
-            <h2 className="text-xl font-bold text-center">
-              {t('faq')}
-              <span className="text-primary">❓</span>
-            </h2>
-
-            <div className="space-y-4 text-sm">
-              <div>
-                <h3 className="font-semibold text-foreground">
-                  💯 {t('faq1Q')}
-                </h3>
-
-                <p className="text-muted-foreground">{t('faq1A')}</p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-foreground">
-                  🗂️ {t('faq2Q')}
-                </h3>
-
-                <p className="text-muted-foreground">{t('faq2A')}</p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-foreground">
-                  🔒 {t('faq3Q')}
-                </h3>
-
-                <p className="text-muted-foreground">{t('faq3A')}</p>
-              </div>
-            </div>
-          </section>
 
           {/* Badge-blend gradient */}
           <div
