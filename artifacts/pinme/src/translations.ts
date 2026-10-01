@@ -1,209 +1,283 @@
-import React from 'react';
+export type Language = 'en' | 'zh' | 'ja' | 'es' | 'pt' | 'bg' | 'de';
 
-export default function HowItWorks({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 px-6 py-4 flex items-center gap-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close How It Works and FAQ and return to the home page"
-          className="h-11 w-11 flex items-center justify-center rounded-lg text-2xl leading-none text-primary hover:bg-primary/10 transition-colors"
-        >
-          ✘
-        </button>
+export const translations = {
+  en: {
+    heading: 'Download Pinterest videos, images, GIFs & carousels',
+    subtitle: 'Fast, free, and directly to your device.',
+    placeholder: 'Paste Pinterest link here...',
+    downloadNow: 'Download Now',
+    infoText:
+      "Your download will be saved to your device's Downloads folder (and usually appears in your Gallery/Photos app automatically).",
+    howItWorks: 'How it works?',
+    step1: 'Copy a Pinterest video link 📎',
+    step2: 'Paste it in the box above 📥',
+    step3: 'Click "Download Now" 📹',
+    step4: 'Your video saves to your device 📱',
+    faq: 'Frequently Asked Questions',
+    faq1Q: 'Is Pin ME free?',
+    faq1A: 'Yes, completely free. No account required.',
+    faq2Q: 'Where do downloads go?',
+    faq2A: "Your video saves to your device's Downloads folder.",
+    faq3Q: 'Do you store my links?',
+    faq3A: 'No. Links are processed and deleted immediately.',
+    checkingMedia: 'Checking media type...',
+    fetchingInfo: 'Fetching video info...',
+    downloadingVideo: 'Downloading video...',
+    processingVideo: 'Processing video...',
+    preparingDownload: 'Preparing download...',
+    startingDownload: 'Starting download...',
+    videoDownloaded: 'Video downloaded',
+    imageDownloaded: 'Image downloaded',
+    carouselDownloaded: 'Carousel downloaded as ZIP',
+    imagesCount: 'images',
+    errorGeneric:
+      'Something went wrong. Please check your connection and try again.',
+    serverStarting: 'Starting server',
+    serverWakingText:
+      'The server is waking up — this usually takes 20–30 seconds. Hang tight!',
+    howItWorksFooter: 'How It Works & FAQ',
+    howItWorksHomeFooter: 'How It Works & FAQ',
+    privacyPolicy: 'Privacy Policy',
+    termsConditions: 'Terms & Conditions',
+  },
 
-        <button
-          type="button"
-          onClick={() => {
-            window.location.hash = '';
-            onClose();
-          }}
-          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-          aria-label="Return to the home page"
-        >
-          <img
-            src="/header-logo.png"
-            alt="pinME Logo"
-            className="h-8 w-8 object-contain rounded-lg"
-          />
-          <span className="text-lg font-bold tracking-tight">
-            pin<span className="text-primary">ME</span>
-          </span>
-        </button>
-      </header>
+  zh: {
+    heading: '下载 Pinterest 视频、图片、GIF 和轮播图',
+    subtitle: '快速、免费，直接保存到您的设备。',
+    placeholder: '在此粘贴 Pinterest 链接...',
+    downloadNow: '立即下载',
+    infoText:
+      '您的下载将保存到设备的下载文件夹（通常会自动出现在相册/照片应用中）。',
+    howItWorks: '使用方法？',
+    step1: '复制 Pinterest 视频链接 📎',
+    step2: '粘贴到上方输入框 📥',
+    step3: '点击"立即下载" 📹',
+    step4: '视频保存到您的设备 📱',
+    faq: '常见问题',
+    faq1Q: 'Pin ME 免费吗？',
+    faq1A: '是的，完全免费。无需注册账号。',
+    faq2Q: '下载文件保存在哪里？',
+    faq2A: '视频保存在您设备的下载文件夹中。',
+    faq3Q: '你们会保存我的链接吗？',
+    faq3A: '不会。链接会立即处理并删除。',
+    checkingMedia: '正在检查媒体类型...',
+    fetchingInfo: '正在获取视频信息...',
+    downloadingVideo: '正在下载视频...',
+    processingVideo: '正在处理视频...',
+    preparingDownload: '正在准备下载...',
+    startingDownload: '正在开始下载...',
+    videoDownloaded: '视频已下载',
+    imageDownloaded: '图片已下载',
+    carouselDownloaded: '轮播图已下载为 ZIP',
+    imagesCount: '张图片',
+    errorGeneric: '出错了。请检查您的网络连接并重试。',
+    serverStarting: '正在启动服务器',
+    serverWakingText: '服务器正在唤醒——通常需要 20–30 秒。请稍候！',
+    howItWorksFooter: '使用方法与常见问题',
+    howItWorksHomeFooter: '使用方法与常见问题',
+    privacyPolicy: '隐私政策',
+    termsConditions: '条款和条件',
+  },
 
-      <main className="max-w-2xl mx-auto px-6 py-12">
-        <h1 className="text-3xl font-bold mb-2">How It Works &amp; FAQ</h1>
+  ja: {
+    heading: 'Pinterest の動画・画像・GIF・カルーセルをダウンロード',
+    subtitle: '高速、無料、デバイスに直接保存。',
+    placeholder: 'ここに Pinterest リンクを貼り付け...',
+    downloadNow: '今すぐダウンロード',
+    infoText:
+      'ダウンロードはデバイスの Downloads フォルダに保存されます（通常はギャラリー/写真アプリにも自動的に表示されます）。',
+    howItWorks: '使い方',
+    step1: 'Pinterest の動画リンクをコピー 📎',
+    step2: '上のボックスに貼り付け 📥',
+    step3: '「今すぐダウンロード」をクリック 📹',
+    step4: '動画がデバイスに保存されます 📱',
+    faq: 'よくある質問',
+    faq1Q: 'Pin ME は無料ですか？',
+    faq1A: 'はい、完全に無料です。アカウントは不要です。',
+    faq2Q: 'ダウンロード先はどこですか？',
+    faq2A: '動画はデバイスの Downloads フォルダに保存されます。',
+    faq3Q: 'リンクは保存されますか？',
+    faq3A: 'いいえ。リンクは処理後すぐに削除されます。',
+    checkingMedia: 'メディアの種類を確認しています...',
+    fetchingInfo: '動画情報を取得しています...',
+    downloadingVideo: '動画をダウンロードしています...',
+    processingVideo: '動画を処理しています...',
+    preparingDownload: 'ダウンロードを準備しています...',
+    startingDownload: 'ダウンロードを開始しています...',
+    videoDownloaded: '動画をダウンロードしました',
+    imageDownloaded: '画像をダウンロードしました',
+    carouselDownloaded: 'カルーセルを ZIP でダウンロードしました',
+    imagesCount: '枚の画像',
+    errorGeneric: '問題が発生しました。接続を確認して再試行してください。',
+    serverStarting: 'サーバーを起動中',
+    serverWakingText:
+      'サーバーを起動しています — 通常 20〜30 秒かかります。少々お待ちください！',
+    howItWorksFooter: '使い方とよくある質問',
+    howItWorksHomeFooter: '使い方とよくある質問',
+    privacyPolicy: 'プライバシーポリシー',
+    termsConditions: '利用規約',
+  },
 
-        <p className="text-sm text-muted-foreground mb-10">
-          Learn how to use pinME and find answers to common questions.
-        </p>
+  es: {
+    heading: 'Descarga videos, imágenes, GIFs y carruseles de Pinterest',
+    subtitle: 'Rápido, gratis y directamente a tu dispositivo.',
+    placeholder: 'Pega el enlace de Pinterest aquí...',
+    downloadNow: 'Descargar ahora',
+    infoText:
+      'Tu descarga se guardará en la carpeta Descargas de tu dispositivo (y normalmente aparece en la Galería/Fotos automáticamente).',
+    howItWorks: '¿Cómo funciona?',
+    step1: 'Copia un enlace de video de Pinterest 📎',
+    step2: 'Pégalo en el cuadro de arriba 📥',
+    step3: 'Haz clic en "Descargar ahora" 📹',
+    step4: 'Tu video se guarda en tu dispositivo 📱',
+    faq: 'Preguntas frecuentes',
+    faq1Q: '¿Pin ME es gratis?',
+    faq1A: 'Sí, completamente gratis. No se requiere cuenta.',
+    faq2Q: '¿Dónde van las descargas?',
+    faq2A: 'Tu video se guarda en la carpeta Descargas de tu dispositivo.',
+    faq3Q: '¿Guardan mis enlaces?',
+    faq3A: 'No. Los enlaces se procesan y eliminan inmediatamente.',
+    checkingMedia: 'Comprobando tipo de contenido...',
+    fetchingInfo: 'Obteniendo información del video...',
+    downloadingVideo: 'Descargando video...',
+    processingVideo: 'Procesando video...',
+    preparingDownload: 'Preparando descarga...',
+    startingDownload: 'Iniciando descarga...',
+    videoDownloaded: 'Video descargado',
+    imageDownloaded: 'Imagen descargada',
+    carouselDownloaded: 'Carrusel descargado como ZIP',
+    imagesCount: 'imágenes',
+    errorGeneric:
+      'Algo salió mal. Comprueba tu conexión e inténtalo de nuevo.',
+    serverStarting: 'Iniciando servidor',
+    serverWakingText:
+      'El servidor se está activando — suele tardar 20–30 segundos. ¡Espera!',
+    howItWorksFooter: 'Cómo funciona y FAQ',
+    howItWorksHomeFooter: 'Cómo funciona y FAQ',
+    privacyPolicy: 'Política de privacidad',
+    termsConditions: 'Términos y condiciones',
+  },
 
-        <section className="space-y-10 text-foreground leading-relaxed">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              How It Works
-            </h2>
+  pt: {
+    heading: 'Baixe vídeos, imagens, GIFs e carrosséis do Pinterest',
+    subtitle: 'Rápido, grátis e diretamente no seu dispositivo.',
+    placeholder: 'Cole o link do Pinterest aqui...',
+    downloadNow: 'Baixar agora',
+    infoText:
+      'Seu download será salvo na pasta Downloads do seu dispositivo (e geralmente aparece automaticamente na Galeria/Fotos).',
+    howItWorks: 'Como funciona?',
+    step1: 'Copie um link de vídeo do Pinterest 📎',
+    step2: 'Cole na caixa acima 📥',
+    step3: 'Clique em "Baixar agora" 📹',
+    step4: 'Seu vídeo é salvo no seu dispositivo 📱',
+    faq: 'Perguntas frequentes',
+    faq1Q: 'O Pin ME é grátis?',
+    faq1A: 'Sim, completamente grátis. Não é necessária conta.',
+    faq2Q: 'Onde vão os downloads?',
+    faq2A: 'Seu vídeo é salvo na pasta Downloads do seu dispositivo.',
+    faq3Q: 'Vocês armazenam meus links?',
+    faq3A: 'Não. Os links são processados e excluídos imediatamente.',
+    checkingMedia: 'Verificando tipo de mídia...',
+    fetchingInfo: 'Obtendo informações do vídeo...',
+    downloadingVideo: 'Baixando vídeo...',
+    processingVideo: 'Processando vídeo...',
+    preparingDownload: 'Preparando download...',
+    startingDownload: 'Iniciando download...',
+    videoDownloaded: 'Vídeo baixado',
+    imageDownloaded: 'Imagem baixada',
+    carouselDownloaded: 'Carrossel baixado como ZIP',
+    imagesCount: 'imagens',
+    errorGeneric:
+      'Algo deu errado. Verifique sua conexão e tente novamente.',
+    serverStarting: 'Iniciando servidor',
+    serverWakingText:
+      'O servidor está acordando — geralmente leva 20–30 segundos. Aguarde!',
+    howItWorksFooter: 'Como funciona e FAQ',
+    howItWorksHomeFooter: 'Como funciona e FAQ',
+    privacyPolicy: 'Política de Privacidade',
+    termsConditions: 'Termos e Condições',
+  },
 
-            <div className="space-y-4">
-              <div>
-                <p className="font-medium">1. Copy a Pinterest link 📎</p>
+  bg: {
+    heading:
+      'Изтегляйте видеоклипове, изображения, GIF файлове и карусели от Pinterest',
+    subtitle: 'Бързо, безплатно и директно на вашето устройство.',
+    placeholder: 'Поставете Pinterest линк тук...',
+    downloadNow: 'Изтегли сега',
+    infoText:
+      'Изтеглянето ще бъде запазено в папката Downloads на вашето устройство (и обикновено се появява автоматично в Галерия/Снимки).',
+    howItWorks: 'Как работи?',
+    step1: 'Копирайте линк към Pinterest видео 📎',
+    step2: 'Поставете го в полето отгоре 📥',
+    step3: 'Натиснете "Изтегли сега" 📹',
+    step4: 'Видеото се запазва на вашето устройство 📱',
+    faq: 'Често задавани въпроси',
+    faq1Q: 'Pin ME безплатен ли е?',
+    faq1A: 'Да, напълно безплатен. Не е необходим акаунт.',
+    faq2Q: 'Къде отиват изтеглянията?',
+    faq2A: 'Видеото се запазва в папката Downloads на вашето устройство.',
+    faq3Q: 'Съхранявате ли моите линкове?',
+    faq3A: 'Не. Линковете се обработват и изтриват незабавно.',
+    checkingMedia: 'Проверка на типа медия...',
+    fetchingInfo: 'Извличане на информация за видеото...',
+    downloadingVideo: 'Изтегляне на видео...',
+    processingVideo: 'Обработка на видео...',
+    preparingDownload: 'Подготовка за изтегляне...',
+    startingDownload: 'Стартиране на изтеглянето...',
+    videoDownloaded: 'Видеото е изтеглено',
+    imageDownloaded: 'Изображението е изтеглено',
+    carouselDownloaded: 'Каруселът е изтеглен като ZIP',
+    imagesCount: 'изображения',
+    errorGeneric:
+      'Нещо се обърка. Проверете връзката си и опитайте отново.',
+    serverStarting: 'Стартиране на сървъра',
+    serverWakingText:
+      'Сървърът се събужда — обикновено отнема 20–30 секунди. Изчакайте!',
+    howItWorksFooter: 'Как работи и ЧЗВ',
+    howItWorksHomeFooter: 'Как работи и ЧЗВ',
+    privacyPolicy: 'Политика за поверителност',
+    termsConditions: 'Общи условия',
+  },
 
-                <p className="text-muted-foreground mt-1">
-                  Copy the Pinterest link containing the video, image, GIF, or
-                  carousel you want to download.
-                </p>
-              </div>
+  de: {
+    heading: 'Pinterest-Videos, -Bilder, GIFs & Karussells herunterladen',
+    subtitle: 'Schnell, kostenlos und direkt auf dein Gerät.',
+    placeholder: 'Pinterest-Link hier einfügen...',
+    downloadNow: 'Jetzt herunterladen',
+    infoText:
+      'Dein Download wird im Downloads-Ordner deines Geräts gespeichert (und erscheint normalerweise automatisch in der Galerie/Fotos-App).',
+    howItWorks: 'Wie funktioniert es?',
+    step1: 'Pinterest-Video-Link kopieren 📎',
+    step2: 'In das Feld oben einfügen 📥',
+    step3: 'Auf "Jetzt herunterladen" klicken 📹',
+    step4: 'Dein Video wird auf deinem Gerät gespeichert 📱',
+    faq: 'Häufig gestellte Fragen',
+    faq1Q: 'Ist Pin ME kostenlos?',
+    faq1A: 'Ja, völlig kostenlos. Kein Konto erforderlich.',
+    faq2Q: 'Wohin gehen die Downloads?',
+    faq2A: 'Dein Video wird im Downloads-Ordner deines Geräts gespeichert.',
+    faq3Q: 'Speichert ihr meine Links?',
+    faq3A: 'Nein. Links werden sofort verarbeitet und gelöscht.',
+    checkingMedia: 'Medientyp wird geprüft...',
+    fetchingInfo: 'Videoinformationen werden abgerufen...',
+    downloadingVideo: 'Video wird heruntergeladen...',
+    processingVideo: 'Video wird verarbeitet...',
+    preparingDownload: 'Download wird vorbereitet...',
+    startingDownload: 'Download wird gestartet...',
+    videoDownloaded: 'Video heruntergeladen',
+    imageDownloaded: 'Bild heruntergeladen',
+    carouselDownloaded: 'Karussell als ZIP heruntergeladen',
+    imagesCount: 'Bilder',
+    errorGeneric:
+      'Etwas ist schiefgelaufen. Überprüfe deine Verbindung und versuche es erneut.',
+    serverStarting: 'Server wird gestartet',
+    serverWakingText:
+      'Der Server wacht auf — dies dauert normalerweise 20–30 Sekunden. Warte kurz!',
+    howItWorksFooter: 'Wie es funktioniert & FAQ',
+    howItWorksHomeFooter: 'Wie es funktioniert & FAQ',
+    privacyPolicy: 'Datenschutzrichtlinie',
+    termsConditions: 'Allgemeine Geschäftsbedingungen',
+  },
+} as const;
 
-              <div>
-                <p className="font-medium">
-                  2. Paste it in the box above 📥
-                </p>
-
-                <p className="text-muted-foreground mt-1">
-                  Paste the copied Pinterest link into the download box on
-                  pinME.
-                </p>
-              </div>
-
-              <div>
-                <p className="font-medium">
-                  3. Click "Download Now" ⬇️
-                </p>
-
-                <p className="text-muted-foreground mt-1">
-                  Start the download and let pinME process the requested media.
-                </p>
-              </div>
-
-              <div>
-                <p className="font-medium">
-                  4. Your download saves to your device 📱
-                </p>
-
-                <p className="text-muted-foreground mt-1">
-                  The downloaded file is sent directly to your device.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Supported Downloads
-            </h2>
-
-            <div className="space-y-3">
-              <p>
-                🎬 <span className="font-medium">Videos</span>
-              </p>
-
-              <p>
-                🖼️ <span className="font-medium">Single Images</span>
-              </p>
-
-              <p>
-                🎞️ <span className="font-medium">GIFs</span>
-              </p>
-
-              <p>
-                🖼️🖼️ <span className="font-medium">Carousels</span> —
-                downloaded as a ZIP file
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold text-foreground mb-4">
-              Frequently Asked Questions ❓
-            </h2>
-
-            <div className="space-y-7">
-              <div>
-                <h3 className="font-semibold mb-1">
-                  💯 Is pinME free?
-                </h3>
-
-                <p>
-                  Yes. pinME is completely free to use and does not require an
-                  account.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold mb-1">
-                  🗂️ Where do downloads go?
-                </h3>
-
-                <p>
-                  Your downloaded file is saved to your device's Downloads
-                  folder. Depending on your device, it may also appear in your
-                  Gallery or Photos app.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold mb-1">
-                  🔒 Do you store my Pinterest links?
-                </h3>
-
-                <p>
-                  No. Pinterest links are processed only to provide the
-                  requested download and are not permanently stored.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold mb-1">
-                  👤 Do I need an account?
-                </h3>
-
-                <p>
-                  No. You can use pinME without creating an account or signing
-                  in.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold mb-1">
-                  📦 How are carousel downloads delivered?
-                </h3>
-
-                <p>
-                  Carousel images are collected and provided together as a ZIP
-                  file containing the images.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold mb-1">
-                  🔗 Is pinME affiliated with Pinterest?
-                </h3>
-
-                <p>
-                  No. pinME is an independent service and is not affiliated
-                  with, sponsored by, or officially connected with Pinterest.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      <footer className="border-t border-border mt-16 px-6 py-6 text-center text-sm text-muted-foreground">
-        © {new Date().getFullYear()} pinME Downloader.{' '}
-        <button
-          type="button"
-          onClick={() => {
-            window.history.replaceState(null, '', window.location.pathname);
-            onClose();
-          }}
-          className="hover:text-foreground transition-colors"
-        >
-          Home
-        </button>
-      </footer>
-    </div>
-  );
-}
+export type TranslationKey = keyof typeof translations.en;
