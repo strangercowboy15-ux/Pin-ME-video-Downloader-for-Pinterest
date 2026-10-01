@@ -31,6 +31,7 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
             alt="pinME Logo"
             className="h-8 w-8 object-contain rounded-lg"
           />
+
           <span className="text-lg font-bold tracking-tight">
             pin<span className="text-primary">ME</span>
           </span>
@@ -48,7 +49,6 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
         </p>
 
         <section className="space-y-10 text-foreground leading-relaxed">
-
           {/* How It Works */}
           <div>
             <h2 className="text-lg font-semibold text-foreground mb-4">
@@ -60,6 +60,7 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
                 <p className="font-medium">
                   {t('howStep1Title')}
                 </p>
+
                 <p className="text-muted-foreground mt-1">
                   {t('howStep1Description')}
                 </p>
@@ -69,6 +70,7 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
                 <p className="font-medium">
                   {t('howStep2Title')}
                 </p>
+
                 <p className="text-muted-foreground mt-1">
                   {t('howStep2Description')}
                 </p>
@@ -78,6 +80,7 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
                 <p className="font-medium">
                   {t('howStep3Title')}
                 </p>
+
                 <p className="text-muted-foreground mt-1">
                   {t('howStep3Description')}
                 </p>
@@ -87,6 +90,7 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
                 <p className="font-medium">
                   {t('howStep4Title')}
                 </p>
+
                 <p className="text-muted-foreground mt-1">
                   {t('howStep4Description')}
                 </p>
@@ -102,15 +106,24 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
 
             <div className="space-y-3">
               <p>
-                🎬 <span className="font-medium">{t('supportedVideos')}</span>
+                🎬{' '}
+                <span className="font-medium">
+                  {t('supportedVideos')}
+                </span>
               </p>
 
               <p>
-                🖼️ <span className="font-medium">{t('supportedImages')}</span>
+                🖼️{' '}
+                <span className="font-medium">
+                  {t('supportedImages')}
+                </span>
               </p>
 
               <p>
-                🎞️ <span className="font-medium">{t('supportedGifs')}</span>
+                🎞️{' '}
+                <span className="font-medium">
+                  {t('supportedGifs')}
+                </span>
               </p>
 
               <p>
@@ -130,12 +143,12 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
             </h2>
 
             <div className="space-y-7">
-
               <div>
                 <h3 className="font-semibold mb-1">
                   {t('faqPage1Question')}
                 </h3>
-                <p>
+
+                <p className="text-muted-foreground">
                   {t('faqPage1Answer')}
                 </p>
               </div>
@@ -144,7 +157,8 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
                 <h3 className="font-semibold mb-1">
                   {t('faqPage2Question')}
                 </h3>
-                <p>
+
+                <p className="text-muted-foreground">
                   {t('faqPage2Answer')}
                 </p>
               </div>
@@ -153,7 +167,8 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
                 <h3 className="font-semibold mb-1">
                   {t('faqPage3Question')}
                 </h3>
-                <p>
+
+                <p className="text-muted-foreground">
                   {t('faqPage3Answer')}
                 </p>
               </div>
@@ -162,7 +177,8 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
                 <h3 className="font-semibold mb-1">
                   {t('faqPage4Question')}
                 </h3>
-                <p>
+
+                <p className="text-muted-foreground">
                   {t('faqPage4Answer')}
                 </p>
               </div>
@@ -171,7 +187,8 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
                 <h3 className="font-semibold mb-1">
                   {t('faqPage5Question')}
                 </h3>
-                <p>
+
+                <p className="text-muted-foreground">
                   {t('faqPage5Answer')}
                 </p>
               </div>
@@ -180,14 +197,13 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
                 <h3 className="font-semibold mb-1">
                   {t('faqPage6Question')}
                 </h3>
-                <p>
+
+                <p className="text-muted-foreground">
                   {t('faqPage6Answer')}
                 </p>
               </div>
-
             </div>
           </div>
-
         </section>
       </main>
 
@@ -197,12 +213,12 @@ export default function HowItWorks({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={() => {
-            window.history.replaceState(null, '', window.location.pathname);
+            window.history.replaceState(null, '', '/');
             onClose();
           }}
           className="hover:text-foreground transition-colors"
         >
-          {t('howItWorksHomeFooter')}
+          Home
         </button>
       </footer>
     </div>
