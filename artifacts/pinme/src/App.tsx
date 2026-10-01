@@ -145,7 +145,7 @@ function ProgressLabel({ label }: { label: string }) {
   );
 }
 
-// ─── Coffee success animation ────────────────────────────────────────────────
+// ─── Coffee fill success animation ───────────────────────────────────────────
 
 function CoffeeDownloadAnimation() {
   return (
@@ -155,153 +155,203 @@ function CoffeeDownloadAnimation() {
     >
       {/* Steam */}
       <motion.span
-        initial={{ opacity: 0, y: 8, x: -12, scale: 0.7 }}
+        initial={{ opacity: 0, y: 5, x: -12, scale: 0.7 }}
         animate={{
           opacity: [0, 0.45, 0.2, 0],
-          y: [8, 1, -8, -20],
+          y: [5, -2, -10, -21],
           x: [-12, -15, -9, -13],
           scale: [0.7, 0.9, 1, 1.15],
         }}
-        transition={{ duration: 1.25, ease: 'easeOut' }}
-        className="absolute left-[54px] top-[4px] text-[11px] leading-none text-white"
+        transition={{
+          duration: 1.25,
+          delay: 1.05,
+          ease: 'easeOut',
+        }}
+        className="absolute left-[55px] top-[8px] text-[11px] leading-none text-white"
       >
         ~
       </motion.span>
 
       <motion.span
-        initial={{ opacity: 0, y: 8, x: 0, scale: 0.7 }}
+        initial={{ opacity: 0, y: 5, x: 0, scale: 0.7 }}
         animate={{
           opacity: [0, 0.5, 0.22, 0],
-          y: [8, 0, -9, -22],
+          y: [5, -3, -12, -23],
           x: [0, 4, -1, 3],
           scale: [0.7, 0.9, 1, 1.2],
         }}
-        transition={{ duration: 1.35, delay: 0.18, ease: 'easeOut' }}
-        className="absolute left-[70px] top-[1px] text-[10px] leading-none text-white"
+        transition={{
+          duration: 1.35,
+          delay: 1.2,
+          ease: 'easeOut',
+        }}
+        className="absolute left-[70px] top-[5px] text-[10px] leading-none text-white"
       >
         ~
       </motion.span>
 
       <motion.span
-        initial={{ opacity: 0, y: 8, x: 10, scale: 0.65 }}
+        initial={{ opacity: 0, y: 5, x: 10, scale: 0.65 }}
         animate={{
           opacity: [0, 0.4, 0.18, 0],
-          y: [8, 0, -8, -21],
+          y: [5, -2, -10, -22],
           x: [10, 13, 9, 12],
           scale: [0.65, 0.85, 1, 1.15],
         }}
-        transition={{ duration: 1.2, delay: 0.35, ease: 'easeOut' }}
-        className="absolute left-[83px] top-[4px] text-[9px] leading-none text-white"
+        transition={{
+          duration: 1.2,
+          delay: 1.35,
+          ease: 'easeOut',
+        }}
+        className="absolute left-[83px] top-[8px] text-[9px] leading-none text-white"
       >
         ~
       </motion.span>
 
-      {/* Coffee cup */}
+      {/* Cup handle */}
       <motion.div
-        initial={{
-          y: 10,
-          scale: 0.82,
-          rotate: 0,
-          opacity: 0,
-        }}
+        initial={{ opacity: 0, scale: 0.8 }}
         animate={{
-          y: [10, -4, 0, -2, 0],
-          scale: [0.82, 1, 1, 1, 1],
-          rotate: [0, 0, 0, -8, -5],
-          opacity: [0, 1, 1, 1, 1],
+          opacity: 1,
+          scale: 1,
         }}
         transition={{
-          duration: 1.15,
-          times: [0, 0.2, 0.4, 0.75, 1],
-          ease: 'easeInOut',
-        }}
-        className="absolute left-1/2 top-[18px] -translate-x-1/2 text-5xl leading-none origin-bottom text-[#f87171]"
-      >
-        ☕︎
-      </motion.div>
-
-      {/* Coffee stream */}
-      <motion.div
-        initial={{
-          opacity: 0,
-          scaleY: 0,
-          y: 30,
-        }}
-        animate={{
-          opacity: [0, 0, 0.9, 0.75, 0],
-          scaleY: [0, 0, 1, 1.12, 0.8],
-          y: [30, 30, 31, 34, 42],
-        }}
-        transition={{
-          duration: 0.85,
-          delay: 0.72,
-          times: [0, 0.18, 0.35, 0.7, 1],
-          ease: 'easeInOut',
-        }}
-        className="absolute left-1/2 top-[54px] -translate-x-1/2 w-[7px] h-[42px] rounded-full bg-[#f87171] origin-top"
-      />
-
-      {/* Coffee stream glow */}
-      <motion.div
-        initial={{ opacity: 0, scaleY: 0 }}
-        animate={{
-          opacity: [0, 0, 0.25, 0],
-          scaleY: [0, 0, 1, 0.8],
-        }}
-        transition={{
-          duration: 0.8,
-          delay: 0.78,
+          duration: 0.35,
+          delay: 0.05,
           ease: 'easeOut',
         }}
-        className="absolute left-1/2 top-[56px] -translate-x-1/2 w-[13px] h-[40px] rounded-full bg-[#fca5a5] blur-[3px] origin-top"
+        className="absolute left-[91px] top-[49px] w-[23px] h-[23px] rounded-r-full border-[5px] border-[#f87171] border-l-0"
       />
 
-      {/* Splash */}
+      {/* Cup body */}
       <motion.div
-        initial={{ opacity: 0, scale: 0 }}
+        initial={{
+          opacity: 0,
+          y: 8,
+          scale: 0.9,
+        }}
         animate={{
-          opacity: [0, 0, 0.9, 0],
-          scale: [0, 0, 1, 1.5],
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: 'easeOut',
+        }}
+        className="absolute left-1/2 top-[42px] -translate-x-1/2 w-[68px] h-[50px] rounded-b-[18px] rounded-t-[7px] border-[4px] border-[#f87171] bg-background overflow-hidden"
+      >
+        {/* Coffee fill */}
+        <motion.div
+          initial={{
+            height: '0%',
+          }}
+          animate={{
+            height: ['0%', '0%', '25%', '55%', '82%'],
+          }}
+          transition={{
+            duration: 1.15,
+            times: [0, 0.12, 0.35, 0.7, 1],
+            ease: 'easeInOut',
+          }}
+          className="absolute bottom-0 left-0 right-0 bg-[#f87171]"
+        />
+
+        {/* Coffee surface */}
+        <motion.div
+          initial={{
+            opacity: 0,
+            scaleX: 0.5,
+          }}
+          animate={{
+            opacity: [0, 0, 1, 1],
+            scaleX: [0.5, 0.5, 1, 1],
+          }}
+          transition={{
+            duration: 0.55,
+            delay: 1.05,
+            ease: 'easeOut',
+          }}
+          className="absolute left-[4px] right-[4px] bottom-[36px] h-[4px] rounded-full bg-[#fca5a5]"
+        />
+      </motion.div>
+
+      {/* Cup rim */}
+      <motion.div
+        initial={{
+          opacity: 0,
+          scaleX: 0.85,
+        }}
+        animate={{
+          opacity: 1,
+          scaleX: 1,
+        }}
+        transition={{
+          duration: 0.35,
+          delay: 0.08,
+          ease: 'easeOut',
+        }}
+        className="absolute left-1/2 top-[39px] -translate-x-1/2 w-[76px] h-[10px] rounded-full border-[4px] border-[#f87171] bg-background"
+      />
+
+      {/* Coffee visible at the rim */}
+      <motion.div
+        initial={{
+          opacity: 0,
+          scale: 0,
+        }}
+        animate={{
+          opacity: [0, 0, 1, 1],
+          scale: [0, 0, 0.8, 1],
+        }}
+        transition={{
+          duration: 0.45,
+          delay: 1.02,
+          ease: 'easeOut',
+        }}
+        className="absolute left-1/2 top-[42px] -translate-x-1/2 w-[61px] h-[5px] rounded-full bg-[#f87171]"
+      />
+
+      {/* Small success sparkle */}
+      <motion.span
+        initial={{
+          opacity: 0,
+          scale: 0,
+          rotate: 0,
+        }}
+        animate={{
+          opacity: [0, 1, 1, 0],
+          scale: [0, 1, 1.15, 0.8],
+          rotate: [0, 45, 90, 135],
+        }}
+        transition={{
+          duration: 0.65,
+          delay: 1.35,
+          ease: 'easeOut',
+        }}
+        className="absolute left-[111px] top-[31px] text-[#f87171] text-sm font-bold"
+      >
+        ✦
+      </motion.span>
+
+      <motion.span
+        initial={{
+          opacity: 0,
+          scale: 0,
+        }}
+        animate={{
+          opacity: [0, 1, 1, 0],
+          scale: [0, 1, 1.1, 0.8],
         }}
         transition={{
           duration: 0.55,
-          delay: 1.35,
+          delay: 1.45,
           ease: 'easeOut',
         }}
-        className="absolute left-1/2 top-[94px] -translate-x-1/2 w-10 h-2 rounded-full bg-[#f87171]"
-      />
-
-      <motion.span
-        initial={{ opacity: 0, x: 0, y: 0, scale: 0 }}
-        animate={{
-          opacity: [0, 0, 1, 0],
-          x: [0, -18, -28, -34],
-          y: [0, 0, -5, -8],
-          scale: [0, 0.7, 1, 0.6],
-        }}
-        transition={{
-          duration: 0.5,
-          delay: 1.35,
-          ease: 'easeOut',
-        }}
-        className="absolute left-1/2 top-[91px] w-1.5 h-1.5 rounded-full bg-[#f87171]"
-      />
-
-      <motion.span
-        initial={{ opacity: 0, x: 0, y: 0, scale: 0 }}
-        animate={{
-          opacity: [0, 0, 1, 0],
-          x: [0, 17, 27, 33],
-          y: [0, -2, -6, -10],
-          scale: [0, 0.7, 1, 0.6],
-        }}
-        transition={{
-          duration: 0.5,
-          delay: 1.4,
-          ease: 'easeOut',
-        }}
-        className="absolute left-1/2 top-[91px] w-1.5 h-1.5 rounded-full bg-[#f87171]"
-      />
+        className="absolute left-[35px] top-[57px] text-[#fca5a5] text-xs"
+      >
+        ✦
+      </motion.span>
     </div>
   );
 }
