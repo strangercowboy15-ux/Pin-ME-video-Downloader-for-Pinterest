@@ -519,8 +519,8 @@ export default function App({
     try {
       if (navigator.share) {
         await navigator.share({
-          title: 'pinME Downloader',
-          text: 'Fast & simple Pinterest downloader',
+          title: 'pinME Downloade',
+          text: 'Fast & simple Pinterest Downloade',
           url: shareUrl,
         });
         return;
@@ -779,7 +779,7 @@ export default function App({
 
               {/* Copyright */}
               <span className="text-[10px] text-muted-foreground/70">
-                © 2026 pinME Downloader. All rights reserved.
+                © 2026 pinME Downloade. All rights reserved.
               </span>
             </div>
           </footer>
