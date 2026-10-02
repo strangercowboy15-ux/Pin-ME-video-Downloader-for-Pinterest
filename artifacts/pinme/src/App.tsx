@@ -776,6 +776,11 @@ export default function App({
               >
                 ➦
               </button>
+
+              {/* Copyright */}
+              <span className="text-[10px] text-muted-foreground/70">
+                © 2026 pinME Downloader. All rights reserved.
+              </span>
             </div>
           </footer>
 
