@@ -124,7 +124,13 @@ function WakingScreen() {
 
 // ─── Progress label shown during loading ─────────────────────────────────────
 
-function ProgressLabel({ label }: { label: string }) {
+function ProgressLabel({
+  label,
+  progress,
+}: {
+  label: string;
+  progress: number;
+}) {
   return (
     <div className="flex flex-col items-center gap-3 w-full">
       <AnimatePresence mode="wait">
@@ -140,7 +146,29 @@ function ProgressLabel({ label }: { label: string }) {
         </motion.p>
       </AnimatePresence>
 
-      <div className="css-spinner" />
+      <div className="w-full max-w-[320px]">
+        <div
+          className="h-2.5 w-full overflow-hidden rounded-full bg-muted/60"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progress}
+        >
+          <motion.div
+            className="h-full rounded-full bg-primary"
+            initial={{ width: '0%' }}
+            animate={{ width: `${progress}%` }}
+            transition={{
+              duration: 0.45,
+              ease: 'easeOut',
+            }}
+          />
+        </div>
+
+        <div className="mt-1.5 text-center text-xs text-muted-foreground">
+          {progress}%
+        </div>
+      </div>
     </div>
   );
 }
@@ -341,6 +369,7 @@ function getTranslatedStage(
       return t('checkingMedia');
 
     case 'fetching video info...':
+    case 'fetching info...':
       return t('fetchingInfo');
 
     case 'downloading video...':
@@ -357,6 +386,42 @@ function getTranslatedStage(
 
     default:
       return label;
+  }
+}
+
+// ─── Progress percentage ─────────────────────────────────────────────────────
+
+function getProgressFromStage(label: string): number {
+  const normalized = label.trim().toLowerCase();
+
+  switch (normalized) {
+    case 'checking media type...':
+      return 10;
+
+    case 'fetching video info...':
+    case 'fetching info...':
+      return 25;
+
+    case 'downloading video...':
+    case 'downloading image...':
+      return 50;
+
+    case 'processing video...':
+    case 'converting image to svg...':
+    case 'converting image to png...':
+    case 'converting carousel to svg...':
+    case 'converting carousel to png...':
+    case 'packaging carousel...':
+      return 75;
+
+    case 'preparing download...':
+      return 90;
+
+    case 'starting download...':
+      return 100;
+
+    default:
+      return 10;
   }
 }
 
@@ -383,6 +448,7 @@ export default function App({
     'idle' | 'loading' | 'success' | 'error'
   >('idle');
   const [progressLabel, setProgressLabel] = useState('');
+  const [progress, setProgress] = useState(10);
   const [errorMsg, setErrorMsg] = useState('');
   const [successInfo, setSuccessInfo] = useState<{
     mediaType?: 'video' | 'image' | 'carousel';
@@ -439,6 +505,7 @@ export default function App({
   const triggerDownload = async (targetUrl: string) => {
     setStatus('loading');
     setProgressLabel(t('checkingMedia'));
+    setProgress(10);
     setErrorMsg('');
     setSuccessInfo({});
 
@@ -467,8 +534,10 @@ export default function App({
       for await (const event of readSSE(response)) {
         if (event.type === 'stage') {
           setProgressLabel(getTranslatedStage(event.label, t));
+          setProgress(getProgressFromStage(event.label));
         } else if (event.type === 'ready') {
           setProgressLabel(t('startingDownload'));
+          setProgress(100);
 
           const a = document.createElement('a');
 
@@ -495,6 +564,7 @@ export default function App({
             setUrl('');
             setStatus('idle');
             setProgressLabel('');
+            setProgress(10);
             setSuccessInfo({});
           }, 3000);
         } else if (event.type === 'error') {
@@ -667,6 +737,7 @@ export default function App({
                       >
                         <ProgressLabel
                           label={progressLabel || t('checkingMedia')}
+                          progress={progress}
                         />
                       </motion.div>
                     ) : status === 'success' ? (
