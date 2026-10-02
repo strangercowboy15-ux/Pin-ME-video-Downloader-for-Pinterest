@@ -122,7 +122,7 @@ function WakingScreen() {
   );
 }
 
-// ─── Progress label shown during loading ─────────────────────────────────────
+// ─── Circular progress indicator ────────────────────────────────────────────
 
 function ProgressLabel({
   label,
@@ -131,6 +131,14 @@ function ProgressLabel({
   label: string;
   progress: number;
 }) {
+  const radius = 34;
+  const circumference = 2 * Math.PI * radius;
+
+  const clampedProgress = Math.min(100, Math.max(0, progress));
+
+  const strokeDashoffset =
+    circumference * (1 - clampedProgress / 100);
+
   return (
     <div className="flex flex-col items-center gap-3 w-full">
       <AnimatePresence mode="wait">
@@ -146,28 +154,67 @@ function ProgressLabel({
         </motion.p>
       </AnimatePresence>
 
-      <div className="w-full max-w-[320px]">
-        <div
-          className="h-2.5 w-full overflow-hidden rounded-full bg-muted/60"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={progress}
+      <div
+        className="relative flex items-center justify-center w-20 h-20"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={clampedProgress}
+        aria-label={`${clampedProgress}%`}
+      >
+        <svg
+          width="80"
+          height="80"
+          viewBox="0 0 80 80"
+          className="absolute inset-0"
+          aria-hidden="true"
         >
-          <motion.div
-            className="h-full rounded-full bg-primary"
-            initial={{ width: '0%' }}
-            animate={{ width: `${progress}%` }}
+          {/* Background ring */}
+          <circle
+            cx="40"
+            cy="40"
+            r={radius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="5"
+            className="text-muted/30"
+          />
+
+          {/* Progress ring */}
+          <motion.circle
+            cx="40"
+            cy="40"
+            r={radius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="5"
+            strokeLinecap="round"
+            className="text-primary"
+            transform="rotate(-90 40 40)"
+            strokeDasharray={circumference}
+            initial={{
+              strokeDashoffset: circumference,
+            }}
+            animate={{
+              strokeDashoffset,
+            }}
             transition={{
               duration: 0.45,
               ease: 'easeOut',
             }}
           />
-        </div>
+        </svg>
 
-        <div className="mt-1.5 text-center text-xs text-muted-foreground">
-          {progress}%
-        </div>
+        {/* Percentage */}
+        <motion.span
+          key={clampedProgress}
+          initial={{ opacity: 0.5, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.2 }}
+          className="relative z-10 text-sm font-semibold text-foreground"
+        >
+          {clampedProgress}%
+        </motion.span>
       </div>
     </div>
   );
