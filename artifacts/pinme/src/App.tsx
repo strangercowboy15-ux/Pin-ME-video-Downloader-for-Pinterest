@@ -1123,11 +1123,6 @@ async function downloadStreamFile(
       token
     )}`;
 
-  /*
-   * Carousel downloads are fetched as a Blob instead of relying
-   * only on <a download>. This makes the browser consume the
-   * complete server response and is safer for ZIP downloads.
-   */
   if (
     mediaType === 'carousel' ||
     filename
@@ -1160,11 +1155,6 @@ async function downloadStreamFile(
       );
     }
 
-    /*
-     * ZIP files normally start with PK.
-     * If the backend accidentally sends one image instead of
-     * the ZIP, do NOT show a false success.
-     */
     const firstBytes =
       await blob
         .slice(0, 4)
@@ -1224,9 +1214,6 @@ async function downloadStreamFile(
     return;
   }
 
-  /*
-   * Non-carousel files keep the existing direct download flow.
-   */
   const a =
     document.createElement(
       'a'
@@ -1310,16 +1297,20 @@ export default function App({
     filename?: string;
   }>({});
 
+  /*
+   * Invalid-link animation flag.
+   * While true, the input shakes and turns red.
+   */
+  const [
+    isInvalidLink,
+    setIsInvalidLink,
+  ] = useState(false);
+
   const inputRef =
     useRef<HTMLInputElement>(
       null
     );
 
-  /*
-   * Prevent two simultaneous download requests.
-   * This is especially important on mobile when paste events
-   * can fire very quickly.
-   */
   const downloadInProgress =
     useRef(false);
 
@@ -1351,13 +1342,13 @@ export default function App({
     };
   }, []);
 
-  // ─── Invalid link (auto-clear + flash message) ────────────────────────────
+  // ─── Invalid link (auto-clear + shake animation) ──────────────────────────
 
   const showInvalidLinkError = () => {
     /*
-     * Auto-clear the input immediately.
+     * Turn input red + shake it.
      */
-    setUrl('');
+    setIsInvalidLink(true);
 
     setErrorMsg(
       "This doesn't look like a Pinterest link."
@@ -1365,21 +1356,28 @@ export default function App({
 
     setStatus('error');
 
-    /*
-     * Flash the message for 2 seconds, then reset back to idle.
-     */
     if (resetTimerRef.current) {
       clearTimeout(
         resetTimerRef.current
       );
     }
 
+    /*
+     * After 1.5 seconds: auto-clear input, stop shake,
+     * hide the error and reset back to idle.
+     */
     resetTimerRef.current =
       setTimeout(() => {
+        setUrl('');
+
+        setIsInvalidLink(false);
+
         setStatus('idle');
+
         setErrorMsg('');
+
         resetTimerRef.current = null;
-      }, 2000);
+      }, 1500);
   };
 
   const triggerDownload =
@@ -1393,18 +1391,11 @@ export default function App({
         return;
       }
 
-      /*
-       * Verify the pasted / typed value is a Pinterest URL.
-       * If not, auto-clear + show the flash error.
-       */
       if (!isPinterestUrl(cleanUrl)) {
         showInvalidLinkError();
         return;
       }
 
-      /*
-       * Never allow duplicate requests.
-       */
       if (
         downloadInProgress.current
       ) {
@@ -1423,6 +1414,8 @@ export default function App({
       setProgress(10);
 
       setErrorMsg('');
+
+      setIsInvalidLink(false);
 
       setSuccessInfo({});
 
@@ -1519,9 +1512,6 @@ export default function App({
 
             setProgress(100);
 
-            /*
-             * Store the COMPLETE metadata before download.
-             */
             setSuccessInfo({
               mediaType:
                 event.mediaType,
@@ -1531,11 +1521,6 @@ export default function App({
                 event.filename,
             });
 
-            /*
-             * IMPORTANT:
-             * Carousel is downloaded as a complete ZIP blob.
-             * Other media retain direct browser download.
-             */
             await downloadStreamFile(
               event.token,
               event.filename,
@@ -1551,9 +1536,6 @@ export default function App({
               'success'
             );
 
-            /*
-             * Keep success message visible for 3 seconds.
-             */
             resetTimerRef.current =
               setTimeout(() => {
                 setUrl('');
@@ -1576,10 +1558,6 @@ export default function App({
                   null;
               }, 3000);
 
-            /*
-             * Do not process another ready event
-             * from the same SSE stream.
-             */
             break;
           }
         }
@@ -1620,9 +1598,6 @@ export default function App({
           const clean =
             text.trim();
 
-          /*
-           * Validate before setting the input.
-           */
           if (
             !isPinterestUrl(clean)
           ) {
@@ -1653,9 +1628,6 @@ export default function App({
       return;
     }
 
-    /*
-     * Let the browser finish inserting the pasted value first.
-     */
     setTimeout(() => {
       if (
         inputRef.current
@@ -1664,9 +1636,6 @@ export default function App({
           inputRef.current.value.trim();
 
         if (value) {
-          /*
-           * Validate before proceeding.
-           */
           if (
             !isPinterestUrl(value)
           ) {
@@ -1692,10 +1661,6 @@ export default function App({
       url.trim() &&
       status !== 'loading'
     ) {
-      /*
-       * triggerDownload already validates the URL,
-       * so we can safely call it here.
-       */
       triggerDownload(
         url.trim()
       );
@@ -1819,8 +1784,39 @@ export default function App({
                   }
                   className="w-full space-y-4"
                 >
-                  <div className="relative flex items-center">
-                    <input
+                  {/* Input + invalid-link shake animation */}
+                  <motion.div
+                    className="relative flex items-center"
+                    animate={
+                      isInvalidLink
+                        ? {
+                            x: [
+                              0,
+                              -8,
+                              8,
+                              -6,
+                              6,
+                              -3,
+                              3,
+                              0,
+                            ],
+                          }
+                        : {
+                            x: 0,
+                          }
+                    }
+                    transition={
+                      isInvalidLink
+                        ? {
+                            duration: 0.45,
+                            ease: 'easeInOut',
+                          }
+                        : {
+                            duration: 0.2,
+                          }
+                    }
+                  >
+                    <motion.input
                       ref={inputRef}
                       type="url"
                       value={url}
@@ -1835,10 +1831,52 @@ export default function App({
                       placeholder={t(
                         'placeholder'
                       )}
-                      className="w-full bg-input/50 border border-border rounded-xl py-4 pl-4 pr-14 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner"
+                      className={`w-full bg-input/50 border rounded-xl py-4 pl-4 pr-14 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner ${
+                        isInvalidLink
+                          ? 'border-red-500 focus:ring-red-500/50'
+                          : 'border-border'
+                      }`}
                       disabled={
                         status ===
                         'loading'
+                      }
+                      animate={
+                        isInvalidLink
+                          ? {
+                              scale: [
+                                1,
+                                1.02,
+                                1,
+                              ],
+                              opacity: [
+                                1,
+                                0.6,
+                                0.4,
+                                0.2,
+                                0,
+                              ],
+                            }
+                          : {
+                              scale: 1,
+                              opacity: 1,
+                            }
+                      }
+                      transition={
+                        isInvalidLink
+                          ? {
+                              duration: 1.5,
+                              times: [
+                                0,
+                                0.2,
+                                0.5,
+                                0.75,
+                                1,
+                              ],
+                              ease: 'easeOut',
+                            }
+                          : {
+                              duration: 0.2,
+                            }
                       }
                       data-testid="input-url"
                     />
@@ -1886,7 +1924,7 @@ export default function App({
                         />
                       </svg>
                     </button>
-                  </div>
+                  </motion.div>
 
                   <AnimatePresence mode="wait">
                     {status ===
