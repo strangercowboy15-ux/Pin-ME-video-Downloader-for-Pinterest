@@ -122,6 +122,39 @@ function WakingScreen() {
   );
 }
 
+// ─── Animated trailing dots ─────────────────────────────────────────────────
+
+function AnimatedStageLabel({ label }: { label: string }) {
+  const [dots, setDots] = useState('...');
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setDots((current) => {
+        if (current === '.') return '..';
+        if (current === '..') return '...';
+        return '.';
+      });
+    }, 450);
+
+    return () => clearInterval(id);
+  }, []);
+
+  const hasTrailingDots = /\.{3}$/.test(label);
+
+  if (!hasTrailingDots) {
+    return <>{label}</>;
+  }
+
+  const baseLabel = label.replace(/\.{3}$/, '');
+
+  return (
+    <>
+      {baseLabel}
+      <span aria-hidden="true">{dots}</span>
+    </>
+  );
+}
+
 // ─── Circular progress indicator ────────────────────────────────────────────
 
 function ProgressLabel({
@@ -150,7 +183,7 @@ function ProgressLabel({
           transition={{ duration: 0.2 }}
           className="text-sm text-muted-foreground text-center"
         >
-          {label}
+          <AnimatedStageLabel label={label} />
         </motion.p>
       </AnimatePresence>
 
