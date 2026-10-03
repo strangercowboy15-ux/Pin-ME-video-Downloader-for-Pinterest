@@ -1266,6 +1266,16 @@ export default function App({
   const [url, setUrl] =
     useState('');
 
+  /*
+   * Separate state for what is actually visible in the input box.
+   * This lets us fade out the text inside the box
+   * WITHOUT fading or shrinking the input box itself.
+   */
+  const [
+    displayUrl,
+    setDisplayUrl,
+  ] = useState('');
+
   const [status, setStatus] =
     useState<
       | 'idle'
@@ -1297,9 +1307,13 @@ export default function App({
     filename?: string;
   }>({});
 
+  /*
+   * When true, the LINK TEXT inside the input fades out.
+   * The input box itself stays visible and stable.
+   */
   const [
-    isInvalidLink,
-    setIsInvalidLink,
+    isLinkFading,
+    setIsLinkFading,
   ] = useState(false);
 
   const inputRef =
@@ -1338,10 +1352,13 @@ export default function App({
     };
   }, []);
 
-  // ─── Invalid link (auto-clear + smooth fade out) ──────────────────────────
+  // ─── Invalid link (link text fades out, box stays) ────────────────────────
 
   const showInvalidLinkError = () => {
-    setIsInvalidLink(true);
+    /*
+     * Start the link-only fade out.
+     */
+    setIsLinkFading(true);
 
     setErrorMsg(
       "This doesn't look like a Pinterest link."
@@ -1356,14 +1373,15 @@ export default function App({
     }
 
     /*
-     * Smooth fade out for 1.5s, then auto-clear the input
-     * and reset back to idle.
+     * After 1.5s, actually clear the value + reset.
      */
     resetTimerRef.current =
       setTimeout(() => {
         setUrl('');
 
-        setIsInvalidLink(false);
+        setDisplayUrl('');
+
+        setIsLinkFading(false);
 
         setStatus('idle');
 
@@ -1408,7 +1426,7 @@ export default function App({
 
       setErrorMsg('');
 
-      setIsInvalidLink(false);
+      setIsLinkFading(false);
 
       setSuccessInfo({});
 
@@ -1539,6 +1557,8 @@ export default function App({
               setTimeout(() => {
                 setUrl('');
 
+                setDisplayUrl('');
+
                 setStatus(
                   'idle'
                 );
@@ -1600,11 +1620,17 @@ export default function App({
           if (
             !isPinterestUrl(clean)
           ) {
+            setUrl(clean);
+
+            setDisplayUrl(clean);
+
             showInvalidLinkError();
             return;
           }
 
           setUrl(clean);
+
+          setDisplayUrl(clean);
 
           await triggerDownload(
             clean
@@ -1635,9 +1661,13 @@ export default function App({
           inputRef.current.value.trim();
 
         if (value) {
+          setDisplayUrl(value);
+
           if (
             !isPinterestUrl(value)
           ) {
+            setUrl(value);
+
             showInvalidLinkError();
             return;
           }
@@ -1776,22 +1806,25 @@ export default function App({
                   }
                   className="w-full space-y-4"
                 >
-                  {/* Input + smooth fade out animation */}
-                  <motion.div
-                    className="relative flex items-center"
-                    animate={{
-                      x: 0,
-                    }}
-                  >
-                    <motion.input
+                  {/*
+                   * Input container.
+                   * The box itself is stable.
+                   * Only the text INSIDE fades out.
+                   */}
+                  <div className="relative flex items-center">
+                    <input
                       ref={inputRef}
                       type="url"
-                      value={url}
-                      onChange={(e) =>
+                      value={displayUrl}
+                      onChange={(e) => {
+                        setDisplayUrl(
+                          e.target.value
+                        );
+
                         setUrl(
                           e.target.value
-                        )
-                      }
+                        );
+                      }}
                       onPaste={
                         handleNativePaste
                       }
@@ -1799,7 +1832,7 @@ export default function App({
                         'placeholder'
                       )}
                       className={`w-full bg-input/50 border rounded-xl py-4 pl-4 pr-14 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner ${
-                        isInvalidLink
+                        isLinkFading
                           ? 'border-red-500 focus:ring-red-500/50'
                           : 'border-border'
                       }`}
@@ -1807,40 +1840,14 @@ export default function App({
                         status ===
                         'loading'
                       }
-                      animate={
-                        isInvalidLink
-                          ? {
-                              opacity: [
-                                1,
-                                1,
-                                0.8,
-                                0.5,
-                                0.2,
-                                0,
-                              ],
-                            }
-                          : {
-                              opacity: 1,
-                            }
-                      }
-                      transition={
-                        isInvalidLink
-                          ? {
-                              duration: 1.5,
-                              times: [
-                                0,
-                                0.2,
-                                0.4,
-                                0.6,
-                                0.8,
-                                1,
-                              ],
-                              ease: 'easeInOut',
-                            }
-                          : {
-                              duration: 0.2,
-                            }
-                      }
+                      style={{
+                        opacity:
+                          isLinkFading
+                            ? 0
+                            : 1,
+                        transition:
+                          'opacity 1.5s ease-in-out',
+                      }}
                       data-testid="input-url"
                     />
 
@@ -1887,7 +1894,7 @@ export default function App({
                         />
                       </svg>
                     </button>
-                  </motion.div>
+                  </div>
 
                   <AnimatePresence mode="wait">
                     {status ===
