@@ -49,17 +49,6 @@ function isPinterestUrl(rawUrl: string): boolean {
   }
 }
 
-// Detect complete-looking URLs without blocking normal partial typing.
-function looksLikeUrl(rawValue: string): boolean {
-  const value = rawValue.trim();
-
-  if (!value) {
-    return false;
-  }
-
-  return /^https?:\/\//i.test(value);
-}
-
 // ─── Server-ready hook ───────────────────────────────────────────────────────
 
 function useServerReady() {
@@ -1374,15 +1363,6 @@ export default function App({
       }
 
       /*
-       * Frontend safety check.
-       * Only Pinterest URLs are allowed to reach the API.
-       */
-      if (!isPinterestUrl(cleanUrl)) {
-        setUrl('');
-        return;
-      }
-
-      /*
        * Never allow duplicate requests.
        */
       if (
@@ -1584,6 +1564,8 @@ export default function App({
       }
     };
 
+  // ─── Paste button ─────────────────────────────────────────────────────────
+
   const handlePasteClick =
     async () => {
       if (
@@ -1596,38 +1578,39 @@ export default function App({
         const text =
           await navigator.clipboard.readText();
 
-        if (text?.trim()) {
-          const clean =
-            text.trim();
+        const clean =
+          text?.trim() ?? '';
 
-          /*
-           * Telegram-style filter:
-           * non-Pinterest URLs disappear immediately.
-           */
-          if (
-            looksLikeUrl(clean) &&
-            !isPinterestUrl(clean)
-          ) {
-            setUrl('');
-            return;
-          }
-
-          /*
-           * Do not send non-URL invalid text to the API.
-           */
-          if (
-            !isPinterestUrl(clean)
-          ) {
-            setUrl('');
-            return;
-          }
-
-          setUrl(clean);
-
-          await triggerDownload(
-            clean
-          );
+        if (!clean) {
+          setUrl('');
+          return;
         }
+
+        /*
+         * NEW BEHAVIOUR:
+         *
+         * Pinterest URL:
+         *   → put it in the input
+         *   → immediately start download
+         *
+         * Invalid / non-Pinterest URL:
+         *   → clear the input
+         *   → do not download
+         */
+        if (
+          !isPinterestUrl(clean)
+        ) {
+          setUrl('');
+          setStatus('idle');
+          setErrorMsg('');
+          return;
+        }
+
+        setUrl(clean);
+
+        await triggerDownload(
+          clean
+        );
       } catch (err) {
         console.error(
           'Failed to read clipboard',
@@ -1635,6 +1618,8 @@ export default function App({
         );
       }
     };
+
+  // ─── Native browser paste ────────────────────────────────────────────────
 
   const handleNativePaste = (
     e: React.ClipboardEvent<HTMLInputElement>
@@ -1651,22 +1636,8 @@ export default function App({
         .trim();
 
     /*
-     * Block non-Pinterest URLs before the browser inserts them.
-     */
-    if (
-      pasted &&
-      looksLikeUrl(pasted) &&
-      !isPinterestUrl(pasted)
-    ) {
-      e.preventDefault();
-
-      setUrl('');
-
-      return;
-    }
-
-    /*
-     * Invalid pasted text should not be sent to the API.
+     * Invalid / non-Pinterest pasted URL:
+     * prevent insertion and clear input.
      */
     if (
       pasted &&
@@ -1675,57 +1646,53 @@ export default function App({
       e.preventDefault();
 
       setUrl('');
+      setStatus('idle');
+      setErrorMsg('');
 
       return;
     }
 
     /*
-     * Let the browser finish inserting the valid Pinterest
-     * value first, then keep the existing auto-download flow.
+     * Pinterest URL:
+     * allow browser to insert it first,
+     * then immediately start download.
      */
-    setTimeout(() => {
-      if (
-        inputRef.current
-      ) {
-        const value =
-          inputRef.current.value.trim();
+    if (
+      pasted &&
+      isPinterestUrl(pasted)
+    ) {
+      setTimeout(() => {
+        setUrl(pasted);
 
-        if (
-          value &&
-          isPinterestUrl(value)
-        ) {
-          setUrl(value);
-
-          triggerDownload(
-            value
-          );
-        } else if (
-          value
-        ) {
-          setUrl('');
-        }
-      }
-    }, 50);
+        triggerDownload(
+          pasted
+        );
+      }, 0);
+    }
   };
 
-  const handleInputChange = (
-    value: string
+  // ─── Manual typing ────────────────────────────────────────────────────────
+
+  const handleUrlChange = (
+    e: React.ChangeEvent<HTMLInputElement>
   ) => {
     /*
-     * Keep normal partial typing possible.
-     * Once the user has entered a complete URL beginning with
-     * http:// or https://, immediately clear non-Pinterest URLs.
+     * Manual typing is intentionally NOT validated here.
+     *
+     * This means the user can type/edit a URL normally.
+     * Validation/clearing happens when using Paste or
+     * when submitting the download.
      */
-    if (
-      value.trim() &&
-      looksLikeUrl(value) &&
-      !isPinterestUrl(value)
-    ) {
-      setUrl('');
-      return;
-    }
+    setUrl(
+      e.target.value
+    );
 
-    setUrl(value);
+    if (
+      status === 'error'
+    ) {
+      setStatus('idle');
+      setErrorMsg('');
+    }
   };
 
   const handleSubmit = (
@@ -1733,25 +1700,12 @@ export default function App({
   ) => {
     e.preventDefault();
 
-    const clean =
-      url.trim();
-
-    if (!clean) {
-      return;
-    }
-
     if (
-      !isPinterestUrl(clean)
-    ) {
-      setUrl('');
-      return;
-    }
-
-    if (
+      url.trim() &&
       status !== 'loading'
     ) {
       triggerDownload(
-        clean
+        url.trim()
       );
     }
   };
@@ -1769,9 +1723,9 @@ export default function App({
         ) {
           await navigator.share({
             title:
-              'pinME Downloade',
+              'pinME Downloader',
             text:
-              'Fast & simple Pinterest Downloade',
+              'Fast & simple Pinterest Downloader',
             url: shareUrl,
           });
 
@@ -1878,10 +1832,8 @@ export default function App({
                       ref={inputRef}
                       type="url"
                       value={url}
-                      onChange={(e) =>
-                        handleInputChange(
-                          e.target.value
-                        )
+                      onChange={
+                        handleUrlChange
                       }
                       onPaste={
                         handleNativePaste
@@ -2136,7 +2088,7 @@ export default function App({
 
                 {/* Copyright */}
                 <span className="text-[10px] text-muted-foreground/70">
-                  © 2026 pinME Downloade. All rights reserved.
+                  © 2026 pinME Downloader. All rights reserved.
                 </span>
               </div>
             </footer>
