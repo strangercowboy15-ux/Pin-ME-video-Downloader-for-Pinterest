@@ -1338,7 +1338,7 @@ export default function App({
     };
   }, []);
 
-  // ─── Invalid link (auto-clear + shake animation) ──────────────────────────
+  // ─── Invalid link (auto-clear + smooth fade out) ──────────────────────────
 
   const showInvalidLinkError = () => {
     setIsInvalidLink(true);
@@ -1355,6 +1355,10 @@ export default function App({
       );
     }
 
+    /*
+     * Smooth fade out for 1.5s, then auto-clear the input
+     * and reset back to idle.
+     */
     resetTimerRef.current =
       setTimeout(() => {
         setUrl('');
@@ -1510,10 +1514,6 @@ export default function App({
                 event.filename,
             });
 
-            /*
-             * Show a distinct stage while the file
-             * is being saved to the user's device.
-             */
             setProgressLabel(
               'Downloading file...'
             );
@@ -1776,36 +1776,12 @@ export default function App({
                   }
                   className="w-full space-y-4"
                 >
+                  {/* Input + smooth fade out animation */}
                   <motion.div
                     className="relative flex items-center"
-                    animate={
-                      isInvalidLink
-                        ? {
-                            x: [
-                              0,
-                              -8,
-                              8,
-                              -6,
-                              6,
-                              -3,
-                              3,
-                              0,
-                            ],
-                          }
-                        : {
-                            x: 0,
-                          }
-                    }
-                    transition={
-                      isInvalidLink
-                        ? {
-                            duration: 0.45,
-                            ease: 'easeInOut',
-                          }
-                        : {
-                            duration: 0.2,
-                          }
-                    }
+                    animate={{
+                      x: 0,
+                    }}
                   >
                     <motion.input
                       ref={inputRef}
@@ -1834,21 +1810,16 @@ export default function App({
                       animate={
                         isInvalidLink
                           ? {
-                              scale: [
-                                1,
-                                1.02,
-                                1,
-                              ],
                               opacity: [
                                 1,
-                                0.6,
-                                0.4,
+                                1,
+                                0.8,
+                                0.5,
                                 0.2,
                                 0,
                               ],
                             }
                           : {
-                              scale: 1,
                               opacity: 1,
                             }
                       }
@@ -1859,11 +1830,12 @@ export default function App({
                               times: [
                                 0,
                                 0.2,
-                                0.5,
-                                0.75,
+                                0.4,
+                                0.6,
+                                0.8,
                                 1,
                               ],
-                              ease: 'easeOut',
+                              ease: 'easeInOut',
                             }
                           : {
                               duration: 0.2,
