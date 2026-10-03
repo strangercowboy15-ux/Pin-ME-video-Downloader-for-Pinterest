@@ -1369,6 +1369,13 @@ async function convertImageToPng(
     return inputPath;
   }
 
+  /*
+   * SPEED MODE:
+   * compressionLevel 3 + adaptiveFiltering false
+   * is 3-5x faster than level 6 + adaptive,
+   * while still producing lossless PNG.
+   * File size is slightly larger (~10-20%).
+   */
   await sharp(
     inputPath,
     {
@@ -1376,8 +1383,8 @@ async function convertImageToPng(
     },
   )
     .png({
-      compressionLevel: 6,
-      adaptiveFiltering: true,
+      compressionLevel: 3,
+      adaptiveFiltering: false,
     })
     .toFile(
       outputPath,
@@ -1821,16 +1828,6 @@ async function downloadImageOrCarousel(
         : "Converting carousel to PNG...",
     );
 
-    /*
-     * PARALLEL CONVERSION
-     * -------------------
-     * Convert images in small parallel batches
-     * (IMAGE_CONVERT_CONCURRENCY at a time).
-     *
-     * This is 3-5x faster than converting them
-     * one after another, while still preserving
-     * lossless PNG output for every image.
-     */
     const convertBatchSize =
       IMAGE_CONVERT_CONCURRENCY;
 
@@ -1856,7 +1853,6 @@ async function downloadImageOrCarousel(
                   imagePath,
                 ).toLowerCase();
 
-              // Keep GIFs untouched.
               if (
                 ext === ".gif"
               ) {
@@ -1875,7 +1871,6 @@ async function downloadImageOrCarousel(
                   err,
                 );
 
-                // Graceful fallback: keep original file.
                 return imagePath;
               }
             },
@@ -1887,8 +1882,6 @@ async function downloadImageOrCarousel(
       );
     }
 
-    // Sort again because timestamps in filenames
-    // can change ordering.
     images =
       convertedImages.sort(
         (a, b) =>
@@ -1913,15 +1906,6 @@ async function downloadImageOrCarousel(
         `pinme-carousel-${pinId}.zip`,
       );
 
-    /*
-     * FAST ZIP
-     * --------
-     * store:true — no extra compression pass.
-     *
-     * The images are already compressed (PNG/JPG),
-     * so store mode is much faster and produces
-     * nearly the same final size.
-     */
     await new Promise<void>(
       (
         resolve,
@@ -2435,10 +2419,6 @@ router.post(
       normalizeImageFormat(
         imageFormat,
       );
-
-    // ========================================================
-    // SSE
-    // ========================================================
 
     res.setHeader(
       "Content-Type",
