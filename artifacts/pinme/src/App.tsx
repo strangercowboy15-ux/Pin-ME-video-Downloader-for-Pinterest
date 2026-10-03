@@ -209,7 +209,6 @@ function ProgressLabel({
   const strokeDashoffset =
     circumference * (1 - clampedProgress / 100);
 
-  // Battery-style progress colors
   const progressColor =
     clampedProgress <= 30
       ? '#ef4444'
@@ -556,10 +555,6 @@ function getTranslatedStage(
     case 'checking media type...':
       return t('checkingMedia');
 
-    // ──────────────────────────────────────────────────────
-    // MEDIA-SPECIFIC INFO STAGES
-    // ──────────────────────────────────────────────────────
-
     case 'fetching video info...':
       return t('fetchingVideoInfo');
 
@@ -572,13 +567,8 @@ function getTranslatedStage(
     case 'fetching gif info...':
       return t('fetchingGifInfo');
 
-    // Backward compatibility with old backend
     case 'fetching info...':
       return t('fetchingInfo');
-
-    // ──────────────────────────────────────────────────────
-    // DOWNLOAD STAGES
-    // ──────────────────────────────────────────────────────
 
     case 'downloading video...':
       return t('downloadingVideo');
@@ -591,10 +581,6 @@ function getTranslatedStage(
 
     case 'downloading carousel...':
       return t('downloadingCarousel');
-
-    // ──────────────────────────────────────────────────────
-    // PROCESSING STAGES
-    // ──────────────────────────────────────────────────────
 
     case 'processing video...':
       return t('processingVideo');
@@ -668,6 +654,74 @@ function getProgressFromStage(
   }
 }
 
+// ─── Success message ─────────────────────────────────────────────────────────
+
+function getSuccessMessage(
+  successInfo: {
+    mediaType?: 'video' | 'image' | 'carousel';
+    imageCount?: number;
+    filename?: string;
+  },
+  t: (key: any) => string
+): string {
+  const filename =
+    successInfo.filename?.toLowerCase() ?? '';
+
+  // GIF is returned by the backend as mediaType: "image".
+  // We identify it from the actual downloaded filename.
+  const isGif =
+    successInfo.mediaType === 'image' &&
+    filename.endsWith('.gif');
+
+  if (isGif) {
+    return 'GIF downloaded';
+  }
+
+  if (successInfo.mediaType === 'carousel') {
+    const count =
+      successInfo.imageCount &&
+      successInfo.imageCount > 0
+        ? ` (${successInfo.imageCount} ${t('imagesCount')})`
+        : '';
+
+    return `${t('carouselDownloaded')}${count} • ZIP`;
+  }
+
+  if (successInfo.mediaType === 'image') {
+    return t('imageDownloaded');
+  }
+
+  if (successInfo.mediaType === 'video') {
+    return t('videoDownloaded');
+  }
+
+  // Safe fallback for older backend responses.
+  if (filename.endsWith('.gif')) {
+    return 'GIF downloaded';
+  }
+
+  if (
+    filename.endsWith('.zip')
+  ) {
+    return successInfo.imageCount
+      ? `${t('carouselDownloaded')} (${successInfo.imageCount} ${t(
+          'imagesCount'
+        )}) • ZIP`
+      : 'Carousel downloaded • ZIP';
+  }
+
+  if (
+    filename.endsWith('.mp4') ||
+    filename.endsWith('.webm') ||
+    filename.endsWith('.mov') ||
+    filename.endsWith('.mkv')
+  ) {
+    return t('videoDownloaded');
+  }
+
+  return t('imageDownloaded');
+}
+
 // ─── Main app ────────────────────────────────────────────────────────────────
 
 export default function App({
@@ -693,9 +747,11 @@ export default function App({
   const [progressLabel, setProgressLabel] = useState('');
   const [progress, setProgress] = useState(10);
   const [errorMsg, setErrorMsg] = useState('');
+
   const [successInfo, setSuccessInfo] = useState<{
     mediaType?: 'video' | 'image' | 'carousel';
     imageCount?: number;
+    filename?: string;
   }>({});
 
   const inputRef =
@@ -838,6 +894,17 @@ export default function App({
 
             setProgress(100);
 
+            // Save the actual media information BEFORE
+            // triggering the browser download.
+            setSuccessInfo({
+              mediaType:
+                event.mediaType,
+              imageCount:
+                event.imageCount,
+              filename:
+                event.filename,
+            });
+
             const a =
               document.createElement(
                 'a'
@@ -864,13 +931,6 @@ export default function App({
 
             downloadTriggered =
               true;
-
-            setSuccessInfo({
-              mediaType:
-                event.mediaType,
-              imageCount:
-                event.imageCount,
-            });
 
             setStatus(
               'success'
@@ -1196,25 +1256,10 @@ export default function App({
                             className="w-full py-4 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2 px-3"
                           >
                             <span className="text-sm sm:text-base">
-                              {successInfo.mediaType ===
-                              'carousel'
-                                ? `${t(
-                                    'carouselDownloaded'
-                                  )}${
-                                    successInfo.imageCount
-                                      ? ` (${successInfo.imageCount} ${t(
-                                          'imagesCount'
-                                        )})`
-                                      : ''
-                                  }`
-                                : successInfo.mediaType ===
-                                    'image'
-                                  ? t(
-                                      'imageDownloaded'
-                                    )
-                                  : t(
-                                      'videoDownloaded'
-                                    )}
+                              {getSuccessMessage(
+                                successInfo,
+                                t
+                              )}
                             </span>
 
                             <span className="text-lg leading-none">
