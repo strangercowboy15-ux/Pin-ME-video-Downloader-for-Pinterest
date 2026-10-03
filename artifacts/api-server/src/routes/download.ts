@@ -478,6 +478,72 @@ interface PinMeta {
   imageUrl?: string | null;
 }
 
+function isImageLikeEntry(
+  entry: Record<string, unknown>,
+): boolean {
+  const entryExt =
+    String(
+      entry.ext || "",
+    ).toLowerCase();
+
+  const entryUrl =
+    String(
+      entry.url || "",
+    ).toLowerCase();
+
+  const entryFormats =
+    (entry.formats as Array<
+      Record<string, unknown>
+    >) || [];
+
+  const hasVideo =
+    entryFormats.some(
+      (f) =>
+        f.vcodec &&
+        f.vcodec !==
+          "none" &&
+        f.vcodec !== null,
+    );
+
+  if (
+    hasVideo
+  ) {
+    return false;
+  }
+
+  if (
+    [
+      "jpg",
+      "jpeg",
+      "png",
+      "webp",
+      "gif",
+    ].includes(
+      entryExt,
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(
+      entryUrl,
+    )
+  ) {
+    return true;
+  }
+
+  const directImage =
+    entry.image_url ||
+    entry.thumbnail;
+
+  return (
+    typeof directImage ===
+      "string" &&
+    directImage.length > 0
+  );
+}
+
 async function getPinMeta(
   url: string,
 ): Promise<PinMeta> {
@@ -489,7 +555,6 @@ async function getPinMeta(
     } =
       await runYtDlp([
         "--dump-json",
-        "--no-playlist",
         "--no-warnings",
         url,
       ]));
@@ -497,6 +562,7 @@ async function getPinMeta(
     const e =
       err as {
         stderr?: string;
+        stdout?: string;
       };
 
     const errLower =
@@ -504,6 +570,12 @@ async function getPinMeta(
         e.stderr ||
         ""
       ).toLowerCase();
+
+    // --------------------------------------------------------
+    // If yt-dlp cannot identify the media, do NOT immediately
+    // call the pin unavailable. Pinterest carousel/image pins
+    // are often better handled by gallery-dl.
+    // --------------------------------------------------------
 
     if (
       errLower.includes(
@@ -635,15 +707,124 @@ async function getPinMeta(
         >
       | undefined;
 
+  const infoType =
+    String(
+      info._type ||
+        "",
+    ).toLowerCase();
+
   // ========================================================
-  // CAROUSEL
+  // CAROUSEL DETECTION
   // ========================================================
+
+  if (
+    infoType ===
+      "playlist" &&
+    Array.isArray(
+      entries,
+    )
+  ) {
+    const imageEntries =
+      entries.filter(
+        (entry) =>
+          isImageLikeEntry(
+            entry,
+          ),
+      );
+
+    if (
+      imageEntries.length >=
+      1
+    ) {
+      return {
+        id:
+          (info.id as string) ||
+          randomBytes(
+            4,
+          ).toString("hex"),
+        title:
+          (info.title as string) ||
+          null,
+        hasVideo: false,
+        isCarousel:
+          entries.length > 1 ||
+          imageEntries.length > 1,
+      };
+    }
+  }
+
+  // --------------------------------------------------------
+  // Standard multiple-entry carousel
+  // --------------------------------------------------------
 
   if (
     Array.isArray(
       entries,
     ) &&
     entries.length > 1
+  ) {
+    const imageEntries =
+      entries.filter(
+        (entry) =>
+          isImageLikeEntry(
+            entry,
+          ),
+      );
+
+    if (
+      imageEntries.length >= 1
+    ) {
+      return {
+        id:
+          (info.id as string) ||
+          randomBytes(
+            4,
+          ).toString("hex"),
+        title:
+          (info.title as string) ||
+          null,
+        hasVideo: false,
+        isCarousel: true,
+      };
+    }
+  }
+
+  // ========================================================
+  // PINTEREST IMAGE COLLECTION FIELDS
+  // ========================================================
+
+  const imagesField =
+    info.images;
+
+  const thumbnailsField =
+    info.thumbnails;
+
+  if (
+    Array.isArray(
+      imagesField,
+    ) &&
+    imagesField.length > 1
+  ) {
+    return {
+      id:
+        (info.id as string) ||
+        randomBytes(
+          4,
+        ).toString("hex"),
+      title:
+        (info.title as string) ||
+        null,
+      hasVideo: false,
+      isCarousel: true,
+    };
+  }
+
+  if (
+    Array.isArray(
+      thumbnailsField,
+    ) &&
+    thumbnailsField.length > 1 &&
+    !hasVideoFormats
   ) {
     return {
       id:
@@ -682,6 +863,7 @@ async function getPinMeta(
       isGif,
       imageUrl:
         (info.url as string) ||
+        (info.image_url as string) ||
         null,
     };
   }
@@ -1012,7 +1194,7 @@ async function convertImageToPng(
 
   if (
     inputPath !==
-    outputPath &&
+      outputPath &&
     fs.existsSync(
       inputPath,
     )
@@ -1028,12 +1210,6 @@ async function convertImageToPng(
 // ============================================================
 // SVG CONVERSION
 // ============================================================
-//
-// IMPORTANT:
-// This creates a valid SVG container containing the original
-// raster image. It does NOT trace a photo into true vectors.
-// The original pixels remain embedded in the SVG.
-//
 
 async function convertImageToSvg(
   inputPath: string,
@@ -1133,8 +1309,6 @@ async function convertImage(
       inputPath,
     ).toLowerCase();
 
-  // GIF is preserved because converting an animated GIF
-  // to a normal PNG/SVG would lose the animation.
   if (
     ext === ".gif"
   ) {
@@ -1296,7 +1470,7 @@ async function downloadImageOrCarousel(
   );
 
   // ========================================================
-  // FAST PATH: SINGLE IMAGE / GIF
+  // FAST PATH
   // ========================================================
 
   if (
@@ -1330,7 +1504,6 @@ async function downloadImageOrCarousel(
           direct.filePath,
         ).toLowerCase();
 
-      // Preserve animated GIF.
       if (
         ext === ".gif"
       ) {
@@ -1371,7 +1544,7 @@ async function downloadImageOrCarousel(
   }
 
   // ========================================================
-  // FALLBACK / CAROUSEL PATH
+  // GALLERY-DL
   // ========================================================
 
   onStage?.(
@@ -1426,7 +1599,6 @@ async function downloadImageOrCarousel(
             imagePath,
           ).toLowerCase();
 
-        // Preserve GIF files.
         if (
           ext === ".gif"
         ) {
@@ -1474,8 +1646,6 @@ async function downloadImageOrCarousel(
             archiver(
               "zip",
               {
-                // Already-compressed image files
-                // don't need another compression pass.
                 store: true,
               },
             );
@@ -1545,7 +1715,7 @@ async function downloadImageOrCarousel(
     }
 
     // ======================================================
-    // SINGLE IMAGE FALLBACK
+    // SINGLE IMAGE
     // ======================================================
 
     if (
@@ -1559,7 +1729,6 @@ async function downloadImageOrCarousel(
           single,
         ).toLowerCase();
 
-      // Preserve GIF.
       if (
         ext === ".gif"
       ) {
@@ -1607,12 +1776,6 @@ async function downloadImageOrCarousel(
 // ============================================================
 // VIDEO DOWNLOAD
 // ============================================================
-//
-// BEST AVAILABLE native quality.
-// No resolution cap.
-// No artificial upscaling.
-// No user quality selector.
-//
 
 async function downloadVideo(
   url: string,
@@ -2024,11 +2187,6 @@ router.post(
       // ======================================================
       // STEP 1
       // ======================================================
-      //
-      // First identify the actual media type.
-      // This replaces the old generic "Fetching info..."
-      // stage so the frontend can show the correct type.
-      //
 
       send({
         type: "stage",
@@ -2160,7 +2318,7 @@ router.post(
 
       // ======================================================
       // PREPARE TOKEN
-      // ========================================================
+      // ======================================================
 
       send({
         type: "stage",
