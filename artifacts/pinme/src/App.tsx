@@ -209,6 +209,14 @@ function ProgressLabel({
   const strokeDashoffset =
     circumference * (1 - clampedProgress / 100);
 
+  // Battery-style progress colors
+  const progressColor =
+    clampedProgress <= 30
+      ? '#ef4444' // Red
+      : clampedProgress <= 70
+        ? '#eab308' // Yellow
+        : '#22c55e'; // Green
+
   return (
     <div className="flex flex-col items-center gap-3 w-full">
       <AnimatePresence mode="wait">
@@ -250,16 +258,15 @@ function ProgressLabel({
             className="text-muted/30"
           />
 
-          {/* Progress ring */}
+          {/* Battery-style progress ring */}
           <motion.circle
             cx="40"
             cy="40"
             r={radius}
             fill="none"
-            stroke="currentColor"
+            stroke={progressColor}
             strokeWidth="5"
             strokeLinecap="round"
-            className="text-primary"
             transform="rotate(-90 40 40)"
             strokeDasharray={circumference}
             initial={{
