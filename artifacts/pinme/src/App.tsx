@@ -606,6 +606,7 @@ async function getPinMeta(
     "png",
     "webp",
     "gif",
+    "avif",
   ].includes(ext);
 
   const entries =
@@ -620,17 +621,6 @@ async function getPinMeta(
 
   // ========================================================
   // CAROUSEL
-  // ========================================================
-  //
-  // IMPORTANT:
-  // If yt-dlp exposes Pinterest media through `entries`,
-  // do NOT use the direct single-image URL.
-  //
-  // Even a single entry can represent a Pinterest
-  // gallery/collection structure. We therefore send it
-  // through gallery-dl so the complete media set can be
-  // discovered and packaged correctly.
-  //
   // ========================================================
 
   if (
@@ -815,21 +805,6 @@ function runGalleryDl(
           if (
             code !== 0
           ) {
-            // ==================================================
-            // IMPORTANT CAROUSEL FIX
-            // ==================================================
-            //
-            // gallery-dl can return a non-zero exit code when
-            // one carousel image fails (for example HTTP 403)
-            // even though other images were downloaded
-            // successfully.
-            //
-            // When allowPartial is true, let the caller inspect
-            // the output directory and package every successfully
-            // downloaded image.
-            //
-            // ==================================================
-
             if (
               allowPartial
             ) {
@@ -882,6 +857,57 @@ function runGalleryDl(
 // IMAGE HELPERS
 // ============================================================
 
+function isSupportedImageFile(
+  filename: string,
+): boolean {
+  return /\.(jpg|jpeg|png|webp|gif|avif|bmp|tif|tiff)$/i.test(
+    filename,
+  );
+}
+
+function extractImageNumber(
+  filePath: string,
+): number {
+  const name =
+    path.basename(
+      filePath,
+    );
+
+  const matches = [
+    name.match(
+      /(?:image|img|photo|picture|media)[-_ ]?(\d+)/i,
+    ),
+    name.match(
+      /(?:^|[-_ ])(\d+)(?:\.[^.]+)?$/i,
+    ),
+  ];
+
+  for (
+    const match of
+    matches
+  ) {
+    if (
+      match &&
+      match[1]
+    ) {
+      const n =
+        Number(
+          match[1],
+        );
+
+      if (
+        Number.isFinite(
+          n,
+        )
+      ) {
+        return n;
+      }
+    }
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+}
+
 function findAllImages(
   dir: string,
 ): string[] {
@@ -919,7 +945,7 @@ function findAllImages(
       entry.isFile()
     ) {
       if (
-        /\.(jpg|jpeg|png|webp|gif)$/i.test(
+        isSupportedImageFile(
           entry.name,
         )
       ) {
@@ -938,7 +964,46 @@ function findAllImages(
     }
   }
 
-  return results;
+  return results.sort(
+    (a, b) => {
+      const aNum =
+        extractImageNumber(
+          a,
+        );
+
+      const bNum =
+        extractImageNumber(
+          b,
+        );
+
+      if (
+        aNum !==
+        Number.MAX_SAFE_INTEGER ||
+        bNum !==
+        Number.MAX_SAFE_INTEGER
+      ) {
+        if (
+          aNum !==
+          bNum
+        ) {
+          return (
+            aNum -
+            bNum
+          );
+        }
+      }
+
+      return a.localeCompare(
+        b,
+        undefined,
+        {
+          numeric: true,
+          sensitivity:
+            "base",
+        },
+      );
+    },
+  );
 }
 
 // ============================================================
@@ -993,6 +1058,25 @@ function getImageMimeType(
     ext === ".gif"
   ) {
     return "image/gif";
+  }
+
+  if (
+    ext === ".avif"
+  ) {
+    return "image/avif";
+  }
+
+  if (
+    ext === ".bmp"
+  ) {
+    return "image/bmp";
+  }
+
+  if (
+    ext === ".tif" ||
+    ext === ".tiff"
+  ) {
+    return "image/tiff";
   }
 
   return "image/jpeg";
@@ -1050,12 +1134,6 @@ async function convertImageToPng(
 // ============================================================
 // SVG CONVERSION
 // ============================================================
-//
-// IMPORTANT:
-// This creates a valid SVG container containing the original
-// raster image. It does NOT trace a photo into true vectors.
-// The original pixels remain embedded in the SVG.
-//
 
 async function convertImageToSvg(
   inputPath: string,
@@ -1158,8 +1236,7 @@ async function convertImage(
       )
       .toLowerCase();
 
-  // GIF is preserved because converting an animated GIF
-  // to a normal PNG/SVG would lose the animation.
+  // Preserve animated GIF.
   if (
     ext === ".gif"
   ) {
@@ -1236,6 +1313,12 @@ async function downloadDirectImage(
     ext = "gif";
   } else if (
     contentType.includes(
+      "image/avif",
+    )
+  ) {
+    ext = "avif";
+  } else if (
+    contentType.includes(
       "image/jpeg",
     )
   ) {
@@ -1243,7 +1326,7 @@ async function downloadDirectImage(
   } else {
     const urlExt =
       imageUrl.match(
-        /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i,
+        /\.(jpg|jpeg|png|webp|gif|avif|bmp|tif|tiff)(?:[?#]|$)/i,
       );
 
     if (urlExt) {
@@ -1317,7 +1400,7 @@ async function downloadImageOrCarousel(
   );
 
   // ========================================================
-  // FAST PATH: SINGLE IMAGE
+  // FAST PATH: SINGLE IMAGE ONLY
   // ========================================================
 
   if (
@@ -1392,7 +1475,7 @@ async function downloadImageOrCarousel(
   }
 
   // ========================================================
-  // FALLBACK / CAROUSEL PATH
+  // CAROUSEL / GALLERY PATH
   // ========================================================
 
   onStage?.(
@@ -1404,10 +1487,6 @@ async function downloadImageOrCarousel(
       "=== gallery-dl image/carousel ===",
     );
 
-    // IMPORTANT:
-    // allowPartial=true means gallery-dl may return a
-    // non-zero exit code while still leaving successfully
-    // downloaded images in outputDir.
     await runGalleryDl(
       [
         "-d",
@@ -1425,7 +1504,26 @@ async function downloadImageOrCarousel(
       );
 
     console.log(
+      "========================================",
+    );
+
+    console.log(
       `gallery-dl found ${images.length} image(s)`,
+    );
+
+    images.forEach(
+      (
+        imagePath,
+        index,
+      ) => {
+        console.log(
+          `Image ${index + 1}: ${imagePath}`,
+        );
+      },
+    );
+
+    console.log(
+      "========================================",
     );
 
     // ======================================================
@@ -1455,7 +1553,7 @@ async function downloadImageOrCarousel(
             )
             .toLowerCase();
 
-        // Preserve GIF files.
+        // Preserve GIF.
         if (
           ext === ".gif"
         ) {
@@ -1477,8 +1575,45 @@ async function downloadImageOrCarousel(
         );
       }
 
+      // Re-sort after conversion because filenames can change.
       images =
-        convertedImages;
+        convertedImages.sort(
+          (a, b) => {
+            const aNum =
+              extractImageNumber(
+                a,
+              );
+
+            const bNum =
+              extractImageNumber(
+                b,
+              );
+
+            if (
+              aNum !==
+                Number.MAX_SAFE_INTEGER &&
+              bNum !==
+                Number.MAX_SAFE_INTEGER &&
+              aNum !==
+                bNum
+            ) {
+              return (
+                aNum -
+                bNum
+              );
+            }
+
+            return a.localeCompare(
+              b,
+              undefined,
+              {
+                numeric: true,
+                sensitivity:
+                  "base",
+              },
+            );
+          },
+        );
 
       onStage?.(
         "Packaging carousel...",
@@ -1504,8 +1639,6 @@ async function downloadImageOrCarousel(
             archiver(
               "zip",
               {
-                // Already-compressed image files
-                // don't need another compression pass.
                 store: true,
               },
             );
@@ -1562,6 +1695,10 @@ async function downloadImageOrCarousel(
 
           archive.finalize();
         },
+      );
+
+      console.log(
+        `Carousel ZIP created with ${images.length} image(s): ${zipPath}`,
       );
 
       return {
@@ -1639,12 +1776,6 @@ async function downloadImageOrCarousel(
 // ============================================================
 // VIDEO DOWNLOAD
 // ============================================================
-//
-// BEST AVAILABLE native quality.
-// No resolution cap.
-// No artificial upscaling.
-// No user quality selector.
-//
 
 async function downloadVideo(
   url: string,
@@ -1908,6 +2039,8 @@ function getMimeType(
       "image/webp",
     ".gif":
       "image/gif",
+    ".avif":
+      "image/avif",
     ".svg":
       "image/svg+xml",
     ".zip":
@@ -2104,9 +2237,7 @@ router.post(
               }),
 
             // IMPORTANT:
-            // Never pass the direct image URL for a carousel.
-            // This prevents the first image from being returned
-            // instead of the complete carousel ZIP.
+            // Never use the direct image URL for a carousel.
             meta.isCarousel
               ? undefined
               : meta.imageUrl,
