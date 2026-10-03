@@ -478,6 +478,10 @@ interface PinMeta {
   imageUrl?: string | null;
 }
 
+// ============================================================
+// IMAGE-LIKE ENTRY
+// ============================================================
+
 function isImageLikeEntry(
   entry: Record<string, unknown>,
 ): boolean {
@@ -535,7 +539,8 @@ function isImageLikeEntry(
 
   const directImage =
     entry.image_url ||
-    entry.thumbnail;
+    entry.thumbnail ||
+    entry.url;
 
   return (
     typeof directImage ===
@@ -543,6 +548,144 @@ function isImageLikeEntry(
     directImage.length > 0
   );
 }
+
+// ============================================================
+// COLLECTION COUNT
+//
+// Pinterest can expose image collections as:
+//   - arrays
+//   - objects keyed by image ids
+//
+// We only count actual image-like values. This prevents a
+// normal single image's "orig"/"736x" size object from being
+// incorrectly treated as a carousel.
+// ============================================================
+
+function countImageCollection(
+  value: unknown,
+): number {
+  if (
+    Array.isArray(value)
+  ) {
+    return value.filter(
+      (item) => {
+        if (
+          typeof item ===
+          "string"
+        ) {
+          return true;
+        }
+
+        if (
+          item &&
+          typeof item ===
+            "object"
+        ) {
+          const obj =
+            item as Record<
+              string,
+              unknown
+            >;
+
+          const url =
+            obj.url ||
+            obj.image_url ||
+            obj.src ||
+            obj.thumbnail;
+
+          if (
+            typeof url ===
+              "string" &&
+            /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(
+              url,
+            )
+          ) {
+            return true;
+          }
+
+          return (
+            typeof obj.url ===
+              "string" ||
+            typeof obj.image_url ===
+              "string"
+          );
+        }
+
+        return false;
+      },
+    ).length;
+  }
+
+  if (
+    !value ||
+    typeof value !==
+      "object"
+  ) {
+    return 0;
+  }
+
+  const obj =
+    value as Record<
+      string,
+      unknown
+    >;
+
+  let count = 0;
+
+  for (
+    const child of
+    Object.values(obj)
+  ) {
+    if (
+      typeof child ===
+      "string"
+    ) {
+      if (
+        /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(
+          child,
+        )
+      ) {
+        count++;
+      }
+
+      continue;
+    }
+
+    if (
+      child &&
+      typeof child ===
+        "object"
+    ) {
+      const childObj =
+        child as Record<
+          string,
+          unknown
+        >;
+
+      const childUrl =
+        childObj.url ||
+        childObj.image_url ||
+        childObj.src ||
+        childObj.thumbnail;
+
+      if (
+        typeof childUrl ===
+          "string" &&
+        /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(
+          childUrl,
+        )
+      ) {
+        count++;
+      }
+    }
+  }
+
+  return count;
+}
+
+// ============================================================
+// PIN META
+// ============================================================
 
 async function getPinMeta(
   url: string,
@@ -572,9 +715,8 @@ async function getPinMeta(
       ).toLowerCase();
 
     // --------------------------------------------------------
-    // If yt-dlp cannot identify the media, do NOT immediately
-    // call the pin unavailable. Pinterest carousel/image pins
-    // are often better handled by gallery-dl.
+    // Do NOT immediately reject unsupported/no-video Pinterest
+    // pins. gallery-dl can often handle them.
     // --------------------------------------------------------
 
     if (
@@ -733,8 +875,7 @@ async function getPinMeta(
       );
 
     if (
-      imageEntries.length >=
-      1
+      imageEntries.length > 1
     ) {
       return {
         id:
@@ -746,9 +887,25 @@ async function getPinMeta(
           (info.title as string) ||
           null,
         hasVideo: false,
-        isCarousel:
-          entries.length > 1 ||
-          imageEntries.length > 1,
+        isCarousel: true,
+      };
+    }
+
+    if (
+      entries.length > 1 &&
+      imageEntries.length >= 1
+    ) {
+      return {
+        id:
+          (info.id as string) ||
+          randomBytes(
+            4,
+          ).toString("hex"),
+        title:
+          (info.title as string) ||
+          null,
+        hasVideo: false,
+        isCarousel: true,
       };
     }
   }
@@ -772,7 +929,7 @@ async function getPinMeta(
       );
 
     if (
-      imageEntries.length >= 1
+      imageEntries.length > 1
     ) {
       return {
         id:
@@ -791,6 +948,11 @@ async function getPinMeta(
 
   // ========================================================
   // PINTEREST IMAGE COLLECTION FIELDS
+  //
+  // IMPORTANT:
+  // "images" / "thumbnails" can be arrays OR objects.
+  // We count actual image URLs instead of simply counting
+  // object keys.
   // ========================================================
 
   const imagesField =
@@ -799,11 +961,28 @@ async function getPinMeta(
   const thumbnailsField =
     info.thumbnails;
 
-  if (
-    Array.isArray(
+  const imageCollectionCount =
+    countImageCollection(
       imagesField,
-    ) &&
-    imagesField.length > 1
+    );
+
+  const thumbnailCollectionCount =
+    countImageCollection(
+      thumbnailsField,
+    );
+
+  console.log(
+    "Pinterest image collection counts:",
+    {
+      images:
+        imageCollectionCount,
+      thumbnails:
+        thumbnailCollectionCount,
+    },
+  );
+
+  if (
+    imageCollectionCount > 1
   ) {
     return {
       id:
@@ -820,10 +999,7 @@ async function getPinMeta(
   }
 
   if (
-    Array.isArray(
-      thumbnailsField,
-    ) &&
-    thumbnailsField.length > 1 &&
+    thumbnailCollectionCount > 1 &&
     !hasVideoFormats
   ) {
     return {
@@ -1309,6 +1485,7 @@ async function convertImage(
       inputPath,
     ).toLowerCase();
 
+  // GIF must remain GIF.
   if (
     ext === ".gif"
   ) {
@@ -1470,11 +1647,16 @@ async function downloadImageOrCarousel(
   );
 
   // ========================================================
-  // FAST PATH
+  // FAST PATH — SINGLE IMAGE / GIF ONLY
+  //
+  // IMPORTANT:
+  // Carousel MUST NEVER enter this path.
+  // Otherwise only the first Pinterest image is downloaded.
   // ========================================================
 
   if (
-    imageUrl
+    imageUrl &&
+    mediaKind !== "carousel"
   ) {
     try {
       onStage?.(
@@ -1484,7 +1666,7 @@ async function downloadImageOrCarousel(
       );
 
       console.log(
-        "=== FAST DIRECT IMAGE FETCH ===",
+        "=== FAST DIRECT SINGLE IMAGE FETCH ===",
       );
 
       const direct =
@@ -1545,27 +1727,32 @@ async function downloadImageOrCarousel(
 
   // ========================================================
   // GALLERY-DL
+  //
+  // Carousel always reaches this section.
   // ========================================================
 
-  onStage?.(
-    mediaKind === "gif"
-      ? "Downloading GIF..."
-      : "Downloading image...",
-  );
+  if (
+    mediaKind === "carousel"
+  ) {
+    onStage?.(
+      "Downloading carousel...",
+    );
+  } else {
+    onStage?.(
+      mediaKind === "gif"
+        ? "Downloading GIF..."
+        : "Downloading image...",
+    );
+  }
 
   console.log(
     "=== gallery-dl image/carousel ===",
   );
 
-  // --------------------------------------------------------
-  // IMPORTANT:
-  // gallery-dl may exit with a non-zero code when one or more
-  // Pinterest CDN images return 403, even though other images
-  // were already downloaded successfully.
-  //
-  // Therefore we intentionally do NOT throw here.
-  // We inspect the output directory after gallery-dl finishes.
-  // --------------------------------------------------------
+  console.log(
+    "Media kind:",
+    mediaKind,
+  );
 
   try {
     await runGalleryDl([
@@ -1580,14 +1767,17 @@ async function downloadImageOrCarousel(
       err,
     );
 
-    // Preserve successfully downloaded files.
-    // A partial gallery-dl failure must not discard
-    // images that were already downloaded.
+    // IMPORTANT:
+    // gallery-dl can return a non-zero exit code after
+    // successfully downloading some images.
+    //
+    // We intentionally continue and recover everything
+    // that was actually downloaded.
   }
 
-  // --------------------------------------------------------
+  // ========================================================
   // RECOVER ALL SUCCESSFULLY DOWNLOADED IMAGES
-  // --------------------------------------------------------
+  // ========================================================
 
   let images =
     findAllImages(
@@ -1598,7 +1788,6 @@ async function downloadImageOrCarousel(
     `=== gallery-dl recovered ${images.length} image(s) ===`,
   );
 
-  // Only fail when gallery-dl produced zero usable images.
   if (
     images.length === 0
   ) {
@@ -1735,6 +1924,10 @@ async function downloadImageOrCarousel(
 
         archive.finalize();
       },
+    );
+
+    console.log(
+      `=== Carousel ZIP created with ${images.length} image(s) ===`,
     );
 
     return {
@@ -2225,6 +2418,26 @@ router.post(
         await getPinMeta(
           trimmed,
         );
+
+      console.log(
+        "=== PIN META ===",
+        {
+          id: meta.id,
+          title: meta.title,
+          hasVideo:
+            meta.hasVideo,
+          isImage:
+            meta.isImage,
+          isGif:
+            meta.isGif,
+          isCarousel:
+            meta.isCarousel,
+          hasImageUrl:
+            Boolean(
+              meta.imageUrl,
+            ),
+        },
+      );
 
       // ======================================================
       // STEP 2
