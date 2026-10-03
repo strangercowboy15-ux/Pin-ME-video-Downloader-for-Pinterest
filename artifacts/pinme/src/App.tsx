@@ -217,6 +217,8 @@ function ProgressLabel({
         ? '#eab308' // Yellow
         : '#22c55e'; // Green
 
+  const isComplete = clampedProgress === 100;
+
   return (
     <div className="flex flex-col items-center gap-3 w-full">
       <AnimatePresence mode="wait">
@@ -232,13 +234,32 @@ function ProgressLabel({
         </motion.p>
       </AnimatePresence>
 
-      <div
+      <motion.div
         className="relative flex items-center justify-center w-20 h-20"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={clampedProgress}
         aria-label={`${clampedProgress}%`}
+        animate={
+          isComplete
+            ? {
+                scale: [1, 1.06, 1],
+              }
+            : {
+                scale: 1,
+              }
+        }
+        transition={
+          isComplete
+            ? {
+                duration: 0.45,
+                ease: 'easeOut',
+              }
+            : {
+                duration: 0.2,
+              }
+        }
       >
         <svg
           width="80"
@@ -280,19 +301,56 @@ function ProgressLabel({
               ease: 'easeOut',
             }}
           />
+
+          {/* Tiny completion glow */}
+          {isComplete && (
+            <motion.circle
+              cx="40"
+              cy="40"
+              r={radius}
+              fill="none"
+              stroke="#22c55e"
+              strokeWidth="5"
+              strokeLinecap="round"
+              transform="rotate(-90 40 40)"
+              strokeDasharray={circumference}
+              initial={{
+                opacity: 0,
+              }}
+              animate={{
+                opacity: [0, 0.35, 0],
+              }}
+              transition={{
+                duration: 0.45,
+                ease: 'easeOut',
+              }}
+            />
+          )}
         </svg>
 
         {/* Percentage */}
         <motion.span
           key={clampedProgress}
           initial={{ opacity: 0.5, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.2 }}
+          animate={
+            isComplete
+              ? {
+                  opacity: [0.5, 1, 1],
+                  scale: [0.9, 1.08, 1],
+                }
+              : {
+                  opacity: 1,
+                  scale: 1,
+                }
+          }
+          transition={{
+            duration: isComplete ? 0.45 : 0.2,
+          }}
           className="relative z-10 text-sm font-semibold text-foreground"
         >
           {clampedProgress}%
         </motion.span>
-      </div>
+      </motion.div>
     </div>
   );
 }
