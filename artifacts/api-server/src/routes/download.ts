@@ -551,14 +551,6 @@ function isImageLikeEntry(
 
 // ============================================================
 // COLLECTION COUNT
-//
-// Pinterest can expose image collections as:
-//   - arrays
-//   - objects keyed by image ids
-//
-// We only count actual image-like values. This prevents a
-// normal single image's "orig"/"736x" size object from being
-// incorrectly treated as a carousel.
 // ============================================================
 
 function countImageCollection(
@@ -713,11 +705,6 @@ async function getPinMeta(
         e.stderr ||
         ""
       ).toLowerCase();
-
-    // --------------------------------------------------------
-    // Do NOT immediately reject unsupported/no-video Pinterest
-    // pins. gallery-dl can often handle them.
-    // --------------------------------------------------------
 
     if (
       errLower.includes(
@@ -948,11 +935,6 @@ async function getPinMeta(
 
   // ========================================================
   // PINTEREST IMAGE COLLECTION FIELDS
-  //
-  // IMPORTANT:
-  // "images" / "thumbnails" can be arrays OR objects.
-  // We count actual image URLs instead of simply counting
-  // object keys.
   // ========================================================
 
   const imagesField =
@@ -1341,6 +1323,19 @@ function getImageMimeType(
 async function convertImageToPng(
   inputPath: string,
 ): Promise<string> {
+  const inputExt =
+    path.extname(
+      inputPath,
+    ).toLowerCase();
+
+  /*
+   * If the input is already a PNG,
+   * there is nothing to convert.
+   */
+  if (inputExt === ".png") {
+    return inputPath;
+  }
+
   const outputPath =
     path.join(
       path.dirname(
@@ -1351,8 +1346,19 @@ async function convertImageToPng(
         path.extname(
           inputPath,
         ),
-      )}.png`,
+      )}-converted-${Date.now()}.png`,
     );
+
+  /*
+   * Safety net: never let sharp use the same
+   * file for input and output.
+   */
+  if (
+    path.resolve(inputPath) ===
+    path.resolve(outputPath)
+  ) {
+    return inputPath;
+  }
 
   await sharp(
     inputPath,
@@ -1375,9 +1381,13 @@ async function convertImageToPng(
       inputPath,
     )
   ) {
-    fs.unlinkSync(
-      inputPath,
-    );
+    try {
+      fs.unlinkSync(
+        inputPath,
+      );
+    } catch {
+      // best-effort
+    }
   }
 
   return outputPath;
@@ -1431,7 +1441,7 @@ async function convertImageToSvg(
         path.extname(
           inputPath,
         ),
-      )}.svg`,
+      )}-converted-${Date.now()}.svg`,
     );
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
@@ -1464,9 +1474,13 @@ async function convertImageToSvg(
       inputPath,
     )
   ) {
-    fs.unlinkSync(
-      inputPath,
-    );
+    try {
+      fs.unlinkSync(
+        inputPath,
+      );
+    } catch {
+      // best-effort
+    }
   }
 
   return outputPath;
@@ -1648,10 +1662,6 @@ async function downloadImageOrCarousel(
 
   // ========================================================
   // FAST PATH — SINGLE IMAGE / GIF ONLY
-  //
-  // IMPORTANT:
-  // Carousel MUST NEVER enter this path.
-  // Otherwise only the first Pinterest image is downloaded.
   // ========================================================
 
   if (
@@ -1727,8 +1737,6 @@ async function downloadImageOrCarousel(
 
   // ========================================================
   // GALLERY-DL
-  //
-  // Carousel always reaches this section.
   // ========================================================
 
   if (
@@ -1766,13 +1774,6 @@ async function downloadImageOrCarousel(
       "gallery-dl image/carousel failed:",
       err,
     );
-
-    // IMPORTANT:
-    // gallery-dl can return a non-zero exit code after
-    // successfully downloading some images.
-    //
-    // We intentionally continue and recover everything
-    // that was actually downloaded.
   }
 
   // ========================================================
@@ -2441,7 +2442,6 @@ router.post(
 
       // ======================================================
       // STEP 2
-      // MEDIA-SPECIFIC INFO
       // ======================================================
 
       if (
