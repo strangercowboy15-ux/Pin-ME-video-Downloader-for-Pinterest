@@ -49,6 +49,77 @@ function isPinterestUrl(rawUrl: string): boolean {
   }
 }
 
+// ─── Sound effect for invalid link ───────────────────────────────────────────
+
+function playInvalidSound() {
+  try {
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as any).webkitAudioContext;
+
+    if (!AudioContextClass) return;
+
+    const audioContext =
+      new AudioContextClass();
+
+    const oscillator =
+      audioContext.createOscillator();
+
+    const gainNode =
+      audioContext.createGain();
+
+    oscillator.connect(gainNode);
+
+    gainNode.connect(
+      audioContext.destination
+    );
+
+    /*
+     * Soft "ding" — two quick descending tones.
+     * Gentle, not aggressive.
+     */
+    oscillator.type = 'sine';
+
+    oscillator.frequency.setValueAtTime(
+      800,
+      audioContext.currentTime
+    );
+
+    oscillator.frequency.exponentialRampToValueAtTime(
+      400,
+      audioContext.currentTime + 0.15
+    );
+
+    gainNode.gain.setValueAtTime(
+      0.15,
+      audioContext.currentTime
+    );
+
+    gainNode.gain.exponentialRampToValueAtTime(
+      0.001,
+      audioContext.currentTime + 0.2
+    );
+
+    oscillator.start(
+      audioContext.currentTime
+    );
+
+    oscillator.stop(
+      audioContext.currentTime + 0.2
+    );
+
+    /*
+     * Close the AudioContext after
+     * the sound finishes to free memory.
+     */
+    setTimeout(() => {
+      audioContext.close();
+    }, 300);
+  } catch {
+    /* Audio not supported — silent fallback */
+  }
+}
+
 // ─── Server-ready hook ───────────────────────────────────────────────────────
 
 function useServerReady() {
@@ -1266,11 +1337,6 @@ export default function App({
   const [url, setUrl] =
     useState('');
 
-  /*
-   * Separate state for what is actually visible in the input box.
-   * This lets us fade out the text inside the box
-   * WITHOUT fading or shrinking the input box itself.
-   */
   const [
     displayUrl,
     setDisplayUrl,
@@ -1307,10 +1373,6 @@ export default function App({
     filename?: string;
   }>({});
 
-  /*
-   * When true, the LINK TEXT inside the input fades out.
-   * The input box itself stays visible and stable.
-   */
   const [
     isLinkFading,
     setIsLinkFading,
@@ -1352,12 +1414,14 @@ export default function App({
     };
   }, []);
 
-  // ─── Invalid link (link text fades out, box stays) ────────────────────────
+  // ─── Invalid link (sound + link fade out) ─────────────────────────────────
 
   const showInvalidLinkError = () => {
     /*
-     * Start the link-only fade out.
+     * Soft "ding" sound.
      */
+    playInvalidSound();
+
     setIsLinkFading(true);
 
     setErrorMsg(
@@ -1372,9 +1436,6 @@ export default function App({
       );
     }
 
-    /*
-     * After 1.5s, actually clear the value + reset.
-     */
     resetTimerRef.current =
       setTimeout(() => {
         setUrl('');
@@ -1806,11 +1867,6 @@ export default function App({
                   }
                   className="w-full space-y-4"
                 >
-                  {/*
-                   * Input container.
-                   * The box itself is stable.
-                   * Only the text INSIDE fades out.
-                   */}
                   <div className="relative flex items-center">
                     <input
                       ref={inputRef}
