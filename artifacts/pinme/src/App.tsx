@@ -122,23 +122,9 @@ function WakingScreen() {
   );
 }
 
-// ─── Animated trailing dots ─────────────────────────────────────────────────
+// ─── Animated bouncing dots ──────────────────────────────────────────────────
 
 function AnimatedStageLabel({ label }: { label: string }) {
-  const [dots, setDots] = useState('...');
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setDots((current) => {
-        if (current === '.') return '..';
-        if (current === '..') return '...';
-        return '.';
-      });
-    }, 450);
-
-    return () => clearInterval(id);
-  }, []);
-
   const hasTrailingDots = /\.{3}$/.test(label);
 
   if (!hasTrailingDots) {
@@ -150,7 +136,58 @@ function AnimatedStageLabel({ label }: { label: string }) {
   return (
     <>
       {baseLabel}
-      <span aria-hidden="true">{dots}</span>
+
+      <span
+        aria-hidden="true"
+        className="inline-flex items-end ml-1"
+        style={{
+          gap: '2px',
+          verticalAlign: 'baseline',
+        }}
+      >
+        <span className="animate-bounce-dot">•</span>
+
+        <span
+          className="animate-bounce-dot"
+          style={{ animationDelay: '0.15s' }}
+        >
+          •
+        </span>
+
+        <span
+          className="animate-bounce-dot"
+          style={{ animationDelay: '0.3s' }}
+        >
+          •
+        </span>
+
+        <style>{`
+          @keyframes bounceDot {
+            0%,
+            60%,
+            100% {
+              transform: translateY(0);
+            }
+
+            30% {
+              transform: translateY(-4px);
+            }
+          }
+
+          .animate-bounce-dot {
+            display: inline-block;
+            animation: bounceDot 0.9s ease-in-out infinite;
+            font-size: 0.9em;
+            line-height: 1;
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .animate-bounce-dot {
+              animation: none;
+            }
+          }
+        `}</style>
+      </span>
     </>
   );
 }
@@ -409,12 +446,15 @@ function CoffeeButton() {
             opacity: 0;
             transform: translateY(5px);
           }
+
           25% {
             opacity: 0.45;
           }
+
           70% {
             opacity: 0.2;
           }
+
           100% {
             opacity: 0;
             transform: translateY(-9px);
