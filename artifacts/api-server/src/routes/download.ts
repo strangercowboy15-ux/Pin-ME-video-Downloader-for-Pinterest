@@ -1553,219 +1553,246 @@ async function downloadImageOrCarousel(
       : "Downloading image...",
   );
 
-  try {
-    console.log(
-      "=== gallery-dl image/carousel ===",
-    );
+  console.log(
+    "=== gallery-dl image/carousel ===",
+  );
 
+  // --------------------------------------------------------
+  // IMPORTANT:
+  // gallery-dl may exit with a non-zero code when one or more
+  // Pinterest CDN images return 403, even though other images
+  // were already downloaded successfully.
+  //
+  // Therefore we intentionally do NOT throw here.
+  // We inspect the output directory after gallery-dl finishes.
+  // --------------------------------------------------------
+
+  try {
     await runGalleryDl([
       "-d",
       outputDir,
       "--no-part",
       url,
     ]);
-
-    let images =
-      findAllImages(
-        outputDir,
-      );
-
-    console.log(
-      `gallery-dl found ${images.length} image(s)`,
+  } catch (err) {
+    console.error(
+      "gallery-dl image/carousel failed:",
+      err,
     );
 
-    // ======================================================
-    // CAROUSEL
-    // ======================================================
+    // Preserve successfully downloaded files.
+    // A partial gallery-dl failure must not discard
+    // images that were already downloaded.
+  }
 
-    if (
-      images.length > 1
+  // --------------------------------------------------------
+  // RECOVER ALL SUCCESSFULLY DOWNLOADED IMAGES
+  // --------------------------------------------------------
+
+  let images =
+    findAllImages(
+      outputDir,
+    );
+
+  console.log(
+    `=== gallery-dl recovered ${images.length} image(s) ===`,
+  );
+
+  // Only fail when gallery-dl produced zero usable images.
+  if (
+    images.length === 0
+  ) {
+    throw new Error(
+      "NO_FILE: no image found for this pin",
+    );
+  }
+
+  // ========================================================
+  // CAROUSEL
+  // ========================================================
+
+  if (
+    images.length > 1
+  ) {
+    onStage?.(
+      imageFormat === "svg"
+        ? "Converting carousel to SVG..."
+        : "Converting carousel to PNG...",
+    );
+
+    const convertedImages:
+      string[] = [];
+
+    for (
+      const imagePath of
+      images
     ) {
-      onStage?.(
-        imageFormat === "svg"
-          ? "Converting carousel to SVG..."
-          : "Converting carousel to PNG...",
-      );
-
-      const convertedImages:
-        string[] = [];
-
-      for (
-        const imagePath of
-        images
-      ) {
-        const ext =
-          path.extname(
-            imagePath,
-          ).toLowerCase();
-
-        if (
-          ext === ".gif"
-        ) {
-          convertedImages.push(
-            imagePath,
-          );
-          continue;
-        }
-
-        const converted =
-          await convertImage(
-            imagePath,
-            imageFormat,
-          );
-
-        convertedImages.push(
-          converted,
-        );
-      }
-
-      images =
-        convertedImages;
-
-      onStage?.(
-        "Packaging carousel...",
-      );
-
-      const zipPath =
-        path.join(
-          outputDir,
-          `pinme-carousel-${pinId}.zip`,
-        );
-
-      await new Promise<void>(
-        (
-          resolve,
-          reject,
-        ) => {
-          const output =
-            fs.createWriteStream(
-              zipPath,
-            );
-
-          const archive =
-            archiver(
-              "zip",
-              {
-                store: true,
-              },
-            );
-
-          output.on(
-            "close",
-            () => resolve(),
-          );
-
-          output.on(
-            "error",
-            (
-              err,
-            ) =>
-              reject(err),
-          );
-
-          archive.on(
-            "error",
-            (
-              err,
-            ) =>
-              reject(err),
-          );
-
-          archive.pipe(
-            output,
-          );
-
-          images.forEach(
-            (
-              imgPath,
-              index,
-            ) => {
-              const ext =
-                path.extname(
-                  imgPath,
-                );
-
-              archive.file(
-                imgPath,
-                {
-                  name:
-                    `image-${String(
-                      index + 1,
-                    ).padStart(
-                      2,
-                      "0",
-                    )}${ext}`,
-                },
-              );
-            },
-          );
-
-          archive.finalize();
-        },
-      );
-
-      return {
-        filePath:
-          zipPath,
-        mediaType:
-          "carousel",
-        imageCount:
-          images.length,
-      };
-    }
-
-    // ======================================================
-    // SINGLE IMAGE
-    // ======================================================
-
-    if (
-      images.length === 1
-    ) {
-      const single =
-        images[0];
-
       const ext =
         path.extname(
-          single,
+          imagePath,
         ).toLowerCase();
 
       if (
         ext === ".gif"
       ) {
-        return {
-          filePath:
-            single,
-          mediaType:
-            "image",
-          imageCount: 1,
-        };
+        convertedImages.push(
+          imagePath,
+        );
+        continue;
       }
-
-      onStage?.(
-        imageFormat === "svg"
-          ? "Converting image to SVG..."
-          : "Converting image to PNG...",
-      );
 
       const converted =
         await convertImage(
-          single,
+          imagePath,
           imageFormat,
         );
 
+      convertedImages.push(
+        converted,
+      );
+    }
+
+    images =
+      convertedImages;
+
+    onStage?.(
+      "Packaging carousel...",
+    );
+
+    const zipPath =
+      path.join(
+        outputDir,
+        `pinme-carousel-${pinId}.zip`,
+      );
+
+    await new Promise<void>(
+      (
+        resolve,
+        reject,
+      ) => {
+        const output =
+          fs.createWriteStream(
+            zipPath,
+          );
+
+        const archive =
+          archiver(
+            "zip",
+            {
+              store: true,
+            },
+          );
+
+        output.on(
+          "close",
+          () => resolve(),
+        );
+
+        output.on(
+          "error",
+          (
+            err,
+          ) =>
+            reject(err),
+        );
+
+        archive.on(
+          "error",
+          (
+            err,
+          ) =>
+            reject(err),
+        );
+
+        archive.pipe(
+          output,
+        );
+
+        images.forEach(
+          (
+            imgPath,
+            index,
+          ) => {
+            const ext =
+              path.extname(
+                imgPath,
+              );
+
+            archive.file(
+              imgPath,
+              {
+                name:
+                  `image-${String(
+                    index + 1,
+                  ).padStart(
+                    2,
+                    "0",
+                  )}${ext}`,
+              },
+            );
+          },
+        );
+
+        archive.finalize();
+      },
+    );
+
+    return {
+      filePath:
+        zipPath,
+      mediaType:
+        "carousel",
+      imageCount:
+        images.length,
+    };
+  }
+
+  // ========================================================
+  // SINGLE IMAGE
+  // ========================================================
+
+  if (
+    images.length === 1
+  ) {
+    const single =
+      images[0];
+
+    const ext =
+      path.extname(
+        single,
+      ).toLowerCase();
+
+    if (
+      ext === ".gif"
+    ) {
       return {
         filePath:
-          converted,
+          single,
         mediaType:
           "image",
         imageCount: 1,
       };
     }
-  } catch (err) {
-    console.log(
-      "gallery-dl image/carousel failed:",
-      err,
+
+    onStage?.(
+      imageFormat === "svg"
+        ? "Converting image to SVG..."
+        : "Converting image to PNG...",
     );
+
+    const converted =
+      await convertImage(
+        single,
+        imageFormat,
+      );
+
+    return {
+      filePath:
+        converted,
+      mediaType:
+        "image",
+      imageCount: 1,
+    };
   }
 
   throw new Error(
