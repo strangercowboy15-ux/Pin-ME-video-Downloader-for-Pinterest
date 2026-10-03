@@ -473,6 +473,7 @@ interface PinMeta {
   title: string | null;
   hasVideo: boolean;
   isImage?: boolean;
+  isGif?: boolean;
   isCarousel?: boolean;
   imageUrl?: string | null;
 }
@@ -614,12 +615,14 @@ async function getPinMeta(
       ""
     ).toLowerCase();
 
+  const isGif =
+    ext === "gif";
+
   const isImage = [
     "jpg",
     "jpeg",
     "png",
     "webp",
-    "gif",
   ].includes(ext);
 
   const entries =
@@ -657,12 +660,13 @@ async function getPinMeta(
   }
 
   // ========================================================
-  // SINGLE IMAGE
+  // SINGLE IMAGE / GIF
   // ========================================================
 
   if (
     !hasVideoFormats ||
-    isImage
+    isImage ||
+    isGif
   ) {
     return {
       id:
@@ -675,6 +679,7 @@ async function getPinMeta(
         null,
       hasVideo: false,
       isImage: true,
+      isGif,
       imageUrl:
         (info.url as string) ||
         null,
@@ -1269,6 +1274,10 @@ async function downloadImageOrCarousel(
   ) => void,
   imageUrl?: string | null,
   imageFormat: ImageFormat = "png",
+  mediaKind:
+    | "image"
+    | "gif"
+    | "carousel" = "image",
 ): Promise<{
   filePath: string;
   mediaType:
@@ -1287,7 +1296,7 @@ async function downloadImageOrCarousel(
   );
 
   // ========================================================
-  // FAST PATH: SINGLE IMAGE
+  // FAST PATH: SINGLE IMAGE / GIF
   // ========================================================
 
   if (
@@ -1295,7 +1304,9 @@ async function downloadImageOrCarousel(
   ) {
     try {
       onStage?.(
-        "Downloading image...",
+        mediaKind === "gif"
+          ? "Downloading GIF..."
+          : "Downloading image...",
       );
 
       console.log(
@@ -1364,7 +1375,9 @@ async function downloadImageOrCarousel(
   // ========================================================
 
   onStage?.(
-    "Downloading image...",
+    mediaKind === "gif"
+      ? "Downloading GIF..."
+      : "Downloading image...",
   );
 
   try {
@@ -2011,17 +2024,59 @@ router.post(
       // ======================================================
       // STEP 1
       // ======================================================
+      //
+      // First identify the actual media type.
+      // This replaces the old generic "Fetching info..."
+      // stage so the frontend can show the correct type.
+      //
 
       send({
         type: "stage",
         label:
-          "Fetching info...",
+          "Checking media type...",
       });
 
       const meta =
         await getPinMeta(
           trimmed,
         );
+
+      // ======================================================
+      // STEP 2
+      // MEDIA-SPECIFIC INFO
+      // ======================================================
+
+      if (
+        meta.isCarousel
+      ) {
+        send({
+          type: "stage",
+          label:
+            "Fetching carousel info...",
+        });
+      } else if (
+        meta.isGif
+      ) {
+        send({
+          type: "stage",
+          label:
+            "Fetching GIF info...",
+        });
+      } else if (
+        meta.isImage
+      ) {
+        send({
+          type: "stage",
+          label:
+            "Fetching image info...",
+        });
+      } else {
+        send({
+          type: "stage",
+          label:
+            "Fetching video info...",
+        });
+      }
 
       let filePath: string;
 
@@ -2035,7 +2090,7 @@ router.post(
         | undefined;
 
       // ======================================================
-      // IMAGE / CAROUSEL
+      // IMAGE / GIF / CAROUSEL
       // ======================================================
 
       if (
@@ -2055,6 +2110,11 @@ router.post(
               }),
             meta.imageUrl,
             selectedImageFormat,
+            meta.isGif
+              ? "gif"
+              : meta.isCarousel
+                ? "carousel"
+                : "image",
           );
 
         filePath =
@@ -2270,6 +2330,7 @@ router.get(
               normalizeImageFormat(
                 payload.imageFormat,
               ),
+              "carousel",
             );
 
           filePath =
@@ -2293,6 +2354,7 @@ router.get(
               normalizeImageFormat(
                 payload.imageFormat,
               ),
+              "image",
             );
 
           filePath =
