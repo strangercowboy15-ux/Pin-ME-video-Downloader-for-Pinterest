@@ -1014,7 +1014,7 @@ function getProgressFromStage(
       return 90;
 
     case 'starting download...':
-      return 100;
+      return 95;
 
     default:
       return 10;
@@ -1297,10 +1297,6 @@ export default function App({
     filename?: string;
   }>({});
 
-  /*
-   * Invalid-link animation flag.
-   * While true, the input shakes and turns red.
-   */
   const [
     isInvalidLink,
     setIsInvalidLink,
@@ -1345,9 +1341,6 @@ export default function App({
   // ─── Invalid link (auto-clear + shake animation) ──────────────────────────
 
   const showInvalidLinkError = () => {
-    /*
-     * Turn input red + shake it.
-     */
     setIsInvalidLink(true);
 
     setErrorMsg(
@@ -1362,10 +1355,6 @@ export default function App({
       );
     }
 
-    /*
-     * After 1.5 seconds: auto-clear input, stop shake,
-     * hide the error and reset back to idle.
-     */
     resetTimerRef.current =
       setTimeout(() => {
         setUrl('');
@@ -1510,7 +1499,7 @@ export default function App({
               )
             );
 
-            setProgress(100);
+            setProgress(95);
 
             setSuccessInfo({
               mediaType:
@@ -1521,11 +1510,21 @@ export default function App({
                 event.filename,
             });
 
+            /*
+             * Show a distinct stage while the file
+             * is being saved to the user's device.
+             */
+            setProgressLabel(
+              'Downloading file...'
+            );
+
             await downloadStreamFile(
               event.token,
               event.filename,
               event.mediaType
             );
+
+            setProgress(100);
 
             trackDownload();
 
@@ -1667,8 +1666,6 @@ export default function App({
     }
   };
 
-  // ─── Share Pin-ME ─────────────────────────────────────────────────────────
-
   const handleShare =
     async () => {
       const shareUrl =
@@ -1717,21 +1714,18 @@ export default function App({
 
   return (
     <>
-      {/* Splash */}
       <AnimatePresence>
         {showSplash && (
           <SplashScreen />
         )}
       </AnimatePresence>
 
-      {/* Server-waking */}
       {!showSplash &&
         serverReady ===
           'checking' && (
           <WakingScreen />
         )}
 
-      {/* Main UI */}
       {!showSplash &&
         serverReady ===
           'ready' && (
@@ -1740,7 +1734,6 @@ export default function App({
               season={season}
             />
 
-            {/* Header */}
             <header className="sticky top-0 z-50 flex flex-col items-center gap-1 p-6 bg-background">
               <div className="flex items-center gap-2">
                 <img
@@ -1765,7 +1758,6 @@ export default function App({
               </span>
             </header>
 
-            {/* Main Content */}
             <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto">
               <div className="w-full space-y-8">
                 <div className="text-center space-y-2">
@@ -1784,7 +1776,6 @@ export default function App({
                   }
                   className="w-full space-y-4"
                 >
-                  {/* Input + invalid-link shake animation */}
                   <motion.div
                     className="relative flex items-center"
                     animate={
@@ -2060,10 +2051,8 @@ export default function App({
               </div>
             </main>
 
-            {/* Footer */}
             <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
               <div className="flex flex-col items-center gap-2">
-                {/* How It Works & FAQ */}
                 <button
                   type="button"
                   onClick={() => {
@@ -2079,7 +2068,6 @@ export default function App({
                   )}
                 </button>
 
-                {/* Privacy Policy */}
                 <button
                   type="button"
                   onClick={
@@ -2092,7 +2080,6 @@ export default function App({
                   )}
                 </button>
 
-                {/* Terms & Conditions */}
                 <button
                   type="button"
                   onClick={
@@ -2105,7 +2092,6 @@ export default function App({
                   )}
                 </button>
 
-                {/* Share */}
                 <button
                   type="button"
                   onClick={
@@ -2118,14 +2104,12 @@ export default function App({
                   ➦
                 </button>
 
-                {/* Copyright */}
                 <span className="text-[10px] text-muted-foreground/70">
                   © 2026 pinME Downloade. All rights reserved.
                 </span>
               </div>
             </footer>
 
-            {/* Badge-blend gradient */}
             <div
               aria-hidden="true"
               className="badge-blend fixed bottom-0 right-0 pointer-events-none"
