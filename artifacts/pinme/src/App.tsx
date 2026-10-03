@@ -1,2712 +1,2157 @@
-import { Router } from "express";
-import { spawn } from "child_process";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath, URL } from "url";
-import {
-  createHmac,
-  randomBytes,
-  timingSafeEqual,
-} from "crypto";
-import archiver from "archiver";
-import sharp from "sharp";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  FormEvent,
+} from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { trackDownload } from './analytics';
+import { SeasonalBackdrop, useSeason } from './seasonal';
+import { useLanguage } from './useLanguage';
 
-const router = Router();
+// ─── API ─────────────────────────────────────────────────────────────────────
 
-const DOWNLOAD_TTL_MS = 30 * 60 * 1000;
+const API_BASE =
+  'https://pinme-api-server.onrender.com';
 
-// ============================================================
-// SPEED TUNING
-// ============================================================
+const GET_PIN_URL =
+  `${API_BASE}/api/get-pin`;
 
-const YTDLP_TIMEOUT_MS = 90_000;
+const STREAM_URL =
+  `${API_BASE}/api/stream`;
 
-const YTDLP_CONCURRENT_FRAGMENTS = 8;
+// ─── Pinterest URL validation ────────────────────────────────────────────────
 
-const FILE_STREAM_HIGH_WATER_MARK =
-  2 * 1024 * 1024;
-
-// ============================================================
-// IMAGE FORMAT
-// ============================================================
-
-type ImageFormat = "png" | "svg";
-
-function normalizeImageFormat(
-  value: unknown,
-): ImageFormat {
-  return value === "svg"
-    ? "svg"
-    : "png";
-}
-
-// ============================================================
-// PATHS
-// ============================================================
-
-const bundledYtDlpPath = path.resolve(
-  path.dirname(
-    fileURLToPath(import.meta.url),
-  ),
-  "../vendor/yt-dlp",
-);
-
-// ============================================================
-// DOWNLOAD TOKEN
-// ============================================================
-
-type DownloadTokenPayload = {
-  url: string;
-  pinId: string;
-  filename: string;
-  expiresAt: number;
-  mediaType:
-    | "video"
-    | "image"
-    | "carousel";
-  imageFormat?: ImageFormat;
-};
-
-const pendingDownloads = new Map<
-  string,
-  {
-    filePath: string;
-    filename: string;
-    expiresAt: number;
-  }
->();
-
-// ============================================================
-// CLEANUP
-// ============================================================
-
-setInterval(() => {
-  const now = Date.now();
-
-  for (
-    const [token, entry] of
-    pendingDownloads.entries()
-  ) {
-    if (entry.expiresAt < now) {
-      try {
-        if (
-          fs.existsSync(
-            entry.filePath,
-          )
-        ) {
-          fs.unlinkSync(
-            entry.filePath,
-          );
-        }
-      } catch {
-        // best-effort cleanup
-      }
-
-      pendingDownloads.delete(token);
-    }
-  }
-}, 2 * 60 * 1000);
-
-// ============================================================
-// TOKEN HELPERS
-// ============================================================
-
-function getTokenSecret(): string {
-  const secret =
-    process.env.SESSION_SECRET;
-
-  if (!secret) {
-    throw new Error(
-      "SESSION_SECRET_UNAVAILABLE",
-    );
-  }
-
-  return secret;
-}
-
-function createDownloadToken(
-  payload: DownloadTokenPayload,
-): string {
-  const encodedPayload =
-    Buffer.from(
-      JSON.stringify(payload),
-    ).toString("base64url");
-
-  const signature =
-    createHmac(
-      "sha256",
-      getTokenSecret(),
-    )
-      .update(encodedPayload)
-      .digest("base64url");
-
-  return `${encodedPayload}.${signature}`;
-}
-
-function parseDownloadToken(
-  token: string,
-): DownloadTokenPayload | null {
-  const [
-    encodedPayload,
-    encodedSignature,
-  ] = token.split(".");
-
-  if (
-    !encodedPayload ||
-    !encodedSignature
-  ) {
-    return null;
-  }
-
+function isPinterestUrl(rawUrl: string): boolean {
   try {
-    const expectedSignature =
-      createHmac(
-        "sha256",
-        getTokenSecret(),
-      )
-        .update(encodedPayload)
-        .digest();
-
-    const providedSignature =
-      Buffer.from(
-        encodedSignature,
-        "base64url",
-      );
-
-    if (
-      providedSignature.length !==
-        expectedSignature.length ||
-      !timingSafeEqual(
-        providedSignature,
-        expectedSignature,
-      )
-    ) {
-      return null;
-    }
-
-    const payload =
-      JSON.parse(
-        Buffer.from(
-          encodedPayload,
-          "base64url",
-        ).toString("utf8"),
-      ) as Partial<DownloadTokenPayload>;
-
-    if (
-      typeof payload.url !==
-        "string" ||
-      typeof payload.pinId !==
-        "string" ||
-      typeof payload.filename !==
-        "string" ||
-      typeof payload.expiresAt !==
-        "number" ||
-      ![
-        "video",
-        "image",
-        "carousel",
-      ].includes(
-        payload.mediaType as string,
-      )
-    ) {
-      return null;
-    }
-
-    return {
-      ...payload,
-      imageFormat:
-        normalizeImageFormat(
-          payload.imageFormat,
-        ),
-    } as DownloadTokenPayload;
-  } catch {
-    return null;
-  }
-}
-
-// ============================================================
-// PINTEREST URL CHECK
-// ============================================================
-
-function isPinterestUrl(
-  rawUrl: string,
-): boolean {
-  try {
-    const parsed =
-      new URL(rawUrl);
-
-    const host =
-      parsed.hostname.toLowerCase();
+    const parsed = new URL(rawUrl.trim());
+    const host = parsed.hostname.toLowerCase();
 
     return (
-      host === "pin.it" ||
-      host === "pinterest.com" ||
-      host.endsWith(
-        ".pinterest.com",
-      ) ||
-      host.endsWith(
-        ".pinterest.ca",
-      ) ||
-      host.endsWith(
-        ".pinterest.co.uk",
-      ) ||
-      host.endsWith(
-        ".pinterest.fr",
-      ) ||
-      host.endsWith(
-        ".pinterest.de",
-      ) ||
-      host.endsWith(
-        ".pinterest.it",
-      ) ||
-      host.endsWith(
-        ".pinterest.es",
-      ) ||
-      host.endsWith(
-        ".pinterest.se",
-      ) ||
-      host.endsWith(
-        ".pinterest.pt",
-      ) ||
-      host.endsWith(
-        ".pinterest.nz",
-      ) ||
-      host.endsWith(
-        ".pinterest.at",
-      ) ||
-      host.endsWith(
-        ".pinterest.mx",
-      ) ||
-      host.endsWith(
-        ".pinterest.jp",
-      )
+      host === 'pin.it' ||
+      host === 'pinterest.com' ||
+      host.endsWith('.pinterest.com') ||
+      host.endsWith('.pinterest.ca') ||
+      host.endsWith('.pinterest.co.uk') ||
+      host.endsWith('.pinterest.fr') ||
+      host.endsWith('.pinterest.de') ||
+      host.endsWith('.pinterest.it') ||
+      host.endsWith('.pinterest.es') ||
+      host.endsWith('.pinterest.se') ||
+      host.endsWith('.pinterest.pt') ||
+      host.endsWith('.pinterest.nz') ||
+      host.endsWith('.pinterest.at') ||
+      host.endsWith('.pinterest.mx') ||
+      host.endsWith('.pinterest.jp')
     );
   } catch {
     return false;
   }
 }
 
-// ============================================================
-// YT-DLP
-// ============================================================
+// Detect complete-looking URLs without blocking normal partial typing.
+function looksLikeUrl(rawValue: string): boolean {
+  const value = rawValue.trim();
 
-function getYtDlpCommand(): string {
-  if (
-    process.env.YT_DLP_PATH
-  ) {
-    return process.env.YT_DLP_PATH;
+  if (!value) {
+    return false;
   }
 
-  if (
-    fs.existsSync(
-      bundledYtDlpPath,
-    )
-  ) {
-    return bundledYtDlpPath;
-  }
-
-  return "yt-dlp";
+  return /^https?:\/\//i.test(value);
 }
 
-function runYtDlp(
-  args: string[],
-  onStderrLine?: (
-    line: string,
-  ) => void,
-): Promise<{
-  stdout: string;
-  stderr: string;
-}> {
-  return new Promise(
-    (
-      resolve,
-      reject,
-    ) => {
-      const proc =
-        spawn(
-          getYtDlpCommand(),
-          args,
+// ─── Server-ready hook ───────────────────────────────────────────────────────
+
+function useServerReady() {
+  const [ready, setReady] =
+    useState<'checking' | 'ready'>('checking');
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const check = async () => {
+      try {
+        const controller =
+          new AbortController();
+
+        const timeout = setTimeout(
+          () => controller.abort(),
+          6000
+        );
+
+        const res = await fetch(
+          '/api/healthz',
           {
-            stdio: [
-              "ignore",
-              "pipe",
-              "pipe",
-            ],
-          },
-        );
-
-      const timeout =
-        setTimeout(
-          () => {
-            proc.kill(
-              "SIGKILL",
-            );
-
-            reject(
-              new Error(
-                "TIMEOUT",
-              ),
-            );
-          },
-          YTDLP_TIMEOUT_MS,
-        );
-
-      let stdout = "";
-      let stderr = "";
-      let stderrBuf = "";
-
-      proc.stdout.on(
-        "data",
-        (
-          d: Buffer,
-        ) => {
-          stdout +=
-            d.toString();
-        },
-      );
-
-      proc.stderr.on(
-        "data",
-        (
-          d: Buffer,
-        ) => {
-          const chunk =
-            d.toString();
-
-          stderr += chunk;
-
-          if (
-            onStderrLine
-          ) {
-            stderrBuf +=
-              chunk;
-
-            const lines =
-              stderrBuf.split(
-                "\n",
-              );
-
-            stderrBuf =
-              lines.pop() ??
-              "";
-
-            for (
-              const line of
-              lines
-            ) {
-              onStderrLine(
-                line,
-              );
-            }
+            signal: controller.signal,
           }
-        },
-      );
-
-      proc.on(
-        "close",
-        (
-          code: number | null,
-        ) => {
-          clearTimeout(
-            timeout,
-          );
-
-          if (
-            code !== 0
-          ) {
-            reject(
-              Object.assign(
-                new Error(
-                  `yt-dlp exit ${code}`,
-                ),
-                {
-                  code,
-                  stdout,
-                  stderr,
-                },
-              ),
-            );
-          } else {
-            resolve({
-              stdout,
-              stderr,
-            });
-          }
-        },
-      );
-
-      proc.on(
-        "error",
-        (err) => {
-          clearTimeout(
-            timeout,
-          );
-
-          reject(err);
-        },
-      );
-    },
-  );
-}
-
-// ============================================================
-// PIN META
-// ============================================================
-
-interface PinMeta {
-  id: string;
-  title: string | null;
-  hasVideo: boolean;
-  isImage?: boolean;
-  isCarousel?: boolean;
-  imageUrl?: string | null;
-}
-
-async function getPinMeta(
-  url: string,
-): Promise<PinMeta> {
-  let stdout: string;
-
-  try {
-    ({
-      stdout,
-    } =
-      await runYtDlp([
-        "--dump-json",
-        "--no-playlist",
-        "--no-warnings",
-        url,
-      ]));
-  } catch (err) {
-    const e =
-      err as {
-        stderr?: string;
-      };
-
-    const errLower =
-      (
-        e.stderr ||
-        ""
-      ).toLowerCase();
-
-    if (
-      errLower.includes(
-        "unsupported url",
-      ) ||
-      errLower.includes(
-        "no video",
-      ) ||
-      errLower.includes(
-        "not a video",
-      )
-    ) {
-      return {
-        id: randomBytes(
-          4,
-        ).toString("hex"),
-        title: null,
-        hasVideo: false,
-        isImage: true,
-      };
-    }
-
-    if (
-      errLower.includes(
-        "private",
-      ) ||
-      errLower.includes(
-        "unavailable",
-      ) ||
-      errLower.includes(
-        "not available",
-      ) ||
-      errLower.includes(
-        "not exist",
-      ) ||
-      errLower.includes(
-        "login required",
-      )
-    ) {
-      throw new Error(
-        "UNAVAILABLE",
-      );
-    }
-
-    throw err;
-  }
-
-  const lines =
-    stdout
-      .trim()
-      .split("\n");
-
-  let info:
-    | Record<
-        string,
-        unknown
-      >
-    | null = null;
-
-  for (
-    let i =
-      lines.length - 1;
-    i >= 0;
-    i--
-  ) {
-    try {
-      const parsed =
-        JSON.parse(
-          lines[i].trim(),
         );
 
-      if (
-        parsed &&
-        typeof parsed ===
-          "object"
-      ) {
-        info =
-          parsed;
-        break;
-      }
-    } catch {
-      // skip malformed lines
-    }
-  }
+        clearTimeout(timeout);
 
-  if (!info) {
-    throw new Error(
-      "PARSE_ERROR",
-    );
-  }
-
-  const formats =
-    (info.formats as Array<
-      Record<string, unknown>
-    >) || [];
-
-  const hasVideoFormats =
-    formats.some(
-      (f) =>
-        f.vcodec &&
-        f.vcodec !==
-          "none" &&
-        f.vcodec !==
-          null,
-    );
-
-  const ext =
-    (
-      (info.ext as string) ||
-      ""
-    ).toLowerCase();
-
-  const isImage = [
-    "jpg",
-    "jpeg",
-    "png",
-    "webp",
-    "gif",
-    "avif",
-  ].includes(ext);
-
-  const entries =
-    info.entries as
-      | Array<
-          Record<
-            string,
-            unknown
-          >
-        >
-      | undefined;
-
-  // ========================================================
-  // CAROUSEL
-  // ========================================================
-
-  if (
-    Array.isArray(entries) &&
-    entries.length >= 1 &&
-    !hasVideoFormats
-  ) {
-    return {
-      id:
-        (info.id as string) ||
-        randomBytes(
-          4,
-        ).toString("hex"),
-      title:
-        (info.title as string) ||
-        null,
-      hasVideo: false,
-      isCarousel: true,
-    };
-  }
-
-  // ========================================================
-  // SINGLE IMAGE
-  // ========================================================
-
-  if (
-    !hasVideoFormats ||
-    isImage
-  ) {
-    return {
-      id:
-        (info.id as string) ||
-        randomBytes(
-          4,
-        ).toString("hex"),
-      title:
-        (info.title as string) ||
-        null,
-      hasVideo: false,
-      isImage: true,
-      imageUrl:
-        (info.url as string) ||
-        null,
-    };
-  }
-
-  // ========================================================
-  // VIDEO
-  // ========================================================
-
-  return {
-    id:
-      (info.id as string) ||
-      randomBytes(
-        4,
-      ).toString("hex"),
-    title:
-      (info.title as string) ||
-      null,
-    hasVideo: true,
-  };
-}
-
-// ============================================================
-// GALLERY-DL
-// ============================================================
-
-function getGalleryDlCommand(): string {
-  if (
-    process.env.GALLERY_DL_PATH
-  ) {
-    return process.env.GALLERY_DL_PATH;
-  }
-
-  return "gallery-dl";
-}
-
-function runGalleryDl(
-  args: string[],
-  onStderrLine?: (
-    line: string,
-  ) => void,
-  allowPartial = false,
-): Promise<{
-  stdout: string;
-  stderr: string;
-}> {
-  return new Promise(
-    (
-      resolve,
-      reject,
-    ) => {
-      const proc =
-        spawn(
-          getGalleryDlCommand(),
-          args,
-          {
-            stdio: [
-              "ignore",
-              "pipe",
-              "pipe",
-            ],
-          },
-        );
-
-      const timeout =
-        setTimeout(
-          () => {
-            proc.kill(
-              "SIGKILL",
-            );
-
-            reject(
-              new Error(
-                "TIMEOUT",
-              ),
-            );
-          },
-          YTDLP_TIMEOUT_MS,
-        );
-
-      let stdout = "";
-      let stderr = "";
-      let stderrBuf = "";
-
-      proc.stdout.on(
-        "data",
-        (
-          d: Buffer,
-        ) => {
-          stdout +=
-            d.toString();
-        },
-      );
-
-      proc.stderr.on(
-        "data",
-        (
-          d: Buffer,
-        ) => {
-          const chunk =
-            d.toString();
-
-          stderr += chunk;
-
-          if (
-            onStderrLine
-          ) {
-            stderrBuf +=
-              chunk;
-
-            const lines =
-              stderrBuf.split(
-                "\n",
-              );
-
-            stderrBuf =
-              lines.pop() ??
-              "";
-
-            for (
-              const line of
-              lines
-            ) {
-              onStderrLine(
-                line,
-              );
-            }
-          }
-        },
-      );
-
-      proc.on(
-        "close",
-        (
-          code: number | null,
-        ) => {
-          clearTimeout(
-            timeout,
-          );
-
-          if (
-            code !== 0
-          ) {
-            if (
-              allowPartial
-            ) {
-              resolve({
-                stdout,
-                stderr,
-              });
-
-              return;
-            }
-
-            reject(
-              Object.assign(
-                new Error(
-                  `gallery-dl exit ${code}`,
-                ),
-                {
-                  code,
-                  stdout,
-                  stderr,
-                },
-              ),
-            );
-
-            return;
-          }
-
-          resolve({
-            stdout,
-            stderr,
-          });
-        },
-      );
-
-      proc.on(
-        "error",
-        (err) => {
-          clearTimeout(
-            timeout,
-          );
-
-          reject(err);
-        },
-      );
-    },
-  );
-}
-
-// ============================================================
-// IMAGE HELPERS
-// ============================================================
-
-function isSupportedImageFile(
-  filename: string,
-): boolean {
-  return /\.(jpg|jpeg|png|webp|gif|avif|bmp|tif|tiff)$/i.test(
-    filename,
-  );
-}
-
-function extractImageNumber(
-  filePath: string,
-): number {
-  const name =
-    path.basename(
-      filePath,
-    );
-
-  const matches = [
-    name.match(
-      /(?:image|img|photo|picture|media)[-_ ]?(\d+)/i,
-    ),
-    name.match(
-      /(?:^|[-_ ])(\d+)(?:\.[^.]+)?$/i,
-    ),
-  ];
-
-  for (
-    const match of
-    matches
-  ) {
-    if (
-      match &&
-      match[1]
-    ) {
-      const n =
-        Number(
-          match[1],
-        );
-
-      if (
-        Number.isFinite(
-          n,
-        )
-      ) {
-        return n;
-      }
-    }
-  }
-
-  return Number.MAX_SAFE_INTEGER;
-}
-
-function findAllImages(
-  dir: string,
-): string[] {
-  const results: string[] =
-    [];
-
-  if (
-    !fs.existsSync(
-      dir,
-    )
-  ) {
-    return results;
-  }
-
-  const entries =
-    fs.readdirSync(
-      dir,
-      {
-        withFileTypes:
-          true,
-      },
-    );
-
-  for (
-    const entry of
-    entries
-  ) {
-    const fullPath =
-      path.join(
-        dir,
-        entry.name,
-      );
-
-    if (
-      entry.isFile()
-    ) {
-      if (
-        isSupportedImageFile(
-          entry.name,
-        )
-      ) {
-        results.push(
-          fullPath,
-        );
-      }
-    } else if (
-      entry.isDirectory()
-    ) {
-      results.push(
-        ...findAllImages(
-          fullPath,
-        ),
-      );
-    }
-  }
-
-  return results.sort(
-    (a, b) => {
-      const aNum =
-        extractImageNumber(
-          a,
-        );
-
-      const bNum =
-        extractImageNumber(
-          b,
-        );
-
-      if (
-        aNum !==
-        Number.MAX_SAFE_INTEGER ||
-        bNum !==
-        Number.MAX_SAFE_INTEGER
-      ) {
         if (
-          aNum !==
-          bNum
+          res.ok &&
+          !cancelled
         ) {
-          return (
-            aNum -
-            bNum
-          );
+          setReady('ready');
+          return;
         }
+      } catch {
+        /* server still waking */
       }
 
-      return a.localeCompare(
-        b,
-        undefined,
-        {
-          numeric: true,
-          sensitivity:
-            "base",
-        },
-      );
-    },
-  );
-}
-
-// ============================================================
-// IMAGE FORMAT HELPERS
-// ============================================================
-
-function escapeXml(
-  value: string,
-): string {
-  return value
-    .replace(
-      /&/g,
-      "&amp;",
-    )
-    .replace(
-      /"/g,
-      "&quot;",
-    )
-    .replace(
-      /</g,
-      "&lt;",
-    )
-    .replace(
-      />/g,
-      "&gt;",
-    );
-}
-
-function getImageMimeType(
-  filePath: string,
-): string {
-  const ext =
-    path
-      .extname(
-        filePath,
-      )
-      .toLowerCase();
-
-  if (
-    ext === ".png"
-  ) {
-    return "image/png";
-  }
-
-  if (
-    ext === ".webp"
-  ) {
-    return "image/webp";
-  }
-
-  if (
-    ext === ".gif"
-  ) {
-    return "image/gif";
-  }
-
-  if (
-    ext === ".avif"
-  ) {
-    return "image/avif";
-  }
-
-  if (
-    ext === ".bmp"
-  ) {
-    return "image/bmp";
-  }
-
-  if (
-    ext === ".tif" ||
-    ext === ".tiff"
-  ) {
-    return "image/tiff";
-  }
-
-  return "image/jpeg";
-}
-
-// ============================================================
-// PNG CONVERSION
-// ============================================================
-
-async function convertImageToPng(
-  inputPath: string,
-): Promise<string> {
-  const outputPath =
-    path.join(
-      path.dirname(
-        inputPath,
-      ),
-      `${path.basename(
-        inputPath,
-        path.extname(
-          inputPath,
-        ),
-      )}.png`,
-    );
-
-  await sharp(
-    inputPath,
-    {
-      animated: false,
-    },
-  )
-    .png({
-      compressionLevel: 6,
-      adaptiveFiltering: true,
-    })
-    .toFile(
-      outputPath,
-    );
-
-  if (
-    inputPath !==
-      outputPath &&
-    fs.existsSync(
-      inputPath,
-    )
-  ) {
-    fs.unlinkSync(
-      inputPath,
-    );
-  }
-
-  return outputPath;
-}
-
-// ============================================================
-// SVG CONVERSION
-// ============================================================
-
-async function convertImageToSvg(
-  inputPath: string,
-): Promise<string> {
-  const buffer =
-    fs.readFileSync(
-      inputPath,
-    );
-
-  const metadata =
-    await sharp(
-      inputPath,
-      {
-        animated: false,
-      },
-    ).metadata();
-
-  const width =
-    metadata.width ||
-    1;
-
-  const height =
-    metadata.height ||
-    1;
-
-  const mime =
-    getImageMimeType(
-      inputPath,
-    );
-
-  const base64 =
-    buffer.toString(
-      "base64",
-    );
-
-  const outputPath =
-    path.join(
-      path.dirname(
-        inputPath,
-      ),
-      `${path.basename(
-        inputPath,
-        path.extname(
-          inputPath,
-        ),
-      )}.svg`,
-    );
-
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg
-  xmlns="http://www.w3.org/2000/svg"
-  xmlns:xlink="http://www.w3.org/1999/xlink"
-  width="${width}"
-  height="${height}"
-  viewBox="0 0 ${width} ${height}"
->
-  <image
-    width="${width}"
-    height="${height}"
-    preserveAspectRatio="none"
-    href="data:${escapeXml(
-      mime,
-    )};base64,${base64}"
-  />
-</svg>`;
-
-  fs.writeFileSync(
-    outputPath,
-    svg,
-    "utf8",
-  );
-
-  if (
-    inputPath !==
-      outputPath &&
-    fs.existsSync(
-      inputPath,
-    )
-  ) {
-    fs.unlinkSync(
-      inputPath,
-    );
-  }
-
-  return outputPath;
-}
-
-// ============================================================
-// CONVERT IMAGE
-// ============================================================
-
-async function convertImage(
-  inputPath: string,
-  format: ImageFormat,
-): Promise<string> {
-  const ext =
-    path
-      .extname(
-        inputPath,
-      )
-      .toLowerCase();
-
-  // Preserve animated GIF.
-  if (
-    ext === ".gif"
-  ) {
-    return inputPath;
-  }
-
-  if (
-    format === "svg"
-  ) {
-    return convertImageToSvg(
-      inputPath,
-    );
-  }
-
-  return convertImageToPng(
-    inputPath,
-  );
-}
-
-// ============================================================
-// DIRECT SINGLE IMAGE DOWNLOAD
-// ============================================================
-
-async function downloadDirectImage(
-  imageUrl: string,
-  outputDir: string,
-  pinId: string,
-): Promise<{
-  filePath: string;
-}> {
-  const response =
-    await fetch(
-      imageUrl,
-      {
-        redirect: "follow",
-      },
-    );
-
-  if (
-    !response.ok
-  ) {
-    throw new Error(
-      `IMAGE_FETCH_${response.status}`,
-    );
-  }
-
-  const contentType =
-    (
-      response.headers.get(
-        "content-type",
-      ) || ""
-    ).toLowerCase();
-
-  let ext =
-    "jpg";
-
-  if (
-    contentType.includes(
-      "image/png",
-    )
-  ) {
-    ext = "png";
-  } else if (
-    contentType.includes(
-      "image/webp",
-    )
-  ) {
-    ext = "webp";
-  } else if (
-    contentType.includes(
-      "image/gif",
-    )
-  ) {
-    ext = "gif";
-  } else if (
-    contentType.includes(
-      "image/avif",
-    )
-  ) {
-    ext = "avif";
-  } else if (
-    contentType.includes(
-      "image/jpeg",
-    )
-  ) {
-    ext = "jpg";
-  } else {
-    const urlExt =
-      imageUrl.match(
-        /\.(jpg|jpeg|png|webp|gif|avif|bmp|tif|tiff)(?:[?#]|$)/i,
-      );
-
-    if (urlExt) {
-      ext =
-        urlExt[1].toLowerCase();
-
-      if (
-        ext === "jpeg"
-      ) {
-        ext = "jpg";
-      }
-    }
-  }
-
-  const buffer =
-    Buffer.from(
-      await response.arrayBuffer(),
-    );
-
-  if (
-    buffer.length < 100
-  ) {
-    throw new Error(
-      "EMPTY_IMAGE",
-    );
-  }
-
-  const filePath =
-    path.join(
-      outputDir,
-      `${pinId}.${ext}`,
-    );
-
-  fs.writeFileSync(
-    filePath,
-    buffer,
-  );
-
-  return {
-    filePath,
-  };
-}
-
-// ============================================================
-// IMAGE / CAROUSEL DOWNLOAD
-// ============================================================
-
-async function downloadImageOrCarousel(
-  url: string,
-  pinId: string,
-  onStage?: (
-    label: string,
-  ) => void,
-  imageUrl?: string | null,
-  imageFormat: ImageFormat = "png",
-): Promise<{
-  filePath: string;
-  mediaType:
-    | "image"
-    | "carousel";
-  imageCount: number;
-}> {
-  const outputDir =
-    `/tmp/pinme-img-${pinId}`;
-
-  fs.mkdirSync(
-    outputDir,
-    {
-      recursive: true,
-    },
-  );
-
-  // ========================================================
-  // FAST PATH: SINGLE IMAGE ONLY
-  // ========================================================
-
-  if (
-    imageUrl
-  ) {
-    try {
-      onStage?.(
-        "Downloading image...",
-      );
-
-      console.log(
-        "=== FAST DIRECT IMAGE FETCH ===",
-      );
-
-      const direct =
-        await downloadDirectImage(
-          imageUrl,
-          outputDir,
-          pinId,
+      if (!cancelled) {
+        timer = setTimeout(
+          check,
+          3000
         );
-
-      console.log(
-        "Direct image download complete:",
-        direct.filePath,
-      );
-
-      const ext =
-        path
-          .extname(
-            direct.filePath,
-          )
-          .toLowerCase();
-
-      // Preserve animated GIF.
-      if (
-        ext === ".gif"
-      ) {
-        return {
-          filePath:
-            direct.filePath,
-          mediaType:
-            "image",
-          imageCount: 1,
-        };
       }
+    };
 
-      onStage?.(
-        imageFormat === "svg"
-          ? "Converting image to SVG..."
-          : "Converting image to PNG...",
-      );
+    check();
 
-      const converted =
-        await convertImage(
-          direct.filePath,
-          imageFormat,
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, []);
+
+  return ready;
+}
+
+// ─── Splash screen ───────────────────────────────────────────────────────────
+
+function SplashScreen() {
+  return (
+    <motion.div
+      key="splash"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.35 }}
+      className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center gap-5"
+    >
+      <motion.img
+        src="/splash-logo.png"
+        alt="pinME"
+        className="h-24 w-24 object-contain rounded-3xl"
+        initial={{
+          scale: 0.85,
+          opacity: 0,
+        }}
+        animate={{
+          scale: 1,
+          opacity: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: 'easeOut',
+        }}
+      />
+
+      <motion.p
+        className="text-sm text-muted-foreground tracking-wide"
+        initial={{
+          opacity: 0,
+          y: 6,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.4,
+          delay: 0.2,
+        }}
+      >
+        pinme.download
+      </motion.p>
+    </motion.div>
+  );
+}
+
+// ─── Server-waking screen ────────────────────────────────────────────────────
+
+function WakingScreen() {
+  const { t } =
+    useLanguage();
+
+  const [dots, setDots] =
+    useState('');
+
+  useEffect(() => {
+    const id =
+      setInterval(() => {
+        setDots((d) =>
+          d.length >= 3
+            ? ''
+            : d + '.'
         );
+      }, 500);
 
-      return {
-        filePath:
-          converted,
-        mediaType:
-          "image",
-        imageCount: 1,
-      };
-    } catch (err) {
-      console.log(
-        "Direct image fetch failed, falling back to gallery-dl:",
-        err,
-      );
-    }
+    return () =>
+      clearInterval(id);
+  }, []);
+
+  return (
+    <div className="min-h-[100dvh] w-full bg-background text-foreground flex flex-col items-center justify-center gap-6 font-sans px-6">
+      <img
+        src="/splash-logo.png"
+        alt="pinME Logo"
+        className="h-20 w-20 object-contain rounded-2xl"
+      />
+
+      <div className="text-center space-y-2">
+        <p className="text-lg font-semibold text-foreground">
+          {t('serverStarting')}
+          <span className="inline-block w-6 text-left">
+            {dots}
+          </span>
+        </p>
+
+        <p className="text-sm text-muted-foreground max-w-xs">
+          {t('serverWakingText')}
+        </p>
+      </div>
+
+      <div className="h-6 w-6 rounded-full border-2 border-foreground/10 border-t-primary animate-spin" />
+    </div>
+  );
+}
+
+// ─── Animated bouncing dots ──────────────────────────────────────────────────
+
+function AnimatedStageLabel({
+  label,
+}: {
+  label: string;
+}) {
+  const hasTrailingDots =
+    /\.{3}$/.test(label);
+
+  if (!hasTrailingDots) {
+    return <>{label}</>;
   }
 
-  // ========================================================
-  // CAROUSEL / GALLERY PATH
-  // ========================================================
+  const baseLabel =
+    label.replace(
+      /\.{3}$/,
+      ''
+    );
 
-  onStage?.(
-    "Downloading image...",
+  return (
+    <>
+      {baseLabel}
+
+      <span
+        aria-hidden="true"
+        className="inline-flex items-end ml-1"
+        style={{
+          gap: '2px',
+          verticalAlign:
+            'baseline',
+        }}
+      >
+        <span className="animate-bounce-dot">
+          •
+        </span>
+
+        <span
+          className="animate-bounce-dot"
+          style={{
+            animationDelay:
+              '0.15s',
+          }}
+        >
+          •
+        </span>
+
+        <span
+          className="animate-bounce-dot"
+          style={{
+            animationDelay:
+              '0.3s',
+          }}
+        >
+          •
+        </span>
+
+        <style>{`
+          @keyframes bounceDot {
+            0%,
+            60%,
+            100% {
+              transform: translateY(0);
+            }
+
+            30% {
+              transform: translateY(-4px);
+            }
+          }
+
+          .animate-bounce-dot {
+            display: inline-block;
+            animation: bounceDot 0.9s ease-in-out infinite;
+            font-size: 0.9em;
+            line-height: 1;
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .animate-bounce-dot {
+              animation: none;
+            }
+          }
+        `}</style>
+      </span>
+    </>
   );
+}
+
+// ─── Circular progress indicator ────────────────────────────────────────────
+
+function ProgressLabel({
+  label,
+  progress,
+}: {
+  label: string;
+  progress: number;
+}) {
+  const radius = 34;
+
+  const circumference =
+    2 * Math.PI * radius;
+
+  const clampedProgress =
+    Math.min(
+      100,
+      Math.max(0, progress)
+    );
+
+  const strokeDashoffset =
+    circumference *
+    (1 -
+      clampedProgress / 100);
+
+  const progressColor =
+    clampedProgress <= 30
+      ? '#ef4444'
+      : clampedProgress <= 70
+        ? '#eab308'
+        : '#22c55e';
+
+  const isComplete =
+    clampedProgress === 100;
+
+  return (
+    <div className="flex flex-col items-center gap-3 w-full">
+      <AnimatePresence mode="wait">
+        <motion.p
+          key={label}
+          initial={{
+            opacity: 0,
+            y: 4,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          exit={{
+            opacity: 0,
+            y: -4,
+          }}
+          transition={{
+            duration: 0.2,
+          }}
+          className="text-sm text-muted-foreground text-center"
+        >
+          <AnimatedStageLabel
+            label={label}
+          />
+        </motion.p>
+      </AnimatePresence>
+
+      <motion.div
+        className="relative flex items-center justify-center w-20 h-20"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={
+          clampedProgress
+        }
+        aria-label={`${clampedProgress}%`}
+        animate={
+          isComplete
+            ? {
+                scale: [
+                  1,
+                  1.06,
+                  1,
+                ],
+              }
+            : {
+                scale: 1,
+              }
+        }
+        transition={
+          isComplete
+            ? {
+                duration: 0.45,
+                ease: 'easeOut',
+              }
+            : {
+                duration: 0.2,
+              }
+        }
+      >
+        <svg
+          width="80"
+          height="80"
+          viewBox="0 0 80 80"
+          className="absolute inset-0"
+          aria-hidden="true"
+        >
+          <circle
+            cx="40"
+            cy="40"
+            r={radius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="5"
+            className="text-muted/30"
+          />
+
+          <motion.circle
+            cx="40"
+            cy="40"
+            r={radius}
+            fill="none"
+            stroke={progressColor}
+            strokeWidth="5"
+            strokeLinecap="round"
+            transform="rotate(-90 40 40)"
+            strokeDasharray={
+              circumference
+            }
+            initial={{
+              strokeDashoffset:
+                circumference,
+            }}
+            animate={{
+              strokeDashoffset,
+            }}
+            transition={{
+              duration: 0.45,
+              ease: 'easeOut',
+            }}
+          />
+
+          {isComplete && (
+            <motion.circle
+              cx="40"
+              cy="40"
+              r={radius}
+              fill="none"
+              stroke="#22c55e"
+              strokeWidth="5"
+              strokeLinecap="round"
+              transform="rotate(-90 40 40)"
+              strokeDasharray={
+                circumference
+              }
+              initial={{
+                opacity: 0,
+              }}
+              animate={{
+                opacity: [
+                  0,
+                  0.35,
+                  0,
+                ],
+              }}
+              transition={{
+                duration: 0.45,
+                ease: 'easeOut',
+              }}
+            />
+          )}
+        </svg>
+
+        <motion.span
+          key={clampedProgress}
+          initial={{
+            opacity: 0.5,
+            scale: 0.9,
+          }}
+          animate={
+            isComplete
+              ? {
+                  opacity: [
+                    0.5,
+                    1,
+                    1,
+                  ],
+                  scale: [
+                    0.9,
+                    1.08,
+                    1,
+                  ],
+                }
+              : {
+                  opacity: 1,
+                  scale: 1,
+                }
+          }
+          transition={{
+            duration:
+              isComplete
+                ? 0.45
+                : 0.2,
+          }}
+          className="relative z-10 text-sm font-semibold text-foreground"
+        >
+          {clampedProgress}%
+        </motion.span>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── Cute coffee success animation ───────────────────────────────────────────
+
+function CoffeeDownloadAnimation() {
+  return (
+    <div
+      className="relative w-[110px] h-[74px] mx-auto pointer-events-none overflow-visible"
+      aria-hidden="true"
+    >
+      <motion.div
+        initial={{
+          y: 8,
+          scale: 0.82,
+          opacity: 0,
+        }}
+        animate={{
+          y: [
+            8,
+            -5,
+            0,
+            -2,
+            0,
+          ],
+          scale: [
+            0.82,
+            1,
+            1,
+            1.08,
+            3.8,
+          ],
+          opacity: [
+            0,
+            1,
+            1,
+            1,
+            0,
+          ],
+        }}
+        transition={{
+          duration: 1.55,
+          times: [
+            0,
+            0.18,
+            0.38,
+            0.58,
+            1,
+          ],
+          ease: 'easeInOut',
+        }}
+        className="absolute inset-0 flex items-center justify-center text-4xl leading-none origin-center"
+      >
+        ☕︎
+      </motion.div>
+
+      <motion.span
+        initial={{
+          opacity: 0,
+          y: 8,
+          x: -8,
+          scale: 0.7,
+        }}
+        animate={{
+          opacity: [
+            0,
+            0.5,
+            0.25,
+            0,
+          ],
+          y: [
+            8,
+            2,
+            -5,
+            -14,
+          ],
+          x: [
+            -8,
+            -10,
+            -6,
+            -9,
+          ],
+          scale: [
+            0.7,
+            0.9,
+            1,
+            1.1,
+          ],
+        }}
+        transition={{
+          duration: 1.25,
+          delay: 0.12,
+          ease: 'easeOut',
+        }}
+        className="absolute left-[38px] top-[7px] text-[11px] leading-none"
+      >
+        ~
+      </motion.span>
+
+      <motion.span
+        initial={{
+          opacity: 0,
+          y: 8,
+          x: 2,
+          scale: 0.7,
+        }}
+        animate={{
+          opacity: [
+            0,
+            0.45,
+            0.2,
+            0,
+          ],
+          y: [
+            8,
+            1,
+            -7,
+            -16,
+          ],
+          x: [
+            2,
+            5,
+            1,
+            4,
+          ],
+          scale: [
+            0.7,
+            0.9,
+            1,
+            1.15,
+          ],
+        }}
+        transition={{
+          duration: 1.35,
+          delay: 0.28,
+          ease: 'easeOut',
+        }}
+        className="absolute left-[53px] top-[4px] text-[10px] leading-none"
+      >
+        ~
+      </motion.span>
+
+      <motion.span
+        initial={{
+          opacity: 0,
+          y: 7,
+          x: 10,
+          scale: 0.65,
+        }}
+        animate={{
+          opacity: [
+            0,
+            0.4,
+            0.18,
+            0,
+          ],
+          y: [
+            7,
+            0,
+            -6,
+            -15,
+          ],
+          x: [
+            10,
+            13,
+            9,
+            12,
+          ],
+          scale: [
+            0.65,
+            0.85,
+            1,
+            1.1,
+          ],
+        }}
+        transition={{
+          duration: 1.2,
+          delay: 0.42,
+          ease: 'easeOut',
+        }}
+        className="absolute left-[62px] top-[7px] text-[9px] leading-none"
+      >
+        ~
+      </motion.span>
+    </div>
+  );
+}
+
+// ─── SSE stream parser ───────────────────────────────────────────────────────
+
+type SSEEvent =
+  | {
+      type: 'stage';
+      label: string;
+    }
+  | {
+      type: 'ready';
+      token: string;
+      filename: string;
+      title: string | null;
+      mediaType?:
+        | 'video'
+        | 'image'
+        | 'carousel';
+      imageCount?: number;
+      imageFormat?: string;
+    }
+  | {
+      type: 'error';
+      message: string;
+    };
+
+async function* readSSE(
+  response: Response
+): AsyncGenerator<SSEEvent> {
+  if (!response.body) {
+    throw new Error(
+      'Empty server response'
+    );
+  }
+
+  const reader =
+    response.body.getReader();
+
+  const decoder =
+    new TextDecoder();
+
+  let buffer = '';
 
   try {
-    console.log(
-      "=== gallery-dl image/carousel ===",
-    );
+    while (true) {
+      const {
+        done,
+        value,
+      } =
+        await reader.read();
 
-    await runGalleryDl(
-      [
-        "-d",
-        outputDir,
-        "--no-part",
-        url,
-      ],
-      undefined,
-      true,
-    );
+      if (done) break;
 
-    let images =
-      findAllImages(
-        outputDir,
+      buffer += decoder.decode(
+        value,
+        {
+          stream: true,
+        }
       );
 
-    console.log(
-      "========================================",
-    );
+      const parts =
+        buffer.split('\n\n');
 
-    console.log(
-      `gallery-dl found ${images.length} image(s)`,
-    );
+      buffer =
+        parts.pop() ?? '';
 
-    images.forEach(
-      (
-        imagePath,
-        index,
-      ) => {
-        console.log(
-          `Image ${index + 1}: ${imagePath}`,
-        );
-      },
-    );
+      for (const part of parts) {
+        const line =
+          part.trim();
 
-    console.log(
-      "========================================",
-    );
-
-    // ======================================================
-    // CAROUSEL
-    // ======================================================
-
-    if (
-      images.length > 1
-    ) {
-      onStage?.(
-        imageFormat === "svg"
-          ? "Converting carousel to SVG..."
-          : "Converting carousel to PNG...",
-      );
-
-      const convertedImages:
-        string[] = [];
-
-      for (
-        const imagePath of
-        images
-      ) {
-        const ext =
-          path
-            .extname(
-              imagePath,
-            )
-            .toLowerCase();
-
-        // Preserve GIF.
         if (
-          ext === ".gif"
+          !line.startsWith(
+            'data: '
+          )
         ) {
-          convertedImages.push(
-            imagePath,
-          );
-
           continue;
         }
 
-        const converted =
-          await convertImage(
-            imagePath,
-            imageFormat,
-          );
-
-        convertedImages.push(
-          converted,
-        );
+        try {
+          yield JSON.parse(
+            line.slice(6)
+          ) as SSEEvent;
+        } catch {
+          /* malformed event — skip */
+        }
       }
-
-      // Re-sort after conversion because filenames can change.
-      images =
-        convertedImages.sort(
-          (a, b) => {
-            const aNum =
-              extractImageNumber(
-                a,
-              );
-
-            const bNum =
-              extractImageNumber(
-                b,
-              );
-
-            if (
-              aNum !==
-                Number.MAX_SAFE_INTEGER &&
-              bNum !==
-                Number.MAX_SAFE_INTEGER &&
-              aNum !==
-                bNum
-            ) {
-              return (
-                aNum -
-                bNum
-              );
-            }
-
-            return a.localeCompare(
-              b,
-              undefined,
-              {
-                numeric: true,
-                sensitivity:
-                  "base",
-              },
-            );
-          },
-        );
-
-      onStage?.(
-        "Packaging carousel...",
-      );
-
-      const zipPath =
-        path.join(
-          outputDir,
-          `pinme-carousel-${pinId}.zip`,
-        );
-
-      await new Promise<void>(
-        (
-          resolve,
-          reject,
-        ) => {
-          const output =
-            fs.createWriteStream(
-              zipPath,
-            );
-
-          const archive =
-            archiver(
-              "zip",
-              {
-                store: true,
-              },
-            );
-
-          output.on(
-            "close",
-            () => resolve(),
-          );
-
-          output.on(
-            "error",
-            (
-              err,
-            ) =>
-              reject(err),
-          );
-
-          archive.on(
-            "error",
-            (
-              err,
-            ) =>
-              reject(err),
-          );
-
-          archive.pipe(
-            output,
-          );
-
-          images.forEach(
-            (
-              imgPath,
-              index,
-            ) => {
-              const ext =
-                path.extname(
-                  imgPath,
-                );
-
-              archive.file(
-                imgPath,
-                {
-                  name:
-                    `image-${String(
-                      index + 1,
-                    ).padStart(
-                      2,
-                      "0",
-                    )}${ext}`,
-                },
-              );
-            },
-          );
-
-          archive.finalize();
-        },
-      );
-
-      console.log(
-        `Carousel ZIP created with ${images.length} image(s): ${zipPath}`,
-      );
-
-      return {
-        filePath:
-          zipPath,
-        mediaType:
-          "carousel",
-        imageCount:
-          images.length,
-      };
     }
 
-    // ======================================================
-    // SINGLE IMAGE FALLBACK
-    // ======================================================
+    if (buffer.trim()) {
+      const line =
+        buffer.trim();
 
-    if (
-      images.length === 1
-    ) {
-      const single =
-        images[0];
-
-      const ext =
-        path
-          .extname(
-            single,
-          )
-          .toLowerCase();
-
-      // Preserve GIF.
       if (
-        ext === ".gif"
-      ) {
-        return {
-          filePath:
-            single,
-          mediaType:
-            "image",
-          imageCount: 1,
-        };
-      }
-
-      onStage?.(
-        imageFormat === "svg"
-          ? "Converting image to SVG..."
-          : "Converting image to PNG...",
-      );
-
-      const converted =
-        await convertImage(
-          single,
-          imageFormat,
-        );
-
-      return {
-        filePath:
-          converted,
-        mediaType:
-          "image",
-        imageCount: 1,
-      };
-    }
-  } catch (err) {
-    console.log(
-      "gallery-dl image/carousel failed:",
-      err,
-    );
-  }
-
-  throw new Error(
-    "NO_FILE: no image found for this pin",
-  );
-}
-
-// ============================================================
-// VIDEO DOWNLOAD
-// ============================================================
-
-async function downloadVideo(
-  url: string,
-  pinId: string,
-  onStage?: (
-    label: string,
-  ) => void,
-): Promise<{
-  filePath: string;
-}> {
-  const outputTemplate =
-    `/tmp/pinme-${pinId}.%(ext)s`;
-
-  let mergeSignalled =
-    false;
-
-  console.log(
-    "=== Video download ===",
-  );
-
-  console.log(
-    "Quality mode: BEST AVAILABLE",
-  );
-
-  console.log(
-    "Speed mode: OPTIMIZED",
-  );
-
-  await runYtDlp(
-    [
-      "--no-playlist",
-      "--no-warnings",
-
-      "--concurrent-fragments",
-      String(
-        YTDLP_CONCURRENT_FRAGMENTS,
-      ),
-
-      "--retries",
-      "2",
-
-      "--fragment-retries",
-      "2",
-
-      "--socket-timeout",
-      "15",
-
-      "--format",
-      "bestvideo+bestaudio/best",
-
-      "--merge-output-format",
-      "mp4",
-
-      "-o",
-      outputTemplate,
-
-      url,
-    ],
-    (line) => {
-      if (
-        !mergeSignalled &&
-        line.includes(
-          "[Merger]",
+        line.startsWith(
+          'data: '
         )
       ) {
-        mergeSignalled =
-          true;
-
-        onStage?.(
-          "Processing video...",
-        );
+        try {
+          yield JSON.parse(
+            line.slice(6)
+          ) as SSEEvent;
+        } catch {
+          /* malformed final event */
+        }
       }
-    },
-  );
-
-  const preferredPath =
-    `/tmp/pinme-${pinId}.mp4`;
-
-  if (
-    fs.existsSync(
-      preferredPath,
-    )
-  ) {
-    const stat =
-      fs.statSync(
-        preferredPath,
-      );
-
-    if (
-      stat.size < 10_000
-    ) {
-      fs.unlinkSync(
-        preferredPath,
-      );
-
-      throw new Error(
-        "NO_VIDEO",
-      );
     }
-
-    return {
-      filePath:
-        preferredPath,
-    };
+  } finally {
+    reader.releaseLock();
   }
-
-  const files =
-    fs.readdirSync(
-      "/tmp",
-    );
-
-  for (
-    const f of files
-  ) {
-    if (
-      f.startsWith(
-        `pinme-${pinId}.`,
-      ) &&
-      !f.endsWith(
-        ".part",
-      ) &&
-      !f.endsWith(
-        ".ytdl",
-      )
-    ) {
-      const fp =
-        path.join(
-          "/tmp",
-          f,
-        );
-
-      const stat =
-        fs.statSync(fp);
-
-      if (
-        stat.size >=
-        10_000
-      ) {
-        return {
-          filePath:
-            fp,
-        };
-      }
-
-      try {
-        fs.unlinkSync(
-          fp,
-        );
-      } catch {
-        // best-effort
-      }
-
-      throw new Error(
-        "NO_VIDEO",
-      );
-    }
-  }
-
-  throw new Error(
-    "NO_FILE: output file not found after yt-dlp succeeded",
-  );
 }
 
-// ============================================================
-// FILENAME
-// ============================================================
+// ─── Coffee button ───────────────────────────────────────────────────────────
 
-function buildFilename(
-  title: string | null,
-  filePath: string,
-): string {
-  const ext =
-    path
-      .extname(
-        filePath,
-      )
-      .slice(1) ||
-    "mp4";
-
-  if (
-    ext.toLowerCase() ===
-    "zip"
-  ) {
-    return `pinme-carousel-${Date.now()}.zip`;
-  }
-
-  const genericTitles =
-    new Set([
-      "mp4",
-      "mkv",
-      "webm",
-      "video",
-      "watch",
-      "pin",
-      "",
-    ]);
-
-  const cleaned =
-    (title || "")
-      .replace(
-        /[^\w\s-]/g,
-        "",
-      )
-      .replace(
-        /\s+/g,
-        "-",
-      )
-      .replace(
-        /^-+|-+$/g,
-        "",
-      )
-      .toLowerCase();
-
-  if (
-    !cleaned ||
-    genericTitles.has(
-      cleaned,
-    ) ||
-    cleaned.length < 3
-  ) {
-    return `pinme-download-${Date.now()}.${ext}`;
-  }
-
-  return `${cleaned.slice(
-    0,
-    60,
-  )}.${ext}`;
-}
-
-// ============================================================
-// MIME
-// ============================================================
-
-function getMimeType(
-  filename: string,
-): string {
-  const ext =
-    path
-      .extname(
-        filename,
-      )
-      .toLowerCase();
-
-  const types: Record<
-    string,
-    string
-  > = {
-    ".mp4":
-      "video/mp4",
-    ".webm":
-      "video/webm",
-    ".mov":
-      "video/quicktime",
-    ".jpg":
-      "image/jpeg",
-    ".jpeg":
-      "image/jpeg",
-    ".png":
-      "image/png",
-    ".webp":
-      "image/webp",
-    ".gif":
-      "image/gif",
-    ".avif":
-      "image/avif",
-    ".svg":
-      "image/svg+xml",
-    ".zip":
-      "application/zip",
-  };
-
+function CoffeeButton() {
   return (
-    types[ext] ||
-    "application/octet-stream"
-  );
-}
-
-// ============================================================
-// USER ERRORS
-// ============================================================
-
-function toUserError(
-  msg: string,
-): {
-  status: number;
-  error: string;
-} {
-  if (
-    msg === "NO_VIDEO"
-  ) {
-    return {
-      status: 400,
-      error:
-        "This pin doesn't contain a video.",
-    };
-  }
-
-  if (
-    msg === "UNAVAILABLE"
-  ) {
-    return {
-      status: 404,
-      error:
-        "Couldn't fetch this video. It may be unavailable or private.",
-    };
-  }
-
-  if (
-    msg === "TIMEOUT"
-  ) {
-    return {
-      status: 504,
-      error:
-        "Request timed out. Please try again.",
-    };
-  }
-
-  return {
-    status: 500,
-    error:
-      "Couldn't fetch this video. It may be unavailable or private.",
-  };
-}
-
-// ============================================================
-// POST /api/get-pin
-// ============================================================
-
-router.post(
-  "/get-pin",
-  async (
-    req,
-    res,
-  ) => {
-    const {
-      url,
-      imageFormat,
-    } =
-      req.body as {
-        url?: string;
-        imageFormat?: ImageFormat;
-      };
-
-    if (
-      !url ||
-      typeof url !==
-        "string" ||
-      !url.trim()
-    ) {
-      res.status(400).json({
-        error:
-          "This doesn't look like a Pinterest link.",
-      });
-
-      return;
-    }
-
-    const trimmed =
-      url.trim();
-
-    if (
-      !isPinterestUrl(
-        trimmed,
-      )
-    ) {
-      res.status(400).json({
-        error:
-          "This doesn't look like a Pinterest link.",
-      });
-
-      return;
-    }
-
-    const selectedImageFormat =
-      normalizeImageFormat(
-        imageFormat,
-      );
-
-    // ========================================================
-    // SSE
-    // ========================================================
-
-    res.setHeader(
-      "Content-Type",
-      "text/event-stream",
-    );
-
-    res.setHeader(
-      "Cache-Control",
-      "no-cache",
-    );
-
-    res.setHeader(
-      "Connection",
-      "keep-alive",
-    );
-
-    res.flushHeaders();
-
-    const send = (
-      data: object,
-    ) => {
-      if (
-        !res.writableEnded
-      ) {
-        res.write(
-          `data: ${JSON.stringify(
-            data,
-          )}\n\n`,
-        );
-      }
-    };
-
-    try {
-      // ======================================================
-      // STEP 1
-      // ======================================================
-
-      send({
-        type: "stage",
-        label:
-          "Fetching info...",
-      });
-
-      const meta =
-        await getPinMeta(
-          trimmed,
-        );
-
-      let filePath: string;
-
-      let mediaType:
-        | "video"
-        | "image"
-        | "carousel";
-
-      let imageCount:
-        | number
-        | undefined;
-
-      // ======================================================
-      // IMAGE / CAROUSEL
-      // ======================================================
-
-      if (
-        meta.isImage ||
-        meta.isCarousel
-      ) {
-        const result =
-          await downloadImageOrCarousel(
-            trimmed,
-            meta.id,
-            (
-              label,
-            ) =>
-              send({
-                type: "stage",
-                label,
-              }),
-
-            // IMPORTANT:
-            // Never use the direct image URL for a carousel.
-            meta.isCarousel
-              ? undefined
-              : meta.imageUrl,
-
-            selectedImageFormat,
-          );
-
-        filePath =
-          result.filePath;
-
-        mediaType =
-          result.mediaType;
-
-        imageCount =
-          result.imageCount;
-      }
-
-      // ======================================================
-      // VIDEO
-      // ======================================================
-
-      else {
-        send({
-          type: "stage",
-          label:
-            "Downloading video...",
-        });
-
-        const vid =
-          await downloadVideo(
-            trimmed,
-            meta.id,
-            (
-              label,
-            ) =>
-              send({
-                type: "stage",
-                label,
-              }),
-          );
-
-        filePath =
-          vid.filePath;
-
-        mediaType =
-          "video";
-      }
-
-      // ======================================================
-      // PREPARE TOKEN
-      // ======================================================
-
-      send({
-        type: "stage",
-        label:
-          "Preparing download...",
-      });
-
-      const filename =
-        buildFilename(
-          meta.title,
-          filePath,
-        );
-
-      const expiresAt =
-        Date.now() +
-        DOWNLOAD_TTL_MS;
-
-      const token =
-        createDownloadToken({
-          url: trimmed,
-          pinId: meta.id,
-          filename,
-          expiresAt,
-          mediaType,
-          imageFormat:
-            selectedImageFormat,
-        });
-
-      pendingDownloads.set(
-        token,
-        {
-          filePath,
-          filename,
-          expiresAt,
-        },
-      );
-
-      // ======================================================
-      // READY
-      // ======================================================
-
-      send({
-        type: "ready",
-        token,
-        filename,
-        title:
-          meta.title ??
-          null,
-        mediaType,
-        imageCount,
-        imageFormat:
-          selectedImageFormat,
-      });
-    } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : String(err);
-
-      req.log?.error(
-        {
-          err: msg,
-          url: trimmed,
-        },
-        "get-pin failed",
-      );
-
-      const {
-        error,
-      } =
-        toUserError(msg);
-
-      send({
-        type: "error",
-        message: error,
-      });
-    } finally {
-      res.end();
-    }
-  },
-);
-
-// ============================================================
-// GET /api/stream/:token
-// ============================================================
-
-router.get(
-  "/stream/:token",
-  async (
-    req,
-    res,
-  ): Promise<void> => {
-    const {
-      token,
-    } = req.params;
-
-    const payload =
-      parseDownloadToken(
-        token,
-      );
-
-    if (
-      !payload ||
-      payload.expiresAt <=
-        Date.now()
-    ) {
-      res.status(404).json({
-        error:
-          "Download link expired. Please try again.",
-      });
-
-      return;
-    }
-
-    const entry =
-      pendingDownloads.get(
-        token,
-      );
-
-    let filePath: string;
-
-    let filename =
-      payload.filename;
-
-    // ========================================================
-    // USE PREPARED FILE
-    // ========================================================
-
-    if (
-      entry &&
-      fs.existsSync(
-        entry.filePath,
-      )
-    ) {
-      filePath =
-        entry.filePath;
-
-      filename =
-        entry.filename;
-    }
-
-    // ========================================================
-    // FALLBACK FRESH DOWNLOAD
-    // ========================================================
-
-    else {
-      try {
-        req.log?.warn(
-          "Prepared download was unavailable; fetching a fresh copy",
-        );
-
-        const retryPinId =
-          `retry-${randomBytes(
-            8,
-          ).toString("hex")}`;
-
-        if (
-          payload.mediaType ===
-          "carousel"
-        ) {
-          const carousel =
-            await downloadImageOrCarousel(
-              payload.url,
-              retryPinId,
-              undefined,
-              undefined,
-              normalizeImageFormat(
-                payload.imageFormat,
-              ),
-            );
-
-          filePath =
-            carousel.filePath;
-
-          filename =
-            buildFilename(
-              null,
-              filePath,
-            );
-        } else if (
-          payload.mediaType ===
-          "image"
-        ) {
-          const image =
-            await downloadImageOrCarousel(
-              payload.url,
-              retryPinId,
-              undefined,
-              undefined,
-              normalizeImageFormat(
-                payload.imageFormat,
-              ),
-            );
-
-          filePath =
-            image.filePath;
-
-          filename =
-            buildFilename(
-              null,
-              filePath,
-            );
-        } else {
-          const fresh =
-            await downloadVideo(
-              payload.url,
-              retryPinId,
-            );
-
-          filePath =
-            fresh.filePath;
-
-          filename =
-            buildFilename(
-              null,
-              filePath,
-            );
+    <a
+      href="https://ko-fi.com/pinmedownload"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Buy me a coffee"
+      className="relative flex items-center justify-center w-12 h-12 hover:scale-110 transition-transform duration-200"
+    >
+      <span className="pointer-events-none absolute left-[18px] top-[2px] text-[10px] leading-none opacity-0 animate-coffee-steam">
+        ~
+      </span>
+
+      <span
+        className="pointer-events-none absolute left-[24px] top-[0px] text-[9px] leading-none opacity-0 animate-coffee-steam"
+        style={{
+          animationDelay:
+            '0.45s',
+        }}
+      >
+        ~
+      </span>
+
+      <span
+        className="pointer-events-none absolute left-[29px] top-[3px] text-[8px] leading-none opacity-0 animate-coffee-steam"
+        style={{
+          animationDelay:
+            '0.9s',
+        }}
+      >
+        ~
+      </span>
+
+      <span className="relative z-10 text-3xl leading-none text-[#f87171]">
+        ☕︎
+      </span>
+
+      <style>{`
+        @keyframes coffeeSteam {
+          0% {
+            opacity: 0;
+            transform: translateY(5px);
+          }
+
+          25% {
+            opacity: 0.45;
+          }
+
+          70% {
+            opacity: 0.2;
+          }
+
+          100% {
+            opacity: 0;
+            transform: translateY(-9px);
+          }
         }
 
-        pendingDownloads.set(
-          token,
-          {
-            filePath,
-            filename,
-            expiresAt:
-              payload.expiresAt,
-          },
+        .animate-coffee-steam {
+          animation: coffeeSteam 2.4s ease-in-out infinite;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .animate-coffee-steam {
+            animation: none;
+            opacity: 0;
+          }
+        }
+      `}</style>
+    </a>
+  );
+}
+
+// ─── Translate backend SSE stages ────────────────────────────────────────────
+
+function getTranslatedStage(
+  label: string,
+  t: (key: any) => string
+): string {
+  const normalized =
+    label.trim().toLowerCase();
+
+  switch (normalized) {
+    case 'checking media type...':
+      return t('checkingMedia');
+
+    case 'fetching video info...':
+      return t(
+        'fetchingVideoInfo'
+      );
+
+    case 'fetching image info...':
+      return t(
+        'fetchingImageInfo'
+      );
+
+    case 'fetching carousel info...':
+      return t(
+        'fetchingCarouselInfo'
+      );
+
+    case 'fetching gif info...':
+      return t(
+        'fetchingGifInfo'
+      );
+
+    case 'fetching info...':
+      return t(
+        'fetchingInfo'
+      );
+
+    case 'downloading video...':
+      return t(
+        'downloadingVideo'
+      );
+
+    case 'downloading image...':
+      return t(
+        'downloadingImage'
+      );
+
+    case 'downloading gif...':
+      return t(
+        'downloadingGif'
+      );
+
+    case 'downloading carousel...':
+      return t(
+        'downloadingCarousel'
+      );
+
+    case 'processing video...':
+      return t(
+        'processingVideo'
+      );
+
+    case 'converting image to svg...':
+      return t(
+        'convertingImageSvg'
+      );
+
+    case 'converting image to png...':
+      return t(
+        'convertingImagePng'
+      );
+
+    case 'converting carousel to svg...':
+      return t(
+        'convertingCarouselSvg'
+      );
+
+    case 'converting carousel to png...':
+      return t(
+        'convertingCarouselPng'
+      );
+
+    case 'packaging carousel...':
+      return t(
+        'packagingCarousel'
+      );
+
+    case 'preparing download...':
+      return t(
+        'preparingDownload'
+      );
+
+    case 'starting download...':
+      return t(
+        'startingDownload'
+      );
+
+    default:
+      return label;
+  }
+}
+
+// ─── Progress percentage ─────────────────────────────────────────────────────
+
+function getProgressFromStage(
+  label: string
+): number {
+  const normalized =
+    label.trim().toLowerCase();
+
+  switch (normalized) {
+    case 'checking media type...':
+      return 10;
+
+    case 'fetching video info...':
+    case 'fetching image info...':
+    case 'fetching carousel info...':
+    case 'fetching gif info...':
+    case 'fetching info...':
+      return 25;
+
+    case 'downloading video...':
+    case 'downloading image...':
+    case 'downloading gif...':
+    case 'downloading carousel...':
+      return 50;
+
+    case 'processing video...':
+    case 'converting image to svg...':
+    case 'converting image to png...':
+    case 'converting carousel to svg...':
+    case 'converting carousel to png...':
+    case 'packaging carousel...':
+      return 75;
+
+    case 'preparing download...':
+      return 90;
+
+    case 'starting download...':
+      return 100;
+
+    default:
+      return 10;
+  }
+}
+
+// ─── Success message ─────────────────────────────────────────────────────────
+
+function getSuccessMessage(
+  successInfo: {
+    mediaType?:
+      | 'video'
+      | 'image'
+      | 'carousel';
+    imageCount?: number;
+    filename?: string;
+  },
+  t: (key: any) => string
+): string {
+  const filename =
+    successInfo.filename
+      ?.toLowerCase() ?? '';
+
+  const isGif =
+    filename.endsWith('.gif');
+
+  const isZip =
+    filename.endsWith('.zip');
+
+  if (
+    successInfo.mediaType ===
+      'carousel' ||
+    isZip
+  ) {
+    const count =
+      successInfo.imageCount &&
+      successInfo.imageCount > 0
+        ? ` (${successInfo.imageCount} ${t(
+            'imagesCount'
+          )})`
+        : '';
+
+    return `${t(
+      'carouselDownloaded'
+    )}${count} • ZIP`;
+  }
+
+  if (
+    successInfo.mediaType ===
+      'image' &&
+    isGif
+  ) {
+    return 'GIF downloaded';
+  }
+
+  if (isGif) {
+    return 'GIF downloaded';
+  }
+
+  if (
+    successInfo.mediaType ===
+    'image'
+  ) {
+    return t(
+      'imageDownloaded'
+    );
+  }
+
+  if (
+    successInfo.mediaType ===
+    'video'
+  ) {
+    return t(
+      'videoDownloaded'
+    );
+  }
+
+  if (
+    filename.endsWith('.mp4') ||
+    filename.endsWith('.webm') ||
+    filename.endsWith('.mov') ||
+    filename.endsWith('.mkv')
+  ) {
+    return t(
+      'videoDownloaded'
+    );
+  }
+
+  return t(
+    'imageDownloaded'
+  );
+}
+
+// ─── Download helper ─────────────────────────────────────────────────────────
+
+async function downloadStreamFile(
+  token: string,
+  filename: string,
+  mediaType?:
+    | 'video'
+    | 'image'
+    | 'carousel'
+): Promise<void> {
+  const streamUrl =
+    `${STREAM_URL}/${encodeURIComponent(
+      token
+    )}`;
+
+  /*
+   * Carousel downloads are fetched as a Blob instead of relying
+   * only on <a download>. This makes the browser consume the
+   * complete server response and is safer for ZIP downloads.
+   */
+  if (
+    mediaType === 'carousel' ||
+    filename
+      .toLowerCase()
+      .endsWith('.zip')
+  ) {
+    const response =
+      await fetch(
+        streamUrl,
+        {
+          method: 'GET',
+          credentials: 'omit',
+        }
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        `Carousel download failed (${response.status})`
+      );
+    }
+
+    const blob =
+      await response.blob();
+
+    if (
+      blob.size === 0
+    ) {
+      throw new Error(
+        'The carousel ZIP is empty.'
+      );
+    }
+
+    /*
+     * ZIP files normally start with PK.
+     * If the backend accidentally sends one image instead of
+     * the ZIP, do NOT show a false success.
+     */
+    const firstBytes =
+      await blob
+        .slice(0, 4)
+        .arrayBuffer();
+
+    const bytes =
+      new Uint8Array(
+        firstBytes
+      );
+
+    const looksLikeZip =
+      bytes.length >= 2 &&
+      bytes[0] === 0x50 &&
+      bytes[1] === 0x4b;
+
+    if (!looksLikeZip) {
+      throw new Error(
+        'Carousel server returned a non-ZIP file. The carousel ZIP must be created on the server.'
+      );
+    }
+
+    const objectUrl =
+      URL.createObjectURL(
+        blob
+      );
+
+    try {
+      const a =
+        document.createElement(
+          'a'
         );
-      } catch (err) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : String(err);
 
-        req.log?.error(
-          {
-            err: msg,
-          },
-          "Fresh download retry failed",
+      a.href =
+        objectUrl;
+
+      a.download =
+        filename ||
+        'pinterest-carousel.zip';
+
+      document.body.appendChild(
+        a
+      );
+
+      a.click();
+
+      a.remove();
+    } finally {
+      setTimeout(
+        () =>
+          URL.revokeObjectURL(
+            objectUrl
+          ),
+        1000
+      );
+    }
+
+    return;
+  }
+
+  /*
+   * Non-carousel files keep the existing direct download flow.
+   */
+  const a =
+    document.createElement(
+      'a'
+    );
+
+  a.href =
+    streamUrl;
+
+  a.download =
+    filename ||
+    'pinterest-download';
+
+  a.rel =
+    'noopener';
+
+  document.body.appendChild(
+    a
+  );
+
+  a.click();
+
+  a.remove();
+}
+
+// ─── Main app ────────────────────────────────────────────────────────────────
+
+export default function App({
+  onOpenPrivacy,
+  onOpenTerms,
+  onOpenHowItWorks,
+  onSplashComplete,
+}: {
+  onOpenPrivacy: () => void;
+  onOpenTerms: () => void;
+  onOpenHowItWorks?: () => void;
+  onSplashComplete?: () => void;
+}) {
+  const serverReady =
+    useServerReady();
+
+  const season =
+    useSeason();
+
+  const { t } =
+    useLanguage();
+
+  const [showSplash, setShowSplash] =
+    useState(true);
+
+  const [url, setUrl] =
+    useState('');
+
+  const [status, setStatus] =
+    useState<
+      | 'idle'
+      | 'loading'
+      | 'success'
+      | 'error'
+    >('idle');
+
+  const [
+    progressLabel,
+    setProgressLabel,
+  ] = useState('');
+
+  const [progress, setProgress] =
+    useState(10);
+
+  const [errorMsg, setErrorMsg] =
+    useState('');
+
+  const [
+    successInfo,
+    setSuccessInfo,
+  ] = useState<{
+    mediaType?:
+      | 'video'
+      | 'image'
+      | 'carousel';
+    imageCount?: number;
+    filename?: string;
+  }>({});
+
+  const inputRef =
+    useRef<HTMLInputElement>(
+      null
+    );
+
+  /*
+   * Prevent two simultaneous download requests.
+   * This is especially important on mobile when paste events
+   * can fire very quickly.
+   */
+  const downloadInProgress =
+    useRef(false);
+
+  const resetTimerRef =
+    useRef<
+      ReturnType<typeof setTimeout> | null
+    >(null);
+
+  useEffect(() => {
+    const id =
+      setTimeout(() => {
+        setShowSplash(false);
+        onSplashComplete?.();
+      }, 1800);
+
+    return () =>
+      clearTimeout(id);
+  }, [onSplashComplete]);
+
+  useEffect(() => {
+    return () => {
+      if (
+        resetTimerRef.current
+      ) {
+        clearTimeout(
+          resetTimerRef.current
         );
+      }
+    };
+  }, []);
 
-        const {
-          status,
-          error,
-        } =
-          toUserError(msg);
+  const triggerDownload =
+    async (
+      targetUrl: string
+    ) => {
+      const cleanUrl =
+        targetUrl.trim();
 
-        res
-          .status(status)
-          .json({
-            error,
-          });
-
+      if (!cleanUrl) {
         return;
       }
+
+      /*
+       * Frontend safety check.
+       * Only Pinterest URLs are allowed to reach the API.
+       */
+      if (!isPinterestUrl(cleanUrl)) {
+        setUrl('');
+        return;
+      }
+
+      /*
+       * Never allow duplicate requests.
+       */
+      if (
+        downloadInProgress.current
+      ) {
+        return;
+      }
+
+      downloadInProgress.current =
+        true;
+
+      setStatus('loading');
+
+      setProgressLabel(
+        t('checkingMedia')
+      );
+
+      setProgress(10);
+
+      setErrorMsg('');
+
+      setSuccessInfo({});
+
+      if (
+        resetTimerRef.current
+      ) {
+        clearTimeout(
+          resetTimerRef.current
+        );
+
+        resetTimerRef.current =
+          null;
+      }
+
+      try {
+        const response =
+          await fetch(
+            GET_PIN_URL,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type':
+                  'application/json',
+              },
+              body: JSON.stringify({
+                url: cleanUrl,
+              }),
+            }
+          );
+
+        if (!response.ok) {
+          const data =
+            await response
+              .json()
+              .catch(
+                () => ({})
+              );
+
+          throw new Error(
+            data.error ||
+              t('errorGeneric')
+          );
+        }
+
+        let downloadTriggered =
+          false;
+
+        for await (
+          const event of readSSE(
+            response
+          )
+        ) {
+          if (
+            event.type ===
+            'stage'
+          ) {
+            setProgressLabel(
+              getTranslatedStage(
+                event.label,
+                t
+              )
+            );
+
+            setProgress(
+              getProgressFromStage(
+                event.label
+              )
+            );
+
+            continue;
+          }
+
+          if (
+            event.type ===
+            'error'
+          ) {
+            throw new Error(
+              event.message ||
+                t(
+                  'errorGeneric'
+                )
+            );
+          }
+
+          if (
+            event.type ===
+            'ready'
+          ) {
+            setProgressLabel(
+              t(
+                'startingDownload'
+              )
+            );
+
+            setProgress(100);
+
+            /*
+             * Store the COMPLETE metadata before download.
+             */
+            setSuccessInfo({
+              mediaType:
+                event.mediaType,
+              imageCount:
+                event.imageCount,
+              filename:
+                event.filename,
+            });
+
+            /*
+             * IMPORTANT:
+             * Carousel is downloaded as a complete ZIP blob.
+             * Other media retain direct browser download.
+             */
+            await downloadStreamFile(
+              event.token,
+              event.filename,
+              event.mediaType
+            );
+
+            trackDownload();
+
+            downloadTriggered =
+              true;
+
+            setStatus(
+              'success'
+            );
+
+            /*
+             * Keep success message visible for 3 seconds.
+             */
+            resetTimerRef.current =
+              setTimeout(() => {
+                setUrl('');
+
+                setStatus(
+                  'idle'
+                );
+
+                setProgressLabel(
+                  ''
+                );
+
+                setProgress(10);
+
+                setSuccessInfo(
+                  {}
+                );
+
+                resetTimerRef.current =
+                  null;
+              }, 3000);
+
+            /*
+             * Do not process another ready event
+             * from the same SSE stream.
+             */
+            break;
+          }
+        }
+
+        if (
+          !downloadTriggered
+        ) {
+          throw new Error(
+            t('errorGeneric')
+          );
+        }
+      } catch (err: any) {
+        setStatus('error');
+
+        setErrorMsg(
+          err?.message ||
+            t('errorGeneric')
+        );
+      } finally {
+        downloadInProgress.current =
+          false;
+      }
+    };
+
+  const handlePasteClick =
+    async () => {
+      if (
+        status === 'loading'
+      ) {
+        return;
+      }
+
+      try {
+        const text =
+          await navigator.clipboard.readText();
+
+        if (text?.trim()) {
+          const clean =
+            text.trim();
+
+          /*
+           * Telegram-style filter:
+           * non-Pinterest URLs disappear immediately.
+           */
+          if (
+            looksLikeUrl(clean) &&
+            !isPinterestUrl(clean)
+          ) {
+            setUrl('');
+            return;
+          }
+
+          /*
+           * Do not send non-URL invalid text to the API.
+           */
+          if (
+            !isPinterestUrl(clean)
+          ) {
+            setUrl('');
+            return;
+          }
+
+          setUrl(clean);
+
+          await triggerDownload(
+            clean
+          );
+        }
+      } catch (err) {
+        console.error(
+          'Failed to read clipboard',
+          err
+        );
+      }
+    };
+
+  const handleNativePaste = (
+    e: React.ClipboardEvent<HTMLInputElement>
+  ) => {
+    if (
+      status === 'loading'
+    ) {
+      return;
     }
 
-    // ========================================================
-    // FILE CHECK
-    // ========================================================
+    const pasted =
+      e.clipboardData
+        .getData('text')
+        .trim();
+
+    /*
+     * Block non-Pinterest URLs before the browser inserts them.
+     */
+    if (
+      pasted &&
+      looksLikeUrl(pasted) &&
+      !isPinterestUrl(pasted)
+    ) {
+      e.preventDefault();
+
+      setUrl('');
+
+      return;
+    }
+
+    /*
+     * Invalid pasted text should not be sent to the API.
+     */
+    if (
+      pasted &&
+      !isPinterestUrl(pasted)
+    ) {
+      e.preventDefault();
+
+      setUrl('');
+
+      return;
+    }
+
+    /*
+     * Let the browser finish inserting the valid Pinterest
+     * value first, then keep the existing auto-download flow.
+     */
+    setTimeout(() => {
+      if (
+        inputRef.current
+      ) {
+        const value =
+          inputRef.current.value.trim();
+
+        if (
+          value &&
+          isPinterestUrl(value)
+        ) {
+          setUrl(value);
+
+          triggerDownload(
+            value
+          );
+        } else if (
+          value
+        ) {
+          setUrl('');
+        }
+      }
+    }, 50);
+  };
+
+  const handleInputChange = (
+    value: string
+  ) => {
+    /*
+     * Keep normal partial typing possible.
+     * Once the user has entered a complete URL beginning with
+     * http:// or https://, immediately clear non-Pinterest URLs.
+     */
+    if (
+      value.trim() &&
+      looksLikeUrl(value) &&
+      !isPinterestUrl(value)
+    ) {
+      setUrl('');
+      return;
+    }
+
+    setUrl(value);
+  };
+
+  const handleSubmit = (
+    e: FormEvent
+  ) => {
+    e.preventDefault();
+
+    const clean =
+      url.trim();
+
+    if (!clean) {
+      return;
+    }
 
     if (
-      !fs.existsSync(
-        filePath,
-      )
+      !isPinterestUrl(clean)
     ) {
-      pendingDownloads.delete(
-        token,
-      );
-
-      res.status(404).json({
-        error:
-          "File not found. Please try again.",
-      });
-
+      setUrl('');
       return;
     }
 
-    let stat: fs.Stats;
-
-    try {
-      stat =
-        fs.statSync(
-          filePath,
-        );
-    } catch {
-      pendingDownloads.delete(
-        token,
+    if (
+      status !== 'loading'
+    ) {
+      triggerDownload(
+        clean
       );
-
-      res.status(500).json({
-        error:
-          "Failed to read download file.",
-      });
-
-      return;
     }
+  };
 
-    // ========================================================
-    // RESPONSE HEADERS
-    // ========================================================
+  // ─── Share Pin-ME ─────────────────────────────────────────────────────────
 
-    res.setHeader(
-      "Content-Type",
-      getMimeType(
-        filename,
-      ),
-    );
+  const handleShare =
+    async () => {
+      const shareUrl =
+        'https://pinme.download/';
 
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${filename}"`,
-    );
+      try {
+        if (
+          navigator.share
+        ) {
+          await navigator.share({
+            title:
+              'pinME Downloade',
+            text:
+              'Fast & simple Pinterest Downloade',
+            url: shareUrl,
+          });
 
-    res.setHeader(
-      "Content-Length",
-      stat.size,
-    );
+          return;
+        }
 
-    res.setHeader(
-      "Cache-Control",
-      "no-store",
-    );
-
-    // ========================================================
-    // FAST FILE STREAM
-    // ========================================================
-
-    const fileStream =
-      fs.createReadStream(
-        filePath,
-        {
-          highWaterMark:
-            FILE_STREAM_HIGH_WATER_MARK,
-        },
-      );
-
-    const removeFailedDownload =
-      () => {
-        pendingDownloads.delete(
-          token,
+        await navigator.clipboard.writeText(
+          shareUrl
         );
+      } catch (err: any) {
+        if (
+          err?.name ===
+          'AbortError'
+        ) {
+          return;
+        }
 
         try {
-          if (
-            fs.existsSync(
-              filePath,
-            )
-          ) {
-            fs.unlinkSync(
-              filePath,
-            );
-          }
-        } catch {
-          // best-effort
-        }
-      };
-
-    fileStream.on(
-      "error",
-      (err) => {
-        req.log?.error(
-          {
-            err,
-          },
-          "stream read error",
-        );
-
-        removeFailedDownload();
-
-        if (
-          !res.headersSent
+          await navigator.clipboard.writeText(
+            shareUrl
+          );
+        } catch (
+          clipboardErr
         ) {
-          res
-            .status(500)
-            .end();
+          console.error(
+            'Failed to share Pin-ME',
+            clipboardErr
+          );
         }
-      },
-    );
+      }
+    };
 
-    res.on(
-      "close",
-      () => {
-        if (
-          !res.writableFinished
-        ) {
-          fileStream.destroy();
-        }
-      },
-    );
+  return (
+    <>
+      {/* Splash */}
+      <AnimatePresence>
+        {showSplash && (
+          <SplashScreen />
+        )}
+      </AnimatePresence>
 
-    res.on(
-      "finish",
-      () => {
-        pendingDownloads.delete(
-          token,
-        );
+      {/* Server-waking */}
+      {!showSplash &&
+        serverReady ===
+          'checking' && (
+          <WakingScreen />
+        )}
 
-        try {
-          if (
-            fs.existsSync(
-              filePath,
-            )
-          ) {
-            fs.unlinkSync(
-              filePath,
-            );
-          }
-        } catch {
-          // best-effort
-        }
-      },
-    );
+      {/* Main UI */}
+      {!showSplash &&
+        serverReady ===
+          'ready' && (
+          <div className="relative min-h-[100dvh] w-full bg-background text-foreground flex flex-col font-sans">
+            <SeasonalBackdrop
+              season={season}
+            />
 
-    fileStream.pipe(
-      res,
-    );
-  },
-);
+            {/* Header */}
+            <header className="sticky top-0 z-50 flex flex-col items-center gap-1 p-6 bg-background">
+              <div className="flex items-center gap-2">
+                <img
+                  src="/header-logo.png"
+                  alt="pinME Logo"
+                  className="h-10 w-10 object-contain"
+                />
 
-export default router;
+                <span className="text-2xl font-bold tracking-tight">
+                  <span className="text-foreground">
+                    pin
+                  </span>
+
+                  <span className="text-primary">
+                    ME
+                  </span>
+                </span>
+              </div>
+
+              <span className="text-[10px] text-muted-foreground tracking-wider">
+                v2.1.0
+              </span>
+            </header>
+
+            {/* Main Content */}
+            <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto">
+              <div className="w-full space-y-8">
+                <div className="text-center space-y-2">
+                  <h1 className="text-2xl font-bold tracking-tight text-balance max-w-[360px] mx-auto">
+                    {t('heading')}
+                  </h1>
+
+                  <p className="text-muted-foreground text-sm max-w-[320px] mx-auto">
+                    {t('subtitle')}
+                  </p>
+                </div>
+
+                <form
+                  onSubmit={
+                    handleSubmit
+                  }
+                  className="w-full space-y-4"
+                >
+                  <div className="relative flex items-center">
+                    <input
+                      ref={inputRef}
+                      type="url"
+                      value={url}
+                      onChange={(e) =>
+                        handleInputChange(
+                          e.target.value
+                        )
+                      }
+                      onPaste={
+                        handleNativePaste
+                      }
+                      placeholder={t(
+                        'placeholder'
+                      )}
+                      className="w-full bg-input/50 border border-border rounded-xl py-4 pl-4 pr-14 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner"
+                      disabled={
+                        status ===
+                        'loading'
+                      }
+                      data-testid="input-url"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={
+                        handlePasteClick
+                      }
+                      className="absolute right-2 p-2 text-muted-foreground hover:text-foreground transition-colors"
+                      title="Paste from clipboard"
+                      disabled={
+                        status ===
+                        'loading'
+                      }
+                      data-testid="button-paste"
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        aria-hidden="true"
+                      >
+                        <rect
+                          x="5.5"
+                          y="1.5"
+                          width="12"
+                          height="12"
+                          rx="2.5"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                        />
+
+                        <rect
+                          x="1.5"
+                          y="6.5"
+                          width="12"
+                          height="12"
+                          rx="2.5"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          fill="var(--color-surface, #1e1e1e)"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <AnimatePresence mode="wait">
+                    {status ===
+                      'error' && (
+                      <motion.div
+                        initial={{
+                          opacity: 0,
+                          y: -10,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                        }}
+                        exit={{
+                          opacity: 0,
+                          y: -10,
+                        }}
+                        className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm text-center"
+                        data-testid="status-error"
+                      >
+                        {errorMsg}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="pt-2 min-h-[92px] flex justify-center items-center w-full">
+                    <AnimatePresence mode="wait">
+                      {status ===
+                      'loading' ? (
+                        <motion.div
+                          key="loading"
+                          initial={{
+                            opacity: 1,
+                          }}
+                          exit={{
+                            opacity: 0,
+                          }}
+                          className="w-full"
+                        >
+                          <ProgressLabel
+                            label={
+                              progressLabel ||
+                              t(
+                                'checkingMedia'
+                              )
+                            }
+                            progress={
+                              progress
+                            }
+                          />
+                        </motion.div>
+                      ) : status ===
+                        'success' ? (
+                        <motion.div
+                          key="success"
+                          initial={{
+                            opacity: 0,
+                            scale: 0.96,
+                          }}
+                          animate={{
+                            opacity: 1,
+                            scale: 1,
+                          }}
+                          className="w-full flex flex-col items-center"
+                          data-testid="status-success"
+                        >
+                          <div className="h-[74px] w-full flex items-center justify-center overflow-visible">
+                            <CoffeeDownloadAnimation />
+                          </div>
+
+                          <motion.div
+                            initial={{
+                              opacity: 0,
+                              y: 6,
+                            }}
+                            animate={{
+                              opacity: 1,
+                              y: 0,
+                            }}
+                            transition={{
+                              delay: 1.05,
+                              duration: 0.22,
+                            }}
+                            className="w-full py-4 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2 px-3"
+                          >
+                            <span className="text-sm sm:text-base">
+                              {getSuccessMessage(
+                                successInfo,
+                                t
+                              )}
+                            </span>
+
+                            <span className="text-lg leading-none">
+                              ✓
+                            </span>
+                          </motion.div>
+                        </motion.div>
+                      ) : (
+                        <motion.button
+                          key="download"
+                          type="submit"
+                          disabled={
+                            !url.trim() ||
+                            status ===
+                              'loading'
+                          }
+                          className={`w-full ${
+                            season ===
+                            'default'
+                              ? 'bg-primary hover:bg-primary/90 disabled:hover:bg-primary'
+                              : `seasonal-button seasonal-button-${season}`
+                          } disabled:opacity-50 text-primary-foreground py-4 rounded-xl font-semibold text-lg transition-colors shadow-[0_0_20px_rgba(230,0,35,0.2)]`}
+                          data-testid="button-submit"
+                        >
+                          {t(
+                            'downloadNow'
+                          )}
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </form>
+
+                <p className="text-center text-xs text-muted-foreground leading-relaxed px-4">
+                  {t(
+                    'infoText'
+                  )}
+                </p>
+
+                <div className="flex justify-center pt-1">
+                  <CoffeeButton />
+                </div>
+              </div>
+            </main>
+
+            {/* Footer */}
+            <footer className="relative z-10 mt-0 pb-16 text-center text-xs text-muted-foreground">
+              <div className="flex flex-col items-center gap-2">
+                {/* How It Works & FAQ */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.hash =
+                      'how-it-works';
+
+                    onOpenHowItWorks?.();
+                  }}
+                  className="hover:text-foreground transition-colors"
+                >
+                  {t(
+                    'howItWorksHomeFooter'
+                  )}
+                </button>
+
+                {/* Privacy Policy */}
+                <button
+                  type="button"
+                  onClick={
+                    onOpenPrivacy
+                  }
+                  className="hover:text-foreground transition-colors"
+                >
+                  {t(
+                    'privacyPolicy'
+                  )}
+                </button>
+
+                {/* Terms & Conditions */}
+                <button
+                  type="button"
+                  onClick={
+                    onOpenTerms
+                  }
+                  className="hover:text-foreground transition-colors"
+                >
+                  {t(
+                    'termsConditions'
+                  )}
+                </button>
+
+                {/* Share */}
+                <button
+                  type="button"
+                  onClick={
+                    handleShare
+                  }
+                  aria-label="Share Pin-ME"
+                  title="Share Pin-ME"
+                  className="text-red-500 hover:text-red-400 hover:scale-110 transition-all duration-200 text-3xl leading-none"
+                >
+                  ➦
+                </button>
+
+                {/* Copyright */}
+                <span className="text-[10px] text-muted-foreground/70">
+                  © 2026 pinME Downloade. All rights reserved.
+                </span>
+              </div>
+            </footer>
+
+            {/* Badge-blend gradient */}
+            <div
+              aria-hidden="true"
+              className="badge-blend fixed bottom-0 right-0 pointer-events-none"
+              style={{
+                width: 220,
+                height: 100,
+              }}
+            />
+          </div>
+        )}
+    </>
+  );
+}
