@@ -1,13 +1,30 @@
-import React, { useState, useEffect, useRef, FormEvent } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  FormEvent,
+} from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trackDownload } from './analytics';
 import { SeasonalBackdrop, useSeason } from './seasonal';
 import { useLanguage } from './useLanguage';
 
+// ─── API ─────────────────────────────────────────────────────────────────────
+
+const API_BASE =
+  'https://pinme-api-server.onrender.com';
+
+const GET_PIN_URL =
+  `${API_BASE}/api/get-pin`;
+
+const STREAM_URL =
+  `${API_BASE}/api/stream`;
+
 // ─── Server-ready hook ───────────────────────────────────────────────────────
 
 function useServerReady() {
-  const [ready, setReady] = useState<'checking' | 'ready'>('checking');
+  const [ready, setReady] =
+    useState<'checking' | 'ready'>('checking');
 
   useEffect(() => {
     let cancelled = false;
@@ -15,16 +32,27 @@ function useServerReady() {
 
     const check = async () => {
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 6000);
+        const controller =
+          new AbortController();
 
-        const res = await fetch('/api/healthz', {
-          signal: controller.signal,
-        });
+        const timeout = setTimeout(
+          () => controller.abort(),
+          6000
+        );
+
+        const res = await fetch(
+          '/api/healthz',
+          {
+            signal: controller.signal,
+          }
+        );
 
         clearTimeout(timeout);
 
-        if (res.ok && !cancelled) {
+        if (
+          res.ok &&
+          !cancelled
+        ) {
           setReady('ready');
           return;
         }
@@ -33,7 +61,10 @@ function useServerReady() {
       }
 
       if (!cancelled) {
-        timer = setTimeout(check, 3000);
+        timer = setTimeout(
+          check,
+          3000
+        );
       }
     };
 
@@ -64,8 +95,14 @@ function SplashScreen() {
         src="/splash-logo.png"
         alt="pinME"
         className="h-24 w-24 object-contain rounded-3xl"
-        initial={{ scale: 0.85, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
+        initial={{
+          scale: 0.85,
+          opacity: 0,
+        }}
+        animate={{
+          scale: 1,
+          opacity: 1,
+        }}
         transition={{
           duration: 0.45,
           ease: 'easeOut',
@@ -74,9 +111,18 @@ function SplashScreen() {
 
       <motion.p
         className="text-sm text-muted-foreground tracking-wide"
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.2 }}
+        initial={{
+          opacity: 0,
+          y: 6,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.4,
+          delay: 0.2,
+        }}
       >
         pinme.download
       </motion.p>
@@ -87,15 +133,24 @@ function SplashScreen() {
 // ─── Server-waking screen ────────────────────────────────────────────────────
 
 function WakingScreen() {
-  const { t } = useLanguage();
-  const [dots, setDots] = useState('');
+  const { t } =
+    useLanguage();
+
+  const [dots, setDots] =
+    useState('');
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setDots((d) => (d.length >= 3 ? '' : d + '.'));
-    }, 500);
+    const id =
+      setInterval(() => {
+        setDots((d) =>
+          d.length >= 3
+            ? ''
+            : d + '.'
+        );
+      }, 500);
 
-    return () => clearInterval(id);
+    return () =>
+      clearInterval(id);
   }, []);
 
   return (
@@ -109,7 +164,9 @@ function WakingScreen() {
       <div className="text-center space-y-2">
         <p className="text-lg font-semibold text-foreground">
           {t('serverStarting')}
-          <span className="inline-block w-6 text-left">{dots}</span>
+          <span className="inline-block w-6 text-left">
+            {dots}
+          </span>
         </p>
 
         <p className="text-sm text-muted-foreground max-w-xs">
@@ -124,14 +181,23 @@ function WakingScreen() {
 
 // ─── Animated bouncing dots ──────────────────────────────────────────────────
 
-function AnimatedStageLabel({ label }: { label: string }) {
-  const hasTrailingDots = /\.{3}$/.test(label);
+function AnimatedStageLabel({
+  label,
+}: {
+  label: string;
+}) {
+  const hasTrailingDots =
+    /\.{3}$/.test(label);
 
   if (!hasTrailingDots) {
     return <>{label}</>;
   }
 
-  const baseLabel = label.replace(/\.{3}$/, '');
+  const baseLabel =
+    label.replace(
+      /\.{3}$/,
+      ''
+    );
 
   return (
     <>
@@ -142,21 +208,30 @@ function AnimatedStageLabel({ label }: { label: string }) {
         className="inline-flex items-end ml-1"
         style={{
           gap: '2px',
-          verticalAlign: 'baseline',
+          verticalAlign:
+            'baseline',
         }}
       >
-        <span className="animate-bounce-dot">•</span>
+        <span className="animate-bounce-dot">
+          •
+        </span>
 
         <span
           className="animate-bounce-dot"
-          style={{ animationDelay: '0.15s' }}
+          style={{
+            animationDelay:
+              '0.15s',
+          }}
         >
           •
         </span>
 
         <span
           className="animate-bounce-dot"
-          style={{ animationDelay: '0.3s' }}
+          style={{
+            animationDelay:
+              '0.3s',
+          }}
         >
           •
         </span>
@@ -202,12 +277,20 @@ function ProgressLabel({
   progress: number;
 }) {
   const radius = 34;
-  const circumference = 2 * Math.PI * radius;
 
-  const clampedProgress = Math.min(100, Math.max(0, progress));
+  const circumference =
+    2 * Math.PI * radius;
+
+  const clampedProgress =
+    Math.min(
+      100,
+      Math.max(0, progress)
+    );
 
   const strokeDashoffset =
-    circumference * (1 - clampedProgress / 100);
+    circumference *
+    (1 -
+      clampedProgress / 100);
 
   const progressColor =
     clampedProgress <= 30
@@ -216,20 +299,34 @@ function ProgressLabel({
         ? '#eab308'
         : '#22c55e';
 
-  const isComplete = clampedProgress === 100;
+  const isComplete =
+    clampedProgress === 100;
 
   return (
     <div className="flex flex-col items-center gap-3 w-full">
       <AnimatePresence mode="wait">
         <motion.p
           key={label}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.2 }}
+          initial={{
+            opacity: 0,
+            y: 4,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          exit={{
+            opacity: 0,
+            y: -4,
+          }}
+          transition={{
+            duration: 0.2,
+          }}
           className="text-sm text-muted-foreground text-center"
         >
-          <AnimatedStageLabel label={label} />
+          <AnimatedStageLabel
+            label={label}
+          />
         </motion.p>
       </AnimatePresence>
 
@@ -238,12 +335,18 @@ function ProgressLabel({
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={clampedProgress}
+        aria-valuenow={
+          clampedProgress
+        }
         aria-label={`${clampedProgress}%`}
         animate={
           isComplete
             ? {
-                scale: [1, 1.06, 1],
+                scale: [
+                  1,
+                  1.06,
+                  1,
+                ],
               }
             : {
                 scale: 1,
@@ -286,9 +389,12 @@ function ProgressLabel({
             strokeWidth="5"
             strokeLinecap="round"
             transform="rotate(-90 40 40)"
-            strokeDasharray={circumference}
+            strokeDasharray={
+              circumference
+            }
             initial={{
-              strokeDashoffset: circumference,
+              strokeDashoffset:
+                circumference,
             }}
             animate={{
               strokeDashoffset,
@@ -309,12 +415,18 @@ function ProgressLabel({
               strokeWidth="5"
               strokeLinecap="round"
               transform="rotate(-90 40 40)"
-              strokeDasharray={circumference}
+              strokeDasharray={
+                circumference
+              }
               initial={{
                 opacity: 0,
               }}
               animate={{
-                opacity: [0, 0.35, 0],
+                opacity: [
+                  0,
+                  0.35,
+                  0,
+                ],
               }}
               transition={{
                 duration: 0.45,
@@ -326,12 +438,23 @@ function ProgressLabel({
 
         <motion.span
           key={clampedProgress}
-          initial={{ opacity: 0.5, scale: 0.9 }}
+          initial={{
+            opacity: 0.5,
+            scale: 0.9,
+          }}
           animate={
             isComplete
               ? {
-                  opacity: [0.5, 1, 1],
-                  scale: [0.9, 1.08, 1],
+                  opacity: [
+                    0.5,
+                    1,
+                    1,
+                  ],
+                  scale: [
+                    0.9,
+                    1.08,
+                    1,
+                  ],
                 }
               : {
                   opacity: 1,
@@ -339,7 +462,10 @@ function ProgressLabel({
                 }
           }
           transition={{
-            duration: isComplete ? 0.45 : 0.2,
+            duration:
+              isComplete
+                ? 0.45
+                : 0.2,
           }}
           className="relative z-10 text-sm font-semibold text-foreground"
         >
@@ -359,15 +485,43 @@ function CoffeeDownloadAnimation() {
       aria-hidden="true"
     >
       <motion.div
-        initial={{ y: 8, scale: 0.82, opacity: 0 }}
+        initial={{
+          y: 8,
+          scale: 0.82,
+          opacity: 0,
+        }}
         animate={{
-          y: [8, -5, 0, -2, 0],
-          scale: [0.82, 1, 1, 1.08, 3.8],
-          opacity: [0, 1, 1, 1, 0],
+          y: [
+            8,
+            -5,
+            0,
+            -2,
+            0,
+          ],
+          scale: [
+            0.82,
+            1,
+            1,
+            1.08,
+            3.8,
+          ],
+          opacity: [
+            0,
+            1,
+            1,
+            1,
+            0,
+          ],
         }}
         transition={{
           duration: 1.55,
-          times: [0, 0.18, 0.38, 0.58, 1],
+          times: [
+            0,
+            0.18,
+            0.38,
+            0.58,
+            1,
+          ],
           ease: 'easeInOut',
         }}
         className="absolute inset-0 flex items-center justify-center text-4xl leading-none origin-center"
@@ -376,42 +530,129 @@ function CoffeeDownloadAnimation() {
       </motion.div>
 
       <motion.span
-        initial={{ opacity: 0, y: 8, x: -8, scale: 0.7 }}
-        animate={{
-          opacity: [0, 0.5, 0.25, 0],
-          y: [8, 2, -5, -14],
-          x: [-8, -10, -6, -9],
-          scale: [0.7, 0.9, 1, 1.1],
+        initial={{
+          opacity: 0,
+          y: 8,
+          x: -8,
+          scale: 0.7,
         }}
-        transition={{ duration: 1.25, delay: 0.12, ease: 'easeOut' }}
+        animate={{
+          opacity: [
+            0,
+            0.5,
+            0.25,
+            0,
+          ],
+          y: [
+            8,
+            2,
+            -5,
+            -14,
+          ],
+          x: [
+            -8,
+            -10,
+            -6,
+            -9,
+          ],
+          scale: [
+            0.7,
+            0.9,
+            1,
+            1.1,
+          ],
+        }}
+        transition={{
+          duration: 1.25,
+          delay: 0.12,
+          ease: 'easeOut',
+        }}
         className="absolute left-[38px] top-[7px] text-[11px] leading-none"
       >
         ~
       </motion.span>
 
       <motion.span
-        initial={{ opacity: 0, y: 8, x: 2, scale: 0.7 }}
-        animate={{
-          opacity: [0, 0.45, 0.2, 0],
-          y: [8, 1, -7, -16],
-          x: [2, 5, 1, 4],
-          scale: [0.7, 0.9, 1, 1.15],
+        initial={{
+          opacity: 0,
+          y: 8,
+          x: 2,
+          scale: 0.7,
         }}
-        transition={{ duration: 1.35, delay: 0.28, ease: 'easeOut' }}
+        animate={{
+          opacity: [
+            0,
+            0.45,
+            0.2,
+            0,
+          ],
+          y: [
+            8,
+            1,
+            -7,
+            -16,
+          ],
+          x: [
+            2,
+            5,
+            1,
+            4,
+          ],
+          scale: [
+            0.7,
+            0.9,
+            1,
+            1.15,
+          ],
+        }}
+        transition={{
+          duration: 1.35,
+          delay: 0.28,
+          ease: 'easeOut',
+        }}
         className="absolute left-[53px] top-[4px] text-[10px] leading-none"
       >
         ~
       </motion.span>
 
       <motion.span
-        initial={{ opacity: 0, y: 7, x: 10, scale: 0.65 }}
-        animate={{
-          opacity: [0, 0.4, 0.18, 0],
-          y: [7, 0, -6, -15],
-          x: [10, 13, 9, 12],
-          scale: [0.65, 0.85, 1, 1.1],
+        initial={{
+          opacity: 0,
+          y: 7,
+          x: 10,
+          scale: 0.65,
         }}
-        transition={{ duration: 1.2, delay: 0.42, ease: 'easeOut' }}
+        animate={{
+          opacity: [
+            0,
+            0.4,
+            0.18,
+            0,
+          ],
+          y: [
+            7,
+            0,
+            -6,
+            -15,
+          ],
+          x: [
+            10,
+            13,
+            9,
+            12,
+          ],
+          scale: [
+            0.65,
+            0.85,
+            1,
+            1.1,
+          ],
+        }}
+        transition={{
+          duration: 1.2,
+          delay: 0.42,
+          ease: 'easeOut',
+        }}
         className="absolute left-[62px] top-[7px] text-[9px] leading-none"
       >
         ~
@@ -423,42 +664,78 @@ function CoffeeDownloadAnimation() {
 // ─── SSE stream parser ───────────────────────────────────────────────────────
 
 type SSEEvent =
-  | { type: 'stage'; label: string }
+  | {
+      type: 'stage';
+      label: string;
+    }
   | {
       type: 'ready';
       token: string;
       filename: string;
       title: string | null;
-      mediaType?: 'video' | 'image' | 'carousel';
+      mediaType?:
+        | 'video'
+        | 'image'
+        | 'carousel';
       imageCount?: number;
+      imageFormat?: string;
     }
-  | { type: 'error'; message: string };
+  | {
+      type: 'error';
+      message: string;
+    };
 
 async function* readSSE(
   response: Response
 ): AsyncGenerator<SSEEvent> {
-  const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
+  if (!response.body) {
+    throw new Error(
+      'Empty server response'
+    );
+  }
+
+  const reader =
+    response.body.getReader();
+
+  const decoder =
+    new TextDecoder();
+
   let buffer = '';
 
   try {
     while (true) {
-      const { done, value } =
+      const {
+        done,
+        value,
+      } =
         await reader.read();
 
       if (done) break;
 
-      buffer += decoder.decode(value, {
-        stream: true,
-      });
+      buffer += decoder.decode(
+        value,
+        {
+          stream: true,
+        }
+      );
 
-      const parts = buffer.split('\n\n');
-      buffer = parts.pop() ?? '';
+      const parts =
+        buffer.split('\n\n');
+
+      buffer =
+        parts.pop() ?? '';
 
       for (const part of parts) {
-        const line = part.trim();
+        const line =
+          part.trim();
 
-        if (!line.startsWith('data: ')) continue;
+        if (
+          !line.startsWith(
+            'data: '
+          )
+        ) {
+          continue;
+        }
 
         try {
           yield JSON.parse(
@@ -466,6 +743,25 @@ async function* readSSE(
           ) as SSEEvent;
         } catch {
           /* malformed event — skip */
+        }
+      }
+    }
+
+    if (buffer.trim()) {
+      const line =
+        buffer.trim();
+
+      if (
+        line.startsWith(
+          'data: '
+        )
+      ) {
+        try {
+          yield JSON.parse(
+            line.slice(6)
+          ) as SSEEvent;
+        } catch {
+          /* malformed final event */
         }
       }
     }
@@ -491,14 +787,20 @@ function CoffeeButton() {
 
       <span
         className="pointer-events-none absolute left-[24px] top-[0px] text-[9px] leading-none opacity-0 animate-coffee-steam"
-        style={{ animationDelay: '0.45s' }}
+        style={{
+          animationDelay:
+            '0.45s',
+        }}
       >
         ~
       </span>
 
       <span
         className="pointer-events-none absolute left-[29px] top-[3px] text-[8px] leading-none opacity-0 animate-coffee-steam"
-        style={{ animationDelay: '0.9s' }}
+        style={{
+          animationDelay:
+            '0.9s',
+        }}
       >
         ~
       </span>
@@ -549,62 +851,97 @@ function getTranslatedStage(
   label: string,
   t: (key: any) => string
 ): string {
-  const normalized = label.trim().toLowerCase();
+  const normalized =
+    label.trim().toLowerCase();
 
   switch (normalized) {
     case 'checking media type...':
       return t('checkingMedia');
 
     case 'fetching video info...':
-      return t('fetchingVideoInfo');
+      return t(
+        'fetchingVideoInfo'
+      );
 
     case 'fetching image info...':
-      return t('fetchingImageInfo');
+      return t(
+        'fetchingImageInfo'
+      );
 
     case 'fetching carousel info...':
-      return t('fetchingCarouselInfo');
+      return t(
+        'fetchingCarouselInfo'
+      );
 
     case 'fetching gif info...':
-      return t('fetchingGifInfo');
+      return t(
+        'fetchingGifInfo'
+      );
 
     case 'fetching info...':
-      return t('fetchingInfo');
+      return t(
+        'fetchingInfo'
+      );
 
     case 'downloading video...':
-      return t('downloadingVideo');
+      return t(
+        'downloadingVideo'
+      );
 
     case 'downloading image...':
-      return t('downloadingImage');
+      return t(
+        'downloadingImage'
+      );
 
     case 'downloading gif...':
-      return t('downloadingGif');
+      return t(
+        'downloadingGif'
+      );
 
     case 'downloading carousel...':
-      return t('downloadingCarousel');
+      return t(
+        'downloadingCarousel'
+      );
 
     case 'processing video...':
-      return t('processingVideo');
+      return t(
+        'processingVideo'
+      );
 
     case 'converting image to svg...':
-      return t('convertingImageSvg');
+      return t(
+        'convertingImageSvg'
+      );
 
     case 'converting image to png...':
-      return t('convertingImagePng');
+      return t(
+        'convertingImagePng'
+      );
 
     case 'converting carousel to svg...':
-      return t('convertingCarouselSvg');
+      return t(
+        'convertingCarouselSvg'
+      );
 
     case 'converting carousel to png...':
-      return t('convertingCarouselPng');
+      return t(
+        'convertingCarouselPng'
+      );
 
     case 'packaging carousel...':
-      return t('packagingCarousel');
+      return t(
+        'packagingCarousel'
+      );
 
     case 'preparing download...':
-      return t('preparingDownload');
+      return t(
+        'preparingDownload'
+      );
 
     case 'starting download...':
-      return t('startingDownload');
+      return t(
+        'startingDownload'
+      );
 
     default:
       return label;
@@ -616,7 +953,8 @@ function getTranslatedStage(
 function getProgressFromStage(
   label: string
 ): number {
-  const normalized = label.trim().toLowerCase();
+  const normalized =
+    label.trim().toLowerCase();
 
   switch (normalized) {
     case 'checking media type...':
@@ -658,56 +996,71 @@ function getProgressFromStage(
 
 function getSuccessMessage(
   successInfo: {
-    mediaType?: 'video' | 'image' | 'carousel';
+    mediaType?:
+      | 'video'
+      | 'image'
+      | 'carousel';
     imageCount?: number;
     filename?: string;
   },
   t: (key: any) => string
 ): string {
   const filename =
-    successInfo.filename?.toLowerCase() ?? '';
+    successInfo.filename
+      ?.toLowerCase() ?? '';
 
-  // GIF is returned by the backend as mediaType: "image".
-  // We identify it from the actual downloaded filename.
   const isGif =
-    successInfo.mediaType === 'image' &&
     filename.endsWith('.gif');
+
+  const isZip =
+    filename.endsWith('.zip');
+
+  if (
+    successInfo.mediaType ===
+      'carousel' ||
+    isZip
+  ) {
+    const count =
+      successInfo.imageCount &&
+      successInfo.imageCount > 0
+        ? ` (${successInfo.imageCount} ${t(
+            'imagesCount'
+          )})`
+        : '';
+
+    return `${t(
+      'carouselDownloaded'
+    )}${count} • ZIP`;
+  }
+
+  if (
+    successInfo.mediaType ===
+      'image' &&
+    isGif
+  ) {
+    return 'GIF downloaded';
+  }
 
   if (isGif) {
     return 'GIF downloaded';
   }
 
-  if (successInfo.mediaType === 'carousel') {
-    const count =
-      successInfo.imageCount &&
-      successInfo.imageCount > 0
-        ? ` (${successInfo.imageCount} ${t('imagesCount')})`
-        : '';
-
-    return `${t('carouselDownloaded')}${count} • ZIP`;
-  }
-
-  if (successInfo.mediaType === 'image') {
-    return t('imageDownloaded');
-  }
-
-  if (successInfo.mediaType === 'video') {
-    return t('videoDownloaded');
-  }
-
-  // Safe fallback for older backend responses.
-  if (filename.endsWith('.gif')) {
-    return 'GIF downloaded';
+  if (
+    successInfo.mediaType ===
+    'image'
+  ) {
+    return t(
+      'imageDownloaded'
+    );
   }
 
   if (
-    filename.endsWith('.zip')
+    successInfo.mediaType ===
+    'video'
   ) {
-    return successInfo.imageCount
-      ? `${t('carouselDownloaded')} (${successInfo.imageCount} ${t(
-          'imagesCount'
-        )}) • ZIP`
-      : 'Carousel downloaded • ZIP';
+    return t(
+      'videoDownloaded'
+    );
   }
 
   if (
@@ -716,10 +1069,157 @@ function getSuccessMessage(
     filename.endsWith('.mov') ||
     filename.endsWith('.mkv')
   ) {
-    return t('videoDownloaded');
+    return t(
+      'videoDownloaded'
+    );
   }
 
-  return t('imageDownloaded');
+  return t(
+    'imageDownloaded'
+  );
+}
+
+// ─── Download helper ─────────────────────────────────────────────────────────
+
+async function downloadStreamFile(
+  token: string,
+  filename: string,
+  mediaType?: 
+    | 'video'
+    | 'image'
+    | 'carousel'
+): Promise<void> {
+  const streamUrl =
+    `${STREAM_URL}/${encodeURIComponent(
+      token
+    )}`;
+
+  /*
+   * Carousel downloads are fetched as a Blob instead of relying
+   * only on <a download>. This makes the browser consume the
+   * complete server response and is safer for ZIP downloads.
+   */
+  if (
+    mediaType === 'carousel' ||
+    filename
+      .toLowerCase()
+      .endsWith('.zip')
+  ) {
+    const response =
+      await fetch(
+        streamUrl,
+        {
+          method: 'GET',
+          credentials: 'omit',
+        }
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        `Carousel download failed (${response.status})`
+      );
+    }
+
+    const blob =
+      await response.blob();
+
+    if (
+      blob.size === 0
+    ) {
+      throw new Error(
+        'The carousel ZIP is empty.'
+      );
+    }
+
+    /*
+     * ZIP files normally start with PK.
+     * If the backend accidentally sends one image instead of
+     * the ZIP, do NOT show a false success.
+     */
+    const firstBytes =
+      await blob
+        .slice(0, 4)
+        .arrayBuffer();
+
+    const bytes =
+      new Uint8Array(
+        firstBytes
+      );
+
+    const looksLikeZip =
+      bytes.length >= 2 &&
+      bytes[0] === 0x50 &&
+      bytes[1] === 0x4b;
+
+    if (!looksLikeZip) {
+      throw new Error(
+        'Carousel server returned a non-ZIP file. The carousel ZIP must be created on the server.'
+      );
+    }
+
+    const objectUrl =
+      URL.createObjectURL(
+        blob
+      );
+
+    try {
+      const a =
+        document.createElement(
+          'a'
+        );
+
+      a.href =
+        objectUrl;
+
+      a.download =
+        filename ||
+        'pinterest-carousel.zip';
+
+      document.body.appendChild(
+        a
+      );
+
+      a.click();
+
+      a.remove();
+    } finally {
+      setTimeout(
+        () =>
+          URL.revokeObjectURL(
+            objectUrl
+          ),
+        1000
+      );
+    }
+
+    return;
+  }
+
+  /*
+   * Non-carousel files keep the existing direct download flow.
+   */
+  const a =
+    document.createElement(
+      'a'
+    );
+
+  a.href =
+    streamUrl;
+
+  a.download =
+    filename ||
+    'pinterest-download';
+
+  a.rel =
+    'noopener';
+
+  document.body.appendChild(
+    a
+  );
+
+  a.click();
+
+  a.remove();
 }
 
 // ─── Main app ────────────────────────────────────────────────────────────────
@@ -735,87 +1235,116 @@ export default function App({
   onOpenHowItWorks?: () => void;
   onSplashComplete?: () => void;
 }) {
-  const serverReady = useServerReady();
-  const season = useSeason();
-  const { t } = useLanguage();
+  const serverReady =
+    useServerReady();
 
-  const [showSplash, setShowSplash] = useState(true);
-  const [url, setUrl] = useState('');
-  const [status, setStatus] = useState<
-    'idle' | 'loading' | 'success' | 'error'
-  >('idle');
-  const [progressLabel, setProgressLabel] = useState('');
-  const [progress, setProgress] = useState(10);
-  const [errorMsg, setErrorMsg] = useState('');
+  const season =
+    useSeason();
 
-  const [successInfo, setSuccessInfo] = useState<{
-    mediaType?: 'video' | 'image' | 'carousel';
+  const { t } =
+    useLanguage();
+
+  const [showSplash, setShowSplash] =
+    useState(true);
+
+  const [url, setUrl] =
+    useState('');
+
+  const [status, setStatus] =
+    useState<
+      | 'idle'
+      | 'loading'
+      | 'success'
+      | 'error'
+    >('idle');
+
+  const [
+    progressLabel,
+    setProgressLabel,
+  ] = useState('');
+
+  const [progress, setProgress] =
+    useState(10);
+
+  const [errorMsg, setErrorMsg] =
+    useState('');
+
+  const [
+    successInfo,
+    setSuccessInfo,
+  ] = useState<{
+    mediaType?:
+      | 'video'
+      | 'image'
+      | 'carousel';
     imageCount?: number;
     filename?: string;
   }>({});
 
   const inputRef =
-    useRef<HTMLInputElement>(null);
+    useRef<HTMLInputElement>(
+      null
+    );
+
+  /*
+   * Prevent two simultaneous download requests.
+   * This is especially important on mobile when paste events
+   * can fire very quickly.
+   */
+  const downloadInProgress =
+    useRef(false);
+
+  const resetTimerRef =
+    useRef<
+      ReturnType<typeof setTimeout> | null
+    >(null);
 
   useEffect(() => {
-    const id = setTimeout(() => {
-      setShowSplash(false);
-      onSplashComplete?.();
-    }, 1800);
+    const id =
+      setTimeout(() => {
+        setShowSplash(false);
+        onSplashComplete?.();
+      }, 1800);
 
-    return () => clearTimeout(id);
+    return () =>
+      clearTimeout(id);
   }, [onSplashComplete]);
 
-  const handlePasteClick =
-    async () => {
-      try {
-        const text =
-          await navigator.clipboard.readText();
-
-        if (text) {
-          setUrl(text);
-          triggerDownload(text);
-        }
-      } catch (err) {
-        console.error(
-          'Failed to read clipboard',
-          err
+  useEffect(() => {
+    return () => {
+      if (
+        resetTimerRef.current
+      ) {
+        clearTimeout(
+          resetTimerRef.current
         );
       }
     };
-
-  const handleNativePaste = (
-    _e: React.ClipboardEvent<HTMLInputElement>
-  ) => {
-    setTimeout(() => {
-      if (inputRef.current) {
-        const value =
-          inputRef.current.value.trim();
-
-        if (value) {
-          setUrl(value);
-          triggerDownload(value);
-        }
-      }
-    }, 50);
-  };
-
-  const handleSubmit = (
-    e: FormEvent
-  ) => {
-    e.preventDefault();
-
-    if (url.trim()) {
-      triggerDownload(
-        url.trim()
-      );
-    }
-  };
+  }, []);
 
   const triggerDownload =
     async (
       targetUrl: string
     ) => {
+      const cleanUrl =
+        targetUrl.trim();
+
+      if (!cleanUrl) {
+        return;
+      }
+
+      /*
+       * Never allow duplicate requests.
+       */
+      if (
+        downloadInProgress.current
+      ) {
+        return;
+      }
+
+      downloadInProgress.current =
+        true;
+
       setStatus('loading');
 
       setProgressLabel(
@@ -828,10 +1357,21 @@ export default function App({
 
       setSuccessInfo({});
 
+      if (
+        resetTimerRef.current
+      ) {
+        clearTimeout(
+          resetTimerRef.current
+        );
+
+        resetTimerRef.current =
+          null;
+      }
+
       try {
         const response =
           await fetch(
-            'https://pinme-api-server.onrender.com/api/get-pin',
+            GET_PIN_URL,
             {
               method: 'POST',
               headers: {
@@ -839,7 +1379,7 @@ export default function App({
                   'application/json',
               },
               body: JSON.stringify({
-                url: targetUrl,
+                url: cleanUrl,
               }),
             }
           );
@@ -882,7 +1422,23 @@ export default function App({
                 event.label
               )
             );
-          } else if (
+
+            continue;
+          }
+
+          if (
+            event.type ===
+            'error'
+          ) {
+            throw new Error(
+              event.message ||
+                t(
+                  'errorGeneric'
+                )
+            );
+          }
+
+          if (
             event.type ===
             'ready'
           ) {
@@ -894,8 +1450,9 @@ export default function App({
 
             setProgress(100);
 
-            // Save the actual media information BEFORE
-            // triggering the browser download.
+            /*
+             * Store the COMPLETE metadata before download.
+             */
             setSuccessInfo({
               mediaType:
                 event.mediaType,
@@ -905,26 +1462,15 @@ export default function App({
                 event.filename,
             });
 
-            const a =
-              document.createElement(
-                'a'
-              );
-
-            a.href =
-              `https://pinme-api-server.onrender.com/api/stream/${event.token}`;
-
-            a.download =
-              event.filename ||
-              'pinterest-download';
-
-            document.body.appendChild(
-              a
-            );
-
-            a.click();
-
-            document.body.removeChild(
-              a
+            /*
+             * IMPORTANT:
+             * Carousel is downloaded as a complete ZIP blob.
+             * Other media retain direct browser download.
+             */
+            await downloadStreamFile(
+              event.token,
+              event.filename,
+              event.mediaType
             );
 
             trackDownload();
@@ -936,8 +1482,11 @@ export default function App({
               'success'
             );
 
-            setTimeout(
-              () => {
+            /*
+             * Keep success message visible for 3 seconds.
+             */
+            resetTimerRef.current =
+              setTimeout(() => {
                 setUrl('');
 
                 setStatus(
@@ -953,19 +1502,16 @@ export default function App({
                 setSuccessInfo(
                   {}
                 );
-              },
-              3000
-            );
-          } else if (
-            event.type ===
-            'error'
-          ) {
-            throw new Error(
-              event.message ||
-                t(
-                  'errorGeneric'
-                )
-            );
+
+                resetTimerRef.current =
+                  null;
+              }, 3000);
+
+            /*
+             * Do not process another ready event
+             * from the same SSE stream.
+             */
+            break;
           }
         }
 
@@ -980,11 +1526,88 @@ export default function App({
         setStatus('error');
 
         setErrorMsg(
-          err.message ||
+          err?.message ||
             t('errorGeneric')
+        );
+      } finally {
+        downloadInProgress.current =
+          false;
+      }
+    };
+
+  const handlePasteClick =
+    async () => {
+      if (
+        status === 'loading'
+      ) {
+        return;
+      }
+
+      try {
+        const text =
+          await navigator.clipboard.readText();
+
+        if (text?.trim()) {
+          const clean =
+            text.trim();
+
+          setUrl(clean);
+
+          await triggerDownload(
+            clean
+          );
+        }
+      } catch (err) {
+        console.error(
+          'Failed to read clipboard',
+          err
         );
       }
     };
+
+  const handleNativePaste = (
+    _e: React.ClipboardEvent<HTMLInputElement>
+  ) => {
+    if (
+      status === 'loading'
+    ) {
+      return;
+    }
+
+    /*
+     * Let the browser finish inserting the pasted value first.
+     */
+    setTimeout(() => {
+      if (
+        inputRef.current
+      ) {
+        const value =
+          inputRef.current.value.trim();
+
+        if (value) {
+          setUrl(value);
+          triggerDownload(
+            value
+          );
+        }
+      }
+    }, 50);
+  };
+
+  const handleSubmit = (
+    e: FormEvent
+  ) => {
+    e.preventDefault();
+
+    if (
+      url.trim() &&
+      status !== 'loading'
+    ) {
+      triggerDownload(
+        url.trim()
+      );
+    }
+  };
 
   // ─── Share Pin-ME ─────────────────────────────────────────────────────────
 
@@ -1072,6 +1695,7 @@ export default function App({
                   <span className="text-foreground">
                     pin
                   </span>
+
                   <span className="text-primary">
                     ME
                   </span>
@@ -1272,7 +1896,9 @@ export default function App({
                           key="download"
                           type="submit"
                           disabled={
-                            !url.trim()
+                            !url.trim() ||
+                            status ===
+                              'loading'
                           }
                           className={`w-full ${
                             season ===
@@ -1292,7 +1918,9 @@ export default function App({
                 </form>
 
                 <p className="text-center text-xs text-muted-foreground leading-relaxed px-4">
-                  {t('infoText')}
+                  {t(
+                    'infoText'
+                  )}
                 </p>
 
                 <div className="flex justify-center pt-1">
