@@ -29,7 +29,7 @@ function ToastContainer({
   return (
     <div
       className="fixed left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 pointer-events-none w-full px-5"
-      style={{ top: '108px' }}
+      style={{ top: '130px' }}
       aria-live="polite"
       aria-atomic="true"
     >
@@ -85,7 +85,7 @@ function ToastContainer({
                 ease: [0.16, 1, 0.3, 1],
               }}
               onClick={() => onDismiss(toast.id)}
-              className="pointer-events-auto relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer backdrop-blur-2xl"
+              className="pointer-events-auto relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer backdrop-blur-2xl max-w-[90vw]"
               style={{
                 background: 'rgba(28, 28, 30, 0.72)',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -138,7 +138,7 @@ function ToastContainer({
                   duration: 0.35,
                   ease: 'easeOut',
                 }}
-                className="flex-1 text-sm text-white/95 font-medium tracking-tight pr-1"
+                className="flex-1 text-sm text-white/95 font-medium tracking-tight pr-1 leading-snug"
               >
                 {toast.message}
               </motion.span>
@@ -1609,19 +1609,23 @@ export default function App({
             event.imageCount
           );
 
-          // 🔔 Premium in-app success toast
-          showToast(
-            getSuccessMessage(
-              {
-                mediaType: event.mediaType,
-                imageCount: event.imageCount,
-                filename: event.filename,
-              },
-              t
-            ),
-            'success',
-            4000
-          );
+          // 🔔 Toast ONLY for carousel (ZIP extract hint)
+          const isCarousel =
+            event.mediaType === 'carousel' ||
+            event.filename
+              ?.toLowerCase()
+              .endsWith('.zip');
+
+          if (isCarousel) {
+            const count = event.imageCount;
+
+            const message =
+              count && count > 0
+                ? `📦 Carousel ZIP (${count} images) • Extract to view`
+                : `📦 Carousel ZIP • Extract to view`;
+
+            showToast(message, 'info', 5000);
+          }
 
           trackDownload();
 
@@ -1777,7 +1781,7 @@ export default function App({
           <div className="relative min-h-[100dvh] w-full bg-background text-foreground flex flex-col font-sans">
             <SeasonalBackdrop season={season} />
 
-            {/* 🔔 Premium toast container — v2.1.0-ന്റെ താഴെ */}
+            {/* 🔔 Carousel toast container */}
             <ToastContainer
               toasts={toasts}
               onDismiss={dismissToast}
