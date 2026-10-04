@@ -105,6 +105,48 @@ function isAllowedOrigin(
 }
 
 // ============================================================
+// TELEGRAM NOTIFICATION
+// ============================================================
+
+async function sendTelegramNotification(
+  message: string,
+): Promise<void> {
+  const botToken =
+    process.env.TELEGRAM_BOT_TOKEN;
+
+  const chatId =
+    process.env.TELEGRAM_CHAT_ID;
+
+  if (!botToken || !chatId) {
+    return;
+  }
+
+  try {
+    const url =
+      `https://api.telegram.org/bot${botToken}/sendMessage`;
+
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      }),
+    });
+  } catch (err) {
+    console.error(
+      "Telegram notification failed:",
+      err,
+    );
+  }
+}
+
+// ============================================================
 // IMAGE FORMAT
 // ============================================================
 
@@ -2464,12 +2506,6 @@ router.post(
         "Blocked bot request (silent)",
       );
 
-      /*
-       * Silent disguise:
-       * - 200 OK
-       * - soft "server busy" message
-       * - bots can't tell they were blocked
-       */
       res.status(200).json({
         error:
           "Server is busy. Please try again later.",
@@ -2739,6 +2775,16 @@ router.post(
         imageFormat:
           selectedImageFormat,
       });
+
+      // ─── Telegram notification (async, non-blocking) ────
+      sendTelegramNotification(
+        `🎉 <b>New Download</b>\n\n` +
+        `📁 <b>Type:</b> ${mediaType}\n` +
+        `📄 <b>File:</b> <code>${filename}</code>\n` +
+        `${meta.title ? `📝 <b>Title:</b> ${meta.title}\n` : ""}` +
+        `${imageCount ? `🖼️ <b>Images:</b> ${imageCount}\n` : ""}` +
+        `🔗 <b>URL:</b> ${trimmed}`
+      );
     } catch (err) {
       const msg =
         err instanceof Error
