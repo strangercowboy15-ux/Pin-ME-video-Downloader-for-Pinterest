@@ -30,6 +30,81 @@ const FILE_STREAM_HIGH_WATER_MARK =
 const IMAGE_CONVERT_CONCURRENCY = 5;
 
 // ============================================================
+// BOT PROTECTION
+// ============================================================
+
+const ALLOWED_ORIGINS = [
+  'https://pinme.download',
+  'https://www.pinme.download',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+const BOT_USER_AGENT_PATTERNS = [
+  /bot/i,
+  /crawl/i,
+  /spider/i,
+  /scrape/i,
+  /curl/i,
+  /wget/i,
+  /python-requests/i,
+  /python-urllib/i,
+  /axios\/\d/i,
+  /node-fetch/i,
+  /go-http-client/i,
+  /java\/\d/i,
+  /okhttp/i,
+  /headless/i,
+  /phantom/i,
+  /puppeteer/i,
+  /playwright/i,
+  /selenium/i,
+  /facebookexternalhit/i,
+  /whatsapp/i,
+  /telegrambot/i,
+  /discordbot/i,
+  /slackbot/i,
+  /twitterbot/i,
+  /linkedinbot/i,
+  /ahrefsbot/i,
+  /semrushbot/i,
+  /mj12bot/i,
+  /dotbot/i,
+  /petalbot/i,
+  /bytespider/i,
+];
+
+function isBotRequest(
+  userAgent: string | undefined,
+): boolean {
+  if (!userAgent || !userAgent.trim()) {
+    return true;
+  }
+
+  for (const pattern of BOT_USER_AGENT_PATTERNS) {
+    if (pattern.test(userAgent)) {
+      return true;
+    }
+  }
+
+  if (!/mozilla/i.test(userAgent)) {
+    return true;
+  }
+
+  return false;
+}
+
+function isAllowedOrigin(
+  origin: string | undefined,
+): boolean {
+  if (!origin) {
+    return true;
+  }
+
+  return ALLOWED_ORIGINS.includes(origin);
+}
+
+// ============================================================
 // IMAGE FORMAT
 // ============================================================
 
@@ -1330,7 +1405,7 @@ function getImageMimeType(
 }
 
 // ============================================================
-// PNG CONVERSION (SAFE — never same file)
+// PNG CONVERSION (SPEED MODE)
 // ============================================================
 
 async function convertImageToPng(
@@ -1341,7 +1416,6 @@ async function convertImageToPng(
       inputPath,
     ).toLowerCase();
 
-  // Already PNG — nothing to convert.
   if (inputExt === ".png") {
     return inputPath;
   }
@@ -1361,7 +1435,6 @@ async function convertImageToPng(
       ).toString("hex")}.png`,
     );
 
-  // Safety net.
   if (
     path.resolve(inputPath) ===
     path.resolve(outputPath)
@@ -1369,13 +1442,6 @@ async function convertImageToPng(
     return inputPath;
   }
 
-  /*
-   * SPEED MODE:
-   * compressionLevel 3 + adaptiveFiltering false
-   * is 3-5x faster than level 6 + adaptive,
-   * while still producing lossless PNG.
-   * File size is slightly larger (~10-20%).
-   */
   await sharp(
     inputPath,
     {
@@ -1517,7 +1583,6 @@ async function convertImage(
       inputPath,
     ).toLowerCase();
 
-  // GIF must remain GIF.
   if (
     ext === ".gif"
   ) {
@@ -2376,6 +2441,47 @@ router.post(
     req,
     res,
   ) => {
+    // ========================================================
+    // BOT PROTECTION
+    // ========================================================
+
+    const userAgent =
+      req.headers[
+        "user-agent"
+      ] as string | undefined;
+
+    const origin =
+      req.headers[
+        "origin"
+      ] as string | undefined;
+
+    if (
+      isBotRequest(userAgent) ||
+      !isAllowedOrigin(origin)
+    ) {
+      req.log?.warn(
+        { userAgent, origin },
+        "Blocked bot request (silent)",
+      );
+
+      /*
+       * Silent disguise:
+       * - 200 OK
+       * - soft "server busy" message
+       * - bots can't tell they were blocked
+       */
+      res.status(200).json({
+        error:
+          "Server is busy. Please try again later.",
+      });
+
+      return;
+    }
+
+    // ========================================================
+    // EXISTING CODE
+    // ========================================================
+
     const {
       url,
       imageFormat,
