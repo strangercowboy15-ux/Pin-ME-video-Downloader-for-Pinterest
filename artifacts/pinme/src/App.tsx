@@ -28,8 +28,8 @@ function ToastContainer({
 }) {
   return (
     <div
-      className="fixed left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 pointer-events-none w-full px-5"
-      style={{ top: '130px' }}
+      className="fixed left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-1.5 pointer-events-none"
+      style={{ top: '100px' }}
       aria-live="polite"
       aria-atomic="true"
     >
@@ -38,24 +38,18 @@ function ToastContainer({
           const config = {
             success: {
               icon: '✓',
-              glow: 'rgba(34, 197, 94, 0.35)',
-              ring: 'rgba(34, 197, 94, 0.6)',
-              iconBg:
-                'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+              color: '#22c55e',
+              ring: 'rgba(34, 197, 94, 0.5)',
             },
             error: {
               icon: '✕',
-              glow: 'rgba(239, 68, 68, 0.35)',
-              ring: 'rgba(239, 68, 68, 0.6)',
-              iconBg:
-                'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              color: '#ef4444',
+              ring: 'rgba(239, 68, 68, 0.5)',
             },
             info: {
               icon: 'i',
-              glow: 'rgba(59, 130, 246, 0.35)',
-              ring: 'rgba(59, 130, 246, 0.6)',
-              iconBg:
-                'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              color: '#3b82f6',
+              ring: 'rgba(59, 130, 246, 0.5)',
             },
           }[toast.type];
 
@@ -64,9 +58,9 @@ function ToastContainer({
               key={toast.id}
               initial={{
                 opacity: 0,
-                y: -16,
-                scale: 0.88,
-                filter: 'blur(8px)',
+                y: -10,
+                scale: 0.9,
+                filter: 'blur(6px)',
               }}
               animate={{
                 opacity: 1,
@@ -76,20 +70,20 @@ function ToastContainer({
               }}
               exit={{
                 opacity: 0,
-                y: -16,
-                scale: 0.88,
-                filter: 'blur(8px)',
+                y: -10,
+                scale: 0.9,
+                filter: 'blur(6px)',
               }}
               transition={{
-                duration: 0.4,
+                duration: 0.35,
                 ease: [0.16, 1, 0.3, 1],
               }}
               onClick={() => onDismiss(toast.id)}
-              className="pointer-events-auto relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer backdrop-blur-2xl max-w-[90vw]"
+              className="pointer-events-auto relative overflow-hidden flex items-center gap-2 px-3 py-1.5 rounded-full cursor-pointer backdrop-blur-xl"
               style={{
-                background: 'rgba(28, 28, 30, 0.72)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                boxShadow: `0 8px 32px rgba(0, 0, 0, 0.5), 0 0 24px ${config.glow}, inset 0 1px 0 rgba(255, 255, 255, 0.06)`,
+                background: 'rgba(28, 28, 30, 0.85)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: `0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px ${config.ring}`,
               }}
               role="status"
             >
@@ -100,48 +94,39 @@ function ToastContainer({
                 initial={{ x: '-120%' }}
                 animate={{ x: '220%' }}
                 transition={{
-                  duration: 1.1,
-                  delay: 0.3,
+                  duration: 0.9,
+                  delay: 0.25,
                   ease: 'easeInOut',
                 }}
                 style={{
                   background:
-                    'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%)',
+                    'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%)',
                   width: '60%',
                 }}
               />
 
-              {/* Icon circle with gradient */}
-              <motion.div
+              {/* Tiny icon */}
+              <motion.span
                 initial={{ scale: 0, rotate: -180 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{
-                  delay: 0.12,
-                  duration: 0.5,
+                  delay: 0.08,
+                  duration: 0.4,
                   ease: [0.16, 1, 0.3, 1],
                 }}
-                className="relative flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold"
+                className="relative flex-shrink-0 text-xs font-bold leading-none"
                 style={{
-                  background: config.iconBg,
-                  boxShadow: `0 0 12px ${config.ring}`,
+                  color: config.color,
+                  textShadow: `0 0 8px ${config.ring}`,
                 }}
               >
                 {config.icon}
-              </motion.div>
-
-              {/* Message */}
-              <motion.span
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{
-                  delay: 0.18,
-                  duration: 0.35,
-                  ease: 'easeOut',
-                }}
-                className="flex-1 text-sm text-white/95 font-medium tracking-tight pr-1 leading-snug"
-              >
-                {toast.message}
               </motion.span>
+
+              {/* Compact message */}
+              <span className="text-[11px] text-white/90 font-medium tracking-tight whitespace-nowrap">
+                {toast.message}
+              </span>
             </motion.div>
           );
         })}
@@ -1609,7 +1594,7 @@ export default function App({
             event.imageCount
           );
 
-          // 🔔 Toast ONLY for carousel (ZIP extract hint)
+          // 🔔 Toast ONLY for carousel
           const isCarousel =
             event.mediaType === 'carousel' ||
             event.filename
@@ -1617,14 +1602,11 @@ export default function App({
               .endsWith('.zip');
 
           if (isCarousel) {
-            const count = event.imageCount;
-
-            const message =
-              count && count > 0
-                ? `📦 Carousel ZIP (${count} images) • Extract to view`
-                : `📦 Carousel ZIP • Extract to view`;
-
-            showToast(message, 'info', 5000);
+            showToast(
+              'Zip is ready, go to extract',
+              'info',
+              5000
+            );
           }
 
           trackDownload();
