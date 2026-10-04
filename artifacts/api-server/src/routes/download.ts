@@ -951,6 +951,86 @@ function runYtDlp(
 }
 
 // ============================================================
+// PINTEREST HTML CAROUSEL DETECTION (NEW)
+// ============================================================
+
+/**
+ * Fetch a Pinterest pin page and extract all unique pinimg.com
+ * "originals" image URLs. Used to detect multi-image (carousel)
+ * pins that yt-dlp / gallery-dl may under-report.
+ *
+ * Safe: never throws, always returns an array (possibly empty).
+ */
+async function fetchPinterestCarouselImages(
+  pinUrl: string,
+): Promise<string[]> {
+  try {
+    const response = await fetch(pinUrl, {
+      method: "GET",
+      redirect: "follow",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept":
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const html = await response.text();
+
+    const seenIds = new Set<string>();
+    const urls: string[] = [];
+
+    // Match originals/ URLs (highest quality)
+    const originalsRegex =
+      /https:\/\/i\.pinimg\.com\/originals\/([a-f0-9]+)\/[^"'\s\\<>]+\.(?:jpg|jpeg|png|webp)/gi;
+
+    for (const m of html.matchAll(originalsRegex)) {
+      const fullUrl = m[0];
+      const pinId = m[1];
+
+      if (!seenIds.has(pinId)) {
+        seenIds.add(pinId);
+        urls.push(fullUrl);
+      }
+    }
+
+    // Fallback: 736x / 564x (medium quality) if originals not found
+    if (urls.length < 2) {
+      const mediumRegex =
+        /https:\/\/i\.pinimg\.com\/(?:736x|564x|474x)\/([a-f0-9]+)\/[^"'\s\\<>]+\.(?:jpg|jpeg|png|webp)/gi;
+
+      for (const m of html.matchAll(mediumRegex)) {
+        const fullUrl = m[0];
+        const pinId = m[1];
+
+        if (!seenIds.has(pinId)) {
+          seenIds.add(pinId);
+          urls.push(fullUrl);
+        }
+      }
+    }
+
+    return urls;
+  } catch (err) {
+    // Silent fail — never crash the request
+    console.error(
+      "fetchPinterestCarouselImages failed:",
+      err instanceof Error
+        ? err.message
+        : String(err),
+    );
+
+    return [];
+  }
+}
+
+// ============================================================
 // PIN META
 // ============================================================
 
@@ -962,6 +1042,7 @@ interface PinMeta {
   isGif?: boolean;
   isCarousel?: boolean;
   imageUrl?: string | null;
+  carouselImages?: string[];
 }
 
 function isImageLikeEntry(
@@ -1327,6 +1408,34 @@ async function getPinMeta(
       hasVideo: false,
       isCarousel: true,
     };
+  }
+
+  // ─── NEW: HTML-based carousel detection ───
+  // If yt-dlp reports a single image but the pin page actually
+  // contains multiple pinimg "originals" URLs, treat it as a carousel.
+  if (
+    !hasVideoFormats &&
+    (isImage || isGif || ext === "")
+  ) {
+    try {
+      const carouselImages =
+        await fetchPinterestCarouselImages(url);
+
+      if (carouselImages.length > 1) {
+        return {
+          id:
+            (info.id as string) ||
+            randomBytes(4).toString("hex"),
+          title:
+            (info.title as string) || null,
+          hasVideo: false,
+          isCarousel: true,
+          carouselImages,
+        };
+      }
+    } catch {
+      // Silent fallback to normal image handling
+    }
   }
 
   if (
@@ -1962,6 +2071,225 @@ async function downloadImageOrCarousel(
   );
 }
 
+// ============================================================
+// CAROUSEL VIA HTML (NEW)
+// ============================================================
+
+/**
+ * Download a carousel from a list of image URLs.
+ * Used when yt-dlp / gallery-dl under-report carousel images.
+ * Safe: throws on failure, but caller wraps in try/catch.
+ */
+async function downloadCarouselFromUrls(
+  imageUrls: string[],
+  pinId: string,
+  onStage?: (label: string) => void,
+  imageFormat: ImageFormat = "png",
+): Promise<{
+  filePath: string;
+  mediaType: "carousel";
+  imageCount: number;
+}> {
+  const outputDir =
+    `/tmp/pinme-img-${pinId}`;
+
+  fs.mkdirSync(outputDir, {
+    recursive: true,
+  });
+
+  onStage?.("Downloading carousel...");
+
+  const downloadedPaths: string[] = [];
+
+  // Download in parallel batches
+  const batchSize = IMAGE_CONVERT_CONCURRENCY;
+
+  for (
+    let i = 0;
+    i < imageUrls.length;
+    i += batchSize
+  ) {
+    const batch = imageUrls.slice(
+      i,
+      i + batchSize,
+    );
+
+    const batchResults = await Promise.all(
+      batch.map(async (imgUrl, idx) => {
+        const globalIdx = i + idx;
+
+        try {
+          const response = await fetch(imgUrl, {
+            redirect: "follow",
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Referer":
+                "https://www.pinterest.com/",
+            },
+          });
+
+          if (!response.ok) {
+            console.error(
+              `Carousel image ${globalIdx + 1} fetch failed: ${response.status}`,
+            );
+            return null;
+          }
+
+          const contentType = (
+            response.headers.get(
+              "content-type",
+            ) || ""
+          ).toLowerCase();
+
+          let ext = "jpg";
+
+          if (
+            contentType.includes("image/png")
+          ) {
+            ext = "png";
+          } else if (
+            contentType.includes(
+              "image/webp",
+            )
+          ) {
+            ext = "webp";
+          } else if (
+            contentType.includes("image/gif")
+          ) {
+            ext = "gif";
+          }
+
+          const buffer = Buffer.from(
+            await response.arrayBuffer(),
+          );
+
+          if (buffer.length < 100) {
+            return null;
+          }
+
+          const filePath = path.join(
+            outputDir,
+            `raw-${String(
+              globalIdx + 1,
+            ).padStart(3, "0")}.${ext}`,
+          );
+
+          fs.writeFileSync(filePath, buffer);
+
+          return filePath;
+        } catch (err) {
+          console.error(
+            `Carousel image ${globalIdx + 1} failed:`,
+            err,
+          );
+          return null;
+        }
+      }),
+    );
+
+    for (const p of batchResults) {
+      if (p) downloadedPaths.push(p);
+    }
+  }
+
+  if (downloadedPaths.length === 0) {
+    throw new Error(
+      "NO_FILE: no carousel images downloaded",
+    );
+  }
+
+  // Convert each (except gif) to selected format
+  onStage?.(
+    imageFormat === "svg"
+      ? "Converting carousel to SVG..."
+      : "Converting carousel to PNG...",
+  );
+
+  const convertedImages: string[] = [];
+
+  for (const imgPath of downloadedPaths) {
+    const ext = path
+      .extname(imgPath)
+      .toLowerCase();
+
+    if (ext === ".gif") {
+      convertedImages.push(imgPath);
+      continue;
+    }
+
+    try {
+      const converted = await convertImage(
+        imgPath,
+        imageFormat,
+      );
+      convertedImages.push(converted);
+    } catch {
+      convertedImages.push(imgPath);
+    }
+  }
+
+  // ─── Single image fallback ───
+  if (convertedImages.length === 1) {
+    return {
+      filePath: convertedImages[0],
+      mediaType: "carousel", // keep carousel type so toast fires
+      imageCount: 1,
+    };
+  }
+
+  // ─── Create ZIP ───
+  onStage?.("Packaging carousel...");
+
+  const sorted = convertedImages.sort(
+    (a, b) =>
+      a.localeCompare(b, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+  );
+
+  const zipPath = path.join(
+    outputDir,
+    `pinme-carousel-${pinId}.zip`,
+  );
+
+  await new Promise<void>(
+    (resolve, reject) => {
+      const output =
+        fs.createWriteStream(zipPath);
+
+      const archive = archiver("zip", {
+        store: true,
+      });
+
+      output.on("close", () => resolve());
+      output.on("error", (err) => reject(err));
+      archive.on("error", (err) => reject(err));
+
+      archive.pipe(output);
+
+      sorted.forEach((imgPath, index) => {
+        const ext = path.extname(imgPath);
+
+        archive.file(imgPath, {
+          name: `image-${String(
+            index + 1,
+          ).padStart(2, "0")}${ext}`,
+        });
+      });
+
+      archive.finalize();
+    },
+  );
+
+  return {
+    filePath: zipPath,
+    mediaType: "carousel",
+    imageCount: sorted.length,
+  };
+}
+
 async function downloadVideo(
   url: string,
   pinId: string,
@@ -2270,7 +2598,28 @@ router.post(
         | "carousel";
       let imageCount: number | undefined;
 
-      if (meta.isImage || meta.isCarousel) {
+      // ─── NEW: Prefer HTML-detected carousel images ───
+      if (
+        meta.isCarousel &&
+        Array.isArray(meta.carouselImages) &&
+        meta.carouselImages.length > 1
+      ) {
+        const result =
+          await downloadCarouselFromUrls(
+            meta.carouselImages,
+            meta.id,
+            (label) =>
+              send({ type: "stage", label }),
+            selectedImageFormat,
+          );
+
+        filePath = result.filePath;
+        mediaType = result.mediaType;
+        imageCount = result.imageCount;
+      } else if (
+        meta.isImage ||
+        meta.isCarousel
+      ) {
         const result =
           await downloadImageOrCarousel(
             trimmed,
