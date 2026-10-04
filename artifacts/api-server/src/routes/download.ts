@@ -945,7 +945,7 @@ function runYtDlp(
 }
 
 // ============================================================
-// PINTEREST HTML CAROUSEL DETECTION (NEW)
+// PINTEREST HTML CAROUSEL DETECTION
 // ============================================================
 
 async function fetchPinterestCarouselImages(
@@ -1898,8 +1898,6 @@ async function downloadImageOrCarousel(
       "--no-part",
       "--user-agent",
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "--referer",
-      "https://www.pinterest.com/",
       url,
     ]);
   } catch (err) {
