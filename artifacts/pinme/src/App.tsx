@@ -49,6 +49,114 @@ function isPinterestUrl(rawUrl: string): boolean {
   }
 }
 
+// ─── Notification helper ─────────────────────────────────────────────────────
+
+async function requestNotificationPermission() {
+  try {
+    if (
+      !('Notification' in window)
+    ) {
+      return false;
+    }
+
+    if (
+      Notification.permission ===
+      'granted'
+    ) {
+      return true;
+    }
+
+    if (
+      Notification.permission !==
+      'denied'
+    ) {
+      const permission =
+        await Notification.requestPermission();
+
+      return (
+        permission === 'granted'
+      );
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function showDownloadNotification(
+  mediaType:
+    | 'video'
+    | 'image'
+    | 'carousel'
+    | undefined,
+  imageCount?: number,
+) {
+  try {
+    if (
+      !('Notification' in window)
+    ) {
+      return;
+    }
+
+    if (
+      Notification.permission !==
+      'granted'
+    ) {
+      return;
+    }
+
+    let title = '📥 pinME Downloader';
+    let body = 'Download complete ✓';
+
+    if (mediaType === 'carousel') {
+      body =
+        imageCount && imageCount > 0
+          ? `📦 Carousel ZIP downloaded (${imageCount} images) ✓`
+          : '📦 Carousel ZIP downloaded ✓';
+    } else if (mediaType === 'image') {
+      body = '🖼️ Image downloaded ✓';
+    } else if (mediaType === 'video') {
+      body = '🎬 Video downloaded ✓';
+    }
+
+    const notification =
+      new Notification(title, {
+        body,
+        icon: '/splash-logo.png',
+        badge: '/splash-logo.png',
+        tag: 'pinme-download',
+        requireInteraction: false,
+        silent: false,
+      });
+
+    /*
+     * Auto-close after 5 seconds.
+     */
+    setTimeout(() => {
+      try {
+        notification.close();
+      } catch {
+        /* ignore */
+      }
+    }, 5000);
+
+    /*
+     * Tap → focus the app.
+     */
+    notification.onclick = () => {
+      try {
+        window.focus();
+        notification.close();
+      } catch {
+        /* ignore */
+      }
+    };
+  } catch {
+    /* Notification not supported — silent fallback */
+  }
+}
+
 // ─── Sound effect for invalid link ───────────────────────────────────────────
 
 function playInvalidSound() {
@@ -455,11 +563,6 @@ function ProgressLabel({
               }
         }
       >
-        {/*
-         * Inner glow pulse — center-only.
-         * Red → Yellow → Green based on progress.
-         * Stays INSIDE the ring.
-         */}
         <motion.div
           aria-hidden="true"
           className="absolute rounded-full"
@@ -488,10 +591,6 @@ function ProgressLabel({
           }}
         />
 
-        {/*
-         * Stronger inner flash — quick double-pulse
-         * also stays INSIDE the ring.
-         */}
         <motion.div
           aria-hidden="true"
           className="absolute rounded-full"
@@ -520,7 +619,6 @@ function ProgressLabel({
           }}
         />
 
-        {/* Progress ring */}
         <svg
           width="80"
           height="80"
@@ -594,7 +692,6 @@ function ProgressLabel({
           )}
         </svg>
 
-        {/* Percentage text (on top) */}
         <motion.span
           key={clampedProgress}
           initial={{
@@ -635,7 +732,7 @@ function ProgressLabel({
   );
 }
 
-// ─── NEW coffee success animation (hearts + sparkles) ──────────────────────
+// ─── Coffee success animation (hearts + sparkles) ──────────────────────────
 
 function CoffeeDownloadAnimation() {
   return (
@@ -643,7 +740,6 @@ function CoffeeDownloadAnimation() {
       className="relative w-[140px] h-[100px] mx-auto pointer-events-none overflow-visible flex items-center justify-center"
       aria-hidden="true"
     >
-      {/* Coffee cup with 3D-like appearance */}
       <motion.div
         initial={{
           y: 20,
@@ -667,7 +763,6 @@ function CoffeeDownloadAnimation() {
         ☕
       </motion.div>
 
-      {/* Heart-shaped steam 1 (left) */}
       <motion.div
         initial={{
           opacity: 0,
@@ -692,7 +787,6 @@ function CoffeeDownloadAnimation() {
         ❤️
       </motion.div>
 
-      {/* Heart-shaped steam 2 (center) */}
       <motion.div
         initial={{
           opacity: 0,
@@ -717,7 +811,6 @@ function CoffeeDownloadAnimation() {
         ❤️
       </motion.div>
 
-      {/* Heart-shaped steam 3 (right) */}
       <motion.div
         initial={{
           opacity: 0,
@@ -742,7 +835,6 @@ function CoffeeDownloadAnimation() {
         ❤️
       </motion.div>
 
-      {/* Sparkles around the cup */}
       <motion.div
         initial={{
           opacity: 0,
@@ -1425,6 +1517,22 @@ export default function App({
       clearTimeout(id);
   }, [onSplashComplete]);
 
+  /*
+   * Request notification permission once on load
+   * (only after splash screen so it doesn't feel aggressive).
+   */
+  useEffect(() => {
+    if (showSplash) {
+      return;
+    }
+
+    const id = setTimeout(() => {
+      requestNotificationPermission();
+    }, 2500);
+
+    return () => clearTimeout(id);
+  }, [showSplash]);
+
   useEffect(() => {
     return () => {
       if (
@@ -1624,6 +1732,14 @@ export default function App({
             );
 
             setProgress(100);
+
+            /*
+             * Show custom browser notification.
+             */
+            showDownloadNotification(
+              event.mediaType,
+              event.imageCount
+            );
 
             trackDownload();
 
