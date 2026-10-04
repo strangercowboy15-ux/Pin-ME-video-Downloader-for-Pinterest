@@ -28,56 +28,120 @@ function ToastContainer({
 }) {
   return (
     <div
-      className="fixed left-1/2 -translate-x-1/2 z-40 flex flex-col gap-2 w-[90%] max-w-md pointer-events-none px-2"
-      style={{ top: '100px' }}
+      className="fixed left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 pointer-events-none w-full px-5"
+      style={{ top: '108px' }}
       aria-live="polite"
       aria-atomic="true"
     >
-      <AnimatePresence>
+      <AnimatePresence mode="popLayout">
         {toasts.map((toast) => {
-          const icons = {
-            success: '✓',
-            error: '!',
-            info: 'i',
-          };
-
-          const accentColors = {
-            success:
-              'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
-            error:
-              'text-red-400 bg-red-400/10 border-red-400/20',
-            info:
-              'text-blue-400 bg-blue-400/10 border-blue-400/20',
-          };
+          const config = {
+            success: {
+              icon: '✓',
+              glow: 'rgba(34, 197, 94, 0.35)',
+              ring: 'rgba(34, 197, 94, 0.6)',
+              iconBg:
+                'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+            },
+            error: {
+              icon: '✕',
+              glow: 'rgba(239, 68, 68, 0.35)',
+              ring: 'rgba(239, 68, 68, 0.6)',
+              iconBg:
+                'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+            },
+            info: {
+              icon: 'i',
+              glow: 'rgba(59, 130, 246, 0.35)',
+              ring: 'rgba(59, 130, 246, 0.6)',
+              iconBg:
+                'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+            },
+          }[toast.type];
 
           return (
             <motion.div
               key={toast.id}
-              initial={{ opacity: 0, y: -12, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -12, scale: 0.96 }}
+              initial={{
+                opacity: 0,
+                y: -16,
+                scale: 0.88,
+                filter: 'blur(8px)',
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                scale: 1,
+                filter: 'blur(0px)',
+              }}
+              exit={{
+                opacity: 0,
+                y: -16,
+                scale: 0.88,
+                filter: 'blur(8px)',
+              }}
               transition={{
-                duration: 0.28,
+                duration: 0.4,
                 ease: [0.16, 1, 0.3, 1],
               }}
               onClick={() => onDismiss(toast.id)}
-              className="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer backdrop-blur-xl border shadow-xl"
+              className="pointer-events-auto relative overflow-hidden flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer backdrop-blur-2xl"
               style={{
-                background: 'rgba(20, 20, 20, 0.75)',
-                borderColor: 'rgba(255, 255, 255, 0.08)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                background: 'rgba(28, 28, 30, 0.72)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                boxShadow: `0 8px 32px rgba(0, 0, 0, 0.5), 0 0 24px ${config.glow}, inset 0 1px 0 rgba(255, 255, 255, 0.06)`,
               }}
               role="status"
             >
-              <div
-                className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${accentColors[toast.type]}`}
-              >
-                {icons[toast.type]}
-              </div>
+              {/* Shine sweep */}
+              <motion.div
+                aria-hidden="true"
+                className="absolute inset-0 pointer-events-none"
+                initial={{ x: '-120%' }}
+                animate={{ x: '220%' }}
+                transition={{
+                  duration: 1.1,
+                  delay: 0.3,
+                  ease: 'easeInOut',
+                }}
+                style={{
+                  background:
+                    'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%)',
+                  width: '60%',
+                }}
+              />
 
-              <span className="flex-1 text-sm text-foreground/90 leading-snug">
+              {/* Icon circle with gradient */}
+              <motion.div
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{
+                  delay: 0.12,
+                  duration: 0.5,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+                className="relative flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold"
+                style={{
+                  background: config.iconBg,
+                  boxShadow: `0 0 12px ${config.ring}`,
+                }}
+              >
+                {config.icon}
+              </motion.div>
+
+              {/* Message */}
+              <motion.span
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{
+                  delay: 0.18,
+                  duration: 0.35,
+                  ease: 'easeOut',
+                }}
+                className="flex-1 text-sm text-white/95 font-medium tracking-tight pr-1"
+              >
                 {toast.message}
-              </span>
+              </motion.span>
             </motion.div>
           );
         })}
@@ -1545,7 +1609,7 @@ export default function App({
             event.imageCount
           );
 
-          // 🔔 In-app success toast (NEW)
+          // 🔔 Premium in-app success toast
           showToast(
             getSuccessMessage(
               {
@@ -1713,7 +1777,7 @@ export default function App({
           <div className="relative min-h-[100dvh] w-full bg-background text-foreground flex flex-col font-sans">
             <SeasonalBackdrop season={season} />
 
-            {/* 🔔 Toast container — v2.1.0-ന്റെ താഴെ */}
+            {/* 🔔 Premium toast container — v2.1.0-ന്റെ താഴെ */}
             <ToastContainer
               toasts={toasts}
               onDismiss={dismissToast}
