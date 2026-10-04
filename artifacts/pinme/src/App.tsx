@@ -9,6 +9,83 @@ import { trackDownload } from './analytics';
 import { SeasonalBackdrop, useSeason } from './seasonal';
 import { useLanguage } from './useLanguage';
 
+// ─── Toast types + component ─────────────────────────────────────────────────
+
+type ToastType = 'success' | 'error' | 'info';
+
+interface ToastItem {
+  id: number;
+  message: string;
+  type: ToastType;
+}
+
+function ToastContainer({
+  toasts,
+  onDismiss,
+}: {
+  toasts: ToastItem[];
+  onDismiss: (id: number) => void;
+}) {
+  return (
+    <div
+      className="fixed left-1/2 -translate-x-1/2 z-40 flex flex-col gap-2 w-[90%] max-w-md pointer-events-none px-2"
+      style={{ top: '100px' }}
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <AnimatePresence>
+        {toasts.map((toast) => {
+          const icons = {
+            success: '✓',
+            error: '!',
+            info: 'i',
+          };
+
+          const accentColors = {
+            success:
+              'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
+            error:
+              'text-red-400 bg-red-400/10 border-red-400/20',
+            info:
+              'text-blue-400 bg-blue-400/10 border-blue-400/20',
+          };
+
+          return (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: -12, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -12, scale: 0.96 }}
+              transition={{
+                duration: 0.28,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+              onClick={() => onDismiss(toast.id)}
+              className="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer backdrop-blur-xl border shadow-xl"
+              style={{
+                background: 'rgba(20, 20, 20, 0.75)',
+                borderColor: 'rgba(255, 255, 255, 0.08)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+              }}
+              role="status"
+            >
+              <div
+                className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${accentColors[toast.type]}`}
+              >
+                {icons[toast.type]}
+              </div>
+
+              <span className="flex-1 text-sm text-foreground/90 leading-snug">
+                {toast.message}
+              </span>
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ─── API ─────────────────────────────────────────────────────────────────────
 
 const API_BASE =
@@ -53,29 +130,19 @@ function isPinterestUrl(rawUrl: string): boolean {
 
 async function requestNotificationPermission() {
   try {
-    if (
-      !('Notification' in window)
-    ) {
+    if (!('Notification' in window)) {
       return false;
     }
 
-    if (
-      Notification.permission ===
-      'granted'
-    ) {
+    if (Notification.permission === 'granted') {
       return true;
     }
 
-    if (
-      Notification.permission !==
-      'denied'
-    ) {
+    if (Notification.permission !== 'denied') {
       const permission =
         await Notification.requestPermission();
 
-      return (
-        permission === 'granted'
-      );
+      return permission === 'granted';
     }
 
     return false;
@@ -93,16 +160,11 @@ function showDownloadNotification(
   imageCount?: number,
 ) {
   try {
-    if (
-      !('Notification' in window)
-    ) {
+    if (!('Notification' in window)) {
       return;
     }
 
-    if (
-      Notification.permission !==
-      'granted'
-    ) {
+    if (Notification.permission !== 'granted') {
       return;
     }
 
@@ -130,9 +192,6 @@ function showDownloadNotification(
         silent: false,
       });
 
-    /*
-     * Auto-close after 5 seconds.
-     */
     setTimeout(() => {
       try {
         notification.close();
@@ -141,9 +200,6 @@ function showDownloadNotification(
       }
     }, 5000);
 
-    /*
-     * Tap → focus the app.
-     */
     notification.onclick = () => {
       try {
         window.focus();
@@ -249,10 +305,7 @@ function useServerReady() {
 
         clearTimeout(timeout);
 
-        if (
-          res.ok &&
-          !cancelled
-        ) {
+        if (res.ok && !cancelled) {
           setReady('ready');
           return;
         }
@@ -261,10 +314,7 @@ function useServerReady() {
       }
 
       if (!cancelled) {
-        timer = setTimeout(
-          check,
-          3000
-        );
+        timer = setTimeout(check, 3000);
       }
     };
 
@@ -333,24 +383,19 @@ function SplashScreen() {
 // ─── Server-waking screen ────────────────────────────────────────────────────
 
 function WakingScreen() {
-  const { t } =
-    useLanguage();
+  const { t } = useLanguage();
 
   const [dots, setDots] =
     useState('');
 
   useEffect(() => {
-    const id =
-      setInterval(() => {
-        setDots((d) =>
-          d.length >= 3
-            ? ''
-            : d + '.'
-        );
-      }, 500);
+    const id = setInterval(() => {
+      setDots((d) =>
+        d.length >= 3 ? '' : d + '.'
+      );
+    }, 500);
 
-    return () =>
-      clearInterval(id);
+    return () => clearInterval(id);
   }, []);
 
   return (
@@ -386,18 +431,13 @@ function AnimatedStageLabel({
 }: {
   label: string;
 }) {
-  const hasTrailingDots =
-    /\.{3}$/.test(label);
+  const hasTrailingDots = /\.{3}$/.test(label);
 
   if (!hasTrailingDots) {
     return <>{label}</>;
   }
 
-  const baseLabel =
-    label.replace(
-      /\.{3}$/,
-      ''
-    );
+  const baseLabel = label.replace(/\.{3}$/, '');
 
   return (
     <>
@@ -408,8 +448,7 @@ function AnimatedStageLabel({
         className="inline-flex items-end ml-1"
         style={{
           gap: '2px',
-          verticalAlign:
-            'baseline',
+          verticalAlign: 'baseline',
         }}
       >
         <span className="animate-bounce-dot">
@@ -418,32 +457,23 @@ function AnimatedStageLabel({
 
         <span
           className="animate-bounce-dot"
-          style={{
-            animationDelay:
-              '0.15s',
-          }}
+          style={{ animationDelay: '0.15s' }}
         >
           •
         </span>
 
         <span
           className="animate-bounce-dot"
-          style={{
-            animationDelay:
-              '0.3s',
-          }}
+          style={{ animationDelay: '0.3s' }}
         >
           •
         </span>
 
         <style>{`
           @keyframes bounceDot {
-            0%,
-            60%,
-            100% {
+            0%, 60%, 100% {
               transform: translateY(0);
             }
-
             30% {
               transform: translateY(-4px);
             }
@@ -477,20 +507,16 @@ function ProgressLabel({
   progress: number;
 }) {
   const radius = 34;
+  const circumference = 2 * Math.PI * radius;
 
-  const circumference =
-    2 * Math.PI * radius;
-
-  const clampedProgress =
-    Math.min(
-      100,
-      Math.max(0, progress)
-    );
+  const clampedProgress = Math.min(
+    100,
+    Math.max(0, progress)
+  );
 
   const strokeDashoffset =
     circumference *
-    (1 -
-      clampedProgress / 100);
+    (1 - clampedProgress / 100);
 
   const progressColor =
     clampedProgress <= 30
@@ -499,8 +525,7 @@ function ProgressLabel({
         ? '#eab308'
         : '#22c55e';
 
-  const isComplete =
-    clampedProgress === 100;
+  const isComplete = clampedProgress === 100;
 
   return (
     <div className="flex flex-col items-center gap-3 w-full">
@@ -519,14 +544,10 @@ function ProgressLabel({
             opacity: 0,
             y: -4,
           }}
-          transition={{
-            duration: 0.2,
-          }}
+          transition={{ duration: 0.2 }}
           className="text-sm text-muted-foreground text-center"
         >
-          <AnimatedStageLabel
-            label={label}
-          />
+          <AnimatedStageLabel label={label} />
         </motion.p>
       </AnimatePresence>
 
@@ -535,22 +556,12 @@ function ProgressLabel({
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={
-          clampedProgress
-        }
+        aria-valuenow={clampedProgress}
         aria-label={`${clampedProgress}%`}
         animate={
           isComplete
-            ? {
-                scale: [
-                  1,
-                  1.06,
-                  1,
-                ],
-              }
-            : {
-                scale: 1,
-              }
+            ? { scale: [1, 1.06, 1] }
+            : { scale: 1 }
         }
         transition={
           isComplete
@@ -558,9 +569,7 @@ function ProgressLabel({
                 duration: 0.45,
                 ease: 'easeOut',
               }
-            : {
-                duration: 0.2,
-              }
+            : { duration: 0.2 }
         }
       >
         <motion.div
@@ -573,16 +582,8 @@ function ProgressLabel({
             filter: 'blur(4px)',
           }}
           animate={{
-            scale: [
-              0.7,
-              1.1,
-              0.7,
-            ],
-            opacity: [
-              0.35,
-              0.85,
-              0.35,
-            ],
+            scale: [0.7, 1.1, 0.7],
+            opacity: [0.35, 0.85, 0.35],
           }}
           transition={{
             duration: 1.6,
@@ -601,16 +602,8 @@ function ProgressLabel({
             filter: 'blur(3px)',
           }}
           animate={{
-            scale: [
-              0.5,
-              1.3,
-              0.5,
-            ],
-            opacity: [
-              0,
-              0.9,
-              0,
-            ],
+            scale: [0.5, 1.3, 0.5],
+            opacity: [0, 0.9, 0],
           }}
           transition={{
             duration: 1.2,
@@ -645,16 +638,11 @@ function ProgressLabel({
             strokeWidth="5"
             strokeLinecap="round"
             transform="rotate(-90 40 40)"
-            strokeDasharray={
-              circumference
-            }
+            strokeDasharray={circumference}
             initial={{
-              strokeDashoffset:
-                circumference,
+              strokeDashoffset: circumference,
             }}
-            animate={{
-              strokeDashoffset,
-            }}
+            animate={{ strokeDashoffset }}
             transition={{
               duration: 0.45,
               ease: 'easeOut',
@@ -671,18 +659,10 @@ function ProgressLabel({
               strokeWidth="5"
               strokeLinecap="round"
               transform="rotate(-90 40 40)"
-              strokeDasharray={
-                circumference
-              }
-              initial={{
-                opacity: 0,
-              }}
+              strokeDasharray={circumference}
+              initial={{ opacity: 0 }}
               animate={{
-                opacity: [
-                  0,
-                  0.35,
-                  0,
-                ],
+                opacity: [0, 0.35, 0],
               }}
               transition={{
                 duration: 0.45,
@@ -701,16 +681,8 @@ function ProgressLabel({
           animate={
             isComplete
               ? {
-                  opacity: [
-                    0.5,
-                    1,
-                    1,
-                  ],
-                  scale: [
-                    0.9,
-                    1.08,
-                    1,
-                  ],
+                  opacity: [0.5, 1, 1],
+                  scale: [0.9, 1.08, 1],
                 }
               : {
                   opacity: 1,
@@ -718,10 +690,7 @@ function ProgressLabel({
                 }
           }
           transition={{
-            duration:
-              isComplete
-                ? 0.45
-                : 0.2,
+            duration: isComplete ? 0.45 : 0.2,
           }}
           className="relative z-10 text-sm font-semibold text-foreground"
         >
@@ -904,51 +873,35 @@ async function* readSSE(
   response: Response
 ): AsyncGenerator<SSEEvent> {
   if (!response.body) {
-    throw new Error(
-      'Empty server response'
-    );
+    throw new Error('Empty server response');
   }
 
   const reader =
     response.body.getReader();
 
-  const decoder =
-    new TextDecoder();
+  const decoder = new TextDecoder();
 
   let buffer = '';
 
   try {
     while (true) {
-      const {
-        done,
-        value,
-      } =
+      const { done, value } =
         await reader.read();
 
       if (done) break;
 
-      buffer += decoder.decode(
-        value,
-        {
-          stream: true,
-        }
-      );
+      buffer += decoder.decode(value, {
+        stream: true,
+      });
 
-      const parts =
-        buffer.split('\n\n');
+      const parts = buffer.split('\n\n');
 
-      buffer =
-        parts.pop() ?? '';
+      buffer = parts.pop() ?? '';
 
       for (const part of parts) {
-        const line =
-          part.trim();
+        const line = part.trim();
 
-        if (
-          !line.startsWith(
-            'data: '
-          )
-        ) {
+        if (!line.startsWith('data: ')) {
           continue;
         }
 
@@ -963,14 +916,9 @@ async function* readSSE(
     }
 
     if (buffer.trim()) {
-      const line =
-        buffer.trim();
+      const line = buffer.trim();
 
-      if (
-        line.startsWith(
-          'data: '
-        )
-      ) {
+      if (line.startsWith('data: ')) {
         try {
           yield JSON.parse(
             line.slice(6)
@@ -1002,20 +950,14 @@ function CoffeeButton() {
 
       <span
         className="pointer-events-none absolute left-[24px] top-[0px] text-[9px] leading-none opacity-0 animate-coffee-steam"
-        style={{
-          animationDelay:
-            '0.45s',
-        }}
+        style={{ animationDelay: '0.45s' }}
       >
         ~
       </span>
 
       <span
         className="pointer-events-none absolute left-[29px] top-[3px] text-[8px] leading-none opacity-0 animate-coffee-steam"
-        style={{
-          animationDelay:
-            '0.9s',
-        }}
+        style={{ animationDelay: '0.9s' }}
       >
         ~
       </span>
@@ -1030,15 +972,12 @@ function CoffeeButton() {
             opacity: 0;
             transform: translateY(5px);
           }
-
           25% {
             opacity: 0.45;
           }
-
           70% {
             opacity: 0.2;
           }
-
           100% {
             opacity: 0;
             transform: translateY(-9px);
@@ -1074,89 +1013,55 @@ function getTranslatedStage(
       return t('checkingMedia');
 
     case 'fetching video info...':
-      return t(
-        'fetchingVideoInfo'
-      );
+      return t('fetchingVideoInfo');
 
     case 'fetching image info...':
-      return t(
-        'fetchingImageInfo'
-      );
+      return t('fetchingImageInfo');
 
     case 'fetching carousel info...':
-      return t(
-        'fetchingCarouselInfo'
-      );
+      return t('fetchingCarouselInfo');
 
     case 'fetching gif info...':
-      return t(
-        'fetchingGifInfo'
-      );
+      return t('fetchingGifInfo');
 
     case 'fetching info...':
-      return t(
-        'fetchingInfo'
-      );
+      return t('fetchingInfo');
 
     case 'downloading video...':
-      return t(
-        'downloadingVideo'
-      );
+      return t('downloadingVideo');
 
     case 'downloading image...':
-      return t(
-        'downloadingImage'
-      );
+      return t('downloadingImage');
 
     case 'downloading gif...':
-      return t(
-        'downloadingGif'
-      );
+      return t('downloadingGif');
 
     case 'downloading carousel...':
-      return t(
-        'downloadingCarousel'
-      );
+      return t('downloadingCarousel');
 
     case 'processing video...':
-      return t(
-        'processingVideo'
-      );
+      return t('processingVideo');
 
     case 'converting image to svg...':
-      return t(
-        'convertingImageSvg'
-      );
+      return t('convertingImageSvg');
 
     case 'converting image to png...':
-      return t(
-        'convertingImagePng'
-      );
+      return t('convertingImagePng');
 
     case 'converting carousel to svg...':
-      return t(
-        'convertingCarouselSvg'
-      );
+      return t('convertingCarouselSvg');
 
     case 'converting carousel to png...':
-      return t(
-        'convertingCarouselPng'
-      );
+      return t('convertingCarouselPng');
 
     case 'packaging carousel...':
-      return t(
-        'packagingCarousel'
-      );
+      return t('packagingCarousel');
 
     case 'preparing download...':
-      return t(
-        'preparingDownload'
-      );
+      return t('preparingDownload');
 
     case 'starting download...':
-      return t(
-        'startingDownload'
-      );
+      return t('startingDownload');
 
     default:
       return label;
@@ -1221,18 +1126,13 @@ function getSuccessMessage(
   t: (key: any) => string
 ): string {
   const filename =
-    successInfo.filename
-      ?.toLowerCase() ?? '';
+    successInfo.filename?.toLowerCase() ?? '';
 
-  const isGif =
-    filename.endsWith('.gif');
-
-  const isZip =
-    filename.endsWith('.zip');
+  const isGif = filename.endsWith('.gif');
+  const isZip = filename.endsWith('.zip');
 
   if (
-    successInfo.mediaType ===
-      'carousel' ||
+    successInfo.mediaType === 'carousel' ||
     isZip
   ) {
     const count =
@@ -1249,8 +1149,7 @@ function getSuccessMessage(
   }
 
   if (
-    successInfo.mediaType ===
-      'image' &&
+    successInfo.mediaType === 'image' &&
     isGif
   ) {
     return 'GIF downloaded';
@@ -1260,22 +1159,12 @@ function getSuccessMessage(
     return 'GIF downloaded';
   }
 
-  if (
-    successInfo.mediaType ===
-    'image'
-  ) {
-    return t(
-      'imageDownloaded'
-    );
+  if (successInfo.mediaType === 'image') {
+    return t('imageDownloaded');
   }
 
-  if (
-    successInfo.mediaType ===
-    'video'
-  ) {
-    return t(
-      'videoDownloaded'
-    );
+  if (successInfo.mediaType === 'video') {
+    return t('videoDownloaded');
   }
 
   if (
@@ -1284,14 +1173,10 @@ function getSuccessMessage(
     filename.endsWith('.mov') ||
     filename.endsWith('.mkv')
   ) {
-    return t(
-      'videoDownloaded'
-    );
+    return t('videoDownloaded');
   }
 
-  return t(
-    'imageDownloaded'
-  );
+  return t('imageDownloaded');
 }
 
 // ─── Download helper ─────────────────────────────────────────────────────────
@@ -1299,7 +1184,7 @@ function getSuccessMessage(
 async function downloadStreamFile(
   token: string,
   filename: string,
-  mediaType?: 
+  mediaType?:
     | 'video'
     | 'image'
     | 'carousel'
@@ -1311,18 +1196,12 @@ async function downloadStreamFile(
 
   if (
     mediaType === 'carousel' ||
-    filename
-      .toLowerCase()
-      .endsWith('.zip')
+    filename.toLowerCase().endsWith('.zip')
   ) {
-    const response =
-      await fetch(
-        streamUrl,
-        {
-          method: 'GET',
-          credentials: 'omit',
-        }
-      );
+    const response = await fetch(streamUrl, {
+      method: 'GET',
+      credentials: 'omit',
+    });
 
     if (!response.ok) {
       throw new Error(
@@ -1330,26 +1209,19 @@ async function downloadStreamFile(
       );
     }
 
-    const blob =
-      await response.blob();
+    const blob = await response.blob();
 
-    if (
-      blob.size === 0
-    ) {
+    if (blob.size === 0) {
       throw new Error(
         'The carousel ZIP is empty.'
       );
     }
 
-    const firstBytes =
-      await blob
-        .slice(0, 4)
-        .arrayBuffer();
+    const firstBytes = await blob
+      .slice(0, 4)
+      .arrayBuffer();
 
-    const bytes =
-      new Uint8Array(
-        firstBytes
-      );
+    const bytes = new Uint8Array(firstBytes);
 
     const looksLikeZip =
       bytes.length >= 2 &&
@@ -1363,36 +1235,24 @@ async function downloadStreamFile(
     }
 
     const objectUrl =
-      URL.createObjectURL(
-        blob
-      );
+      URL.createObjectURL(blob);
 
     try {
       const a =
-        document.createElement(
-          'a'
-        );
+        document.createElement('a');
 
-      a.href =
-        objectUrl;
+      a.href = objectUrl;
 
       a.download =
         filename ||
         'pinterest-carousel.zip';
 
-      document.body.appendChild(
-        a
-      );
-
+      document.body.appendChild(a);
       a.click();
-
       a.remove();
     } finally {
       setTimeout(
-        () =>
-          URL.revokeObjectURL(
-            objectUrl
-          ),
+        () => URL.revokeObjectURL(objectUrl),
         1000
       );
     }
@@ -1401,26 +1261,17 @@ async function downloadStreamFile(
   }
 
   const a =
-    document.createElement(
-      'a'
-    );
+    document.createElement('a');
 
-  a.href =
-    streamUrl;
+  a.href = streamUrl;
 
   a.download =
-    filename ||
-    'pinterest-download';
+    filename || 'pinterest-download';
 
-  a.rel =
-    'noopener';
+  a.rel = 'noopener';
 
-  document.body.appendChild(
-    a
-  );
-
+  document.body.appendChild(a);
   a.click();
-
   a.remove();
 }
 
@@ -1437,25 +1288,16 @@ export default function App({
   onOpenHowItWorks?: () => void;
   onSplashComplete?: () => void;
 }) {
-  const serverReady =
-    useServerReady();
-
-  const season =
-    useSeason();
-
-  const { t } =
-    useLanguage();
+  const serverReady = useServerReady();
+  const season = useSeason();
+  const { t } = useLanguage();
 
   const [showSplash, setShowSplash] =
     useState(true);
 
-  const [url, setUrl] =
+  const [url, setUrl] = useState('');
+  const [displayUrl, setDisplayUrl] =
     useState('');
-
-  const [
-    displayUrl,
-    setDisplayUrl,
-  ] = useState('');
 
   const [status, setStatus] =
     useState<
@@ -1493,13 +1335,42 @@ export default function App({
     setIsLinkFading,
   ] = useState(false);
 
-  const inputRef =
-    useRef<HTMLInputElement>(
-      null
-    );
+  // ─── Toast state ──────────────────────────────────────────────────────────
 
-  const downloadInProgress =
-    useRef(false);
+  const [toasts, setToasts] =
+    useState<ToastItem[]>([]);
+
+  const toastIdRef = useRef(0);
+
+  const showToast = (
+    message: string,
+    type: ToastType = 'info',
+    duration = 3500
+  ) => {
+    const id = ++toastIdRef.current;
+
+    setToasts((prev) => [
+      ...prev,
+      { id, message, type },
+    ]);
+
+    setTimeout(() => {
+      setToasts((prev) =>
+        prev.filter((toast) => toast.id !== id)
+      );
+    }, duration);
+  };
+
+  const dismissToast = (id: number) => {
+    setToasts((prev) =>
+      prev.filter((toast) => toast.id !== id)
+    );
+  };
+
+  const inputRef =
+    useRef<HTMLInputElement>(null);
+
+  const downloadInProgress = useRef(false);
 
   const resetTimerRef =
     useRef<
@@ -1507,20 +1378,14 @@ export default function App({
     >(null);
 
   useEffect(() => {
-    const id =
-      setTimeout(() => {
-        setShowSplash(false);
-        onSplashComplete?.();
-      }, 1800);
+    const id = setTimeout(() => {
+      setShowSplash(false);
+      onSplashComplete?.();
+    }, 1800);
 
-    return () =>
-      clearTimeout(id);
+    return () => clearTimeout(id);
   }, [onSplashComplete]);
 
-  /*
-   * Request notification permission once on load
-   * (only after splash screen so it doesn't feel aggressive).
-   */
   useEffect(() => {
     if (showSplash) {
       return;
@@ -1535,12 +1400,8 @@ export default function App({
 
   useEffect(() => {
     return () => {
-      if (
-        resetTimerRef.current
-      ) {
-        clearTimeout(
-          resetTimerRef.current
-        );
+      if (resetTimerRef.current) {
+        clearTimeout(resetTimerRef.current);
       }
     };
   }, []);
@@ -1549,416 +1410,313 @@ export default function App({
 
   const showInvalidLinkError = () => {
     playInvalidSound();
-
     setIsLinkFading(true);
-
     setErrorMsg(
       "This doesn't look like a Pinterest link."
     );
-
     setStatus('error');
 
     if (resetTimerRef.current) {
-      clearTimeout(
-        resetTimerRef.current
-      );
+      clearTimeout(resetTimerRef.current);
     }
 
-    resetTimerRef.current =
-      setTimeout(() => {
-        setUrl('');
-
-        setDisplayUrl('');
-
-        setIsLinkFading(false);
-
-        setStatus('idle');
-
-        setErrorMsg('');
-
-        resetTimerRef.current = null;
-      }, 1500);
+    resetTimerRef.current = setTimeout(() => {
+      setUrl('');
+      setDisplayUrl('');
+      setIsLinkFading(false);
+      setStatus('idle');
+      setErrorMsg('');
+      resetTimerRef.current = null;
+    }, 1500);
   };
 
-  const triggerDownload =
-    async (
-      targetUrl: string
-    ) => {
-      const cleanUrl =
-        targetUrl.trim();
+  const triggerDownload = async (
+    targetUrl: string
+  ) => {
+    const cleanUrl = targetUrl.trim();
 
-      if (!cleanUrl) {
-        return;
-      }
+    if (!cleanUrl) {
+      return;
+    }
 
-      if (!isPinterestUrl(cleanUrl)) {
-        showInvalidLinkError();
-        return;
-      }
+    if (!isPinterestUrl(cleanUrl)) {
+      showInvalidLinkError();
+      return;
+    }
 
-      if (
-        downloadInProgress.current
-      ) {
-        return;
-      }
+    if (downloadInProgress.current) {
+      return;
+    }
 
-      downloadInProgress.current =
-        true;
+    downloadInProgress.current = true;
 
-      setStatus('loading');
+    setStatus('loading');
+    setProgressLabel(t('checkingMedia'));
+    setProgress(10);
+    setErrorMsg('');
+    setIsLinkFading(false);
+    setSuccessInfo({});
 
-      setProgressLabel(
-        t('checkingMedia')
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = null;
+    }
+
+    try {
+      const response = await fetch(
+        GET_PIN_URL,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            url: cleanUrl,
+          }),
+        }
       );
 
-      setProgress(10);
+      if (!response.ok) {
+        const data = await response
+          .json()
+          .catch(() => ({}));
 
-      setErrorMsg('');
-
-      setIsLinkFading(false);
-
-      setSuccessInfo({});
-
-      if (
-        resetTimerRef.current
-      ) {
-        clearTimeout(
-          resetTimerRef.current
+        throw new Error(
+          data.error || t('errorGeneric')
         );
-
-        resetTimerRef.current =
-          null;
       }
 
-      try {
-        const response =
-          await fetch(
-            GET_PIN_URL,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type':
-                  'application/json',
+      let downloadTriggered = false;
+
+      for await (const event of readSSE(
+        response
+      )) {
+        if (event.type === 'stage') {
+          setProgressLabel(
+            getTranslatedStage(
+              event.label,
+              t
+            )
+          );
+
+          setProgress(
+            getProgressFromStage(event.label)
+          );
+
+          continue;
+        }
+
+        if (event.type === 'error') {
+          throw new Error(
+            event.message || t('errorGeneric')
+          );
+        }
+
+        if (event.type === 'ready') {
+          setProgressLabel(
+            t('startingDownload')
+          );
+          setProgress(95);
+
+          setSuccessInfo({
+            mediaType: event.mediaType,
+            imageCount: event.imageCount,
+            filename: event.filename,
+          });
+
+          setProgressLabel(
+            'Downloading file...'
+          );
+
+          await downloadStreamFile(
+            event.token,
+            event.filename,
+            event.mediaType
+          );
+
+          setProgress(100);
+
+          /*
+           * Show custom browser notification.
+           */
+          showDownloadNotification(
+            event.mediaType,
+            event.imageCount
+          );
+
+          // 🔔 In-app success toast (NEW)
+          showToast(
+            getSuccessMessage(
+              {
+                mediaType: event.mediaType,
+                imageCount: event.imageCount,
+                filename: event.filename,
               },
-              body: JSON.stringify({
-                url: cleanUrl,
-              }),
-            }
+              t
+            ),
+            'success',
+            4000
           );
 
-        if (!response.ok) {
-          const data =
-            await response
-              .json()
-              .catch(
-                () => ({})
-              );
+          trackDownload();
 
-          throw new Error(
-            data.error ||
-              t('errorGeneric')
-          );
+          downloadTriggered = true;
+          setStatus('success');
+
+          resetTimerRef.current = setTimeout(() => {
+            setUrl('');
+            setDisplayUrl('');
+            setStatus('idle');
+            setProgressLabel('');
+            setProgress(10);
+            setSuccessInfo({});
+            resetTimerRef.current = null;
+          }, 3000);
+
+          break;
         }
-
-        let downloadTriggered =
-          false;
-
-        for await (
-          const event of readSSE(
-            response
-          )
-        ) {
-          if (
-            event.type ===
-            'stage'
-          ) {
-            setProgressLabel(
-              getTranslatedStage(
-                event.label,
-                t
-              )
-            );
-
-            setProgress(
-              getProgressFromStage(
-                event.label
-              )
-            );
-
-            continue;
-          }
-
-          if (
-            event.type ===
-            'error'
-          ) {
-            throw new Error(
-              event.message ||
-                t(
-                  'errorGeneric'
-                )
-            );
-          }
-
-          if (
-            event.type ===
-            'ready'
-          ) {
-            setProgressLabel(
-              t(
-                'startingDownload'
-              )
-            );
-
-            setProgress(95);
-
-            setSuccessInfo({
-              mediaType:
-                event.mediaType,
-              imageCount:
-                event.imageCount,
-              filename:
-                event.filename,
-            });
-
-            setProgressLabel(
-              'Downloading file...'
-            );
-
-            await downloadStreamFile(
-              event.token,
-              event.filename,
-              event.mediaType
-            );
-
-            setProgress(100);
-
-            /*
-             * Show custom browser notification.
-             */
-            showDownloadNotification(
-              event.mediaType,
-              event.imageCount
-            );
-
-            trackDownload();
-
-            downloadTriggered =
-              true;
-
-            setStatus(
-              'success'
-            );
-
-            resetTimerRef.current =
-              setTimeout(() => {
-                setUrl('');
-
-                setDisplayUrl('');
-
-                setStatus(
-                  'idle'
-                );
-
-                setProgressLabel(
-                  ''
-                );
-
-                setProgress(10);
-
-                setSuccessInfo(
-                  {}
-                );
-
-                resetTimerRef.current =
-                  null;
-              }, 3000);
-
-            break;
-          }
-        }
-
-        if (
-          !downloadTriggered
-        ) {
-          throw new Error(
-            t('errorGeneric')
-          );
-        }
-      } catch (err: any) {
-        setStatus('error');
-
-        setErrorMsg(
-          err?.message ||
-            t('errorGeneric')
-        );
-      } finally {
-        downloadInProgress.current =
-          false;
-      }
-    };
-
-  const handlePasteClick =
-    async () => {
-      if (
-        status === 'loading'
-      ) {
-        return;
       }
 
-      try {
-        const text =
-          await navigator.clipboard.readText();
+      if (!downloadTriggered) {
+        throw new Error(t('errorGeneric'));
+      }
+    } catch (err: any) {
+      setStatus('error');
 
-        if (text?.trim()) {
-          const clean =
-            text.trim();
+      setErrorMsg(
+        err?.message || t('errorGeneric')
+      );
+    } finally {
+      downloadInProgress.current = false;
+    }
+  };
 
-          if (
-            !isPinterestUrl(clean)
-          ) {
-            setUrl(clean);
+  const handlePasteClick = async () => {
+    if (status === 'loading') {
+      return;
+    }
 
-            setDisplayUrl(clean);
+    try {
+      const text =
+        await navigator.clipboard.readText();
 
-            showInvalidLinkError();
-            return;
-          }
+      if (text?.trim()) {
+        const clean = text.trim();
 
+        if (!isPinterestUrl(clean)) {
           setUrl(clean);
-
           setDisplayUrl(clean);
-
-          await triggerDownload(
-            clean
-          );
+          showInvalidLinkError();
+          return;
         }
-      } catch (err) {
-        console.error(
-          'Failed to read clipboard',
-          err
-        );
+
+        setUrl(clean);
+        setDisplayUrl(clean);
+        await triggerDownload(clean);
       }
-    };
+    } catch (err) {
+      console.error(
+        'Failed to read clipboard',
+        err
+      );
+    }
+  };
 
   const handleNativePaste = (
     _e: React.ClipboardEvent<HTMLInputElement>
   ) => {
-    if (
-      status === 'loading'
-    ) {
+    if (status === 'loading') {
       return;
     }
 
     setTimeout(() => {
-      if (
-        inputRef.current
-      ) {
+      if (inputRef.current) {
         const value =
           inputRef.current.value.trim();
 
         if (value) {
           setDisplayUrl(value);
 
-          if (
-            !isPinterestUrl(value)
-          ) {
+          if (!isPinterestUrl(value)) {
             setUrl(value);
-
             showInvalidLinkError();
             return;
           }
 
           setUrl(value);
-          triggerDownload(
-            value
-          );
+          triggerDownload(value);
         }
       }
     }, 50);
   };
 
-  const handleSubmit = (
-    e: FormEvent
-  ) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
 
     if (
       url.trim() &&
       status !== 'loading'
     ) {
-      triggerDownload(
-        url.trim()
-      );
+      triggerDownload(url.trim());
     }
   };
 
-  const handleShare =
-    async () => {
-      const shareUrl =
-        'https://pinme.download/';
+  const handleShare = async () => {
+    const shareUrl = 'https://pinme.download/';
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'pinME Downloade',
+          text: 'Fast & simple Pinterest Downloade',
+          url: shareUrl,
+        });
+
+        return;
+      }
+
+      await navigator.clipboard.writeText(
+        shareUrl
+      );
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        return;
+      }
 
       try {
-        if (
-          navigator.share
-        ) {
-          await navigator.share({
-            title:
-              'pinME Downloade',
-            text:
-              'Fast & simple Pinterest Downloade',
-            url: shareUrl,
-          });
-
-          return;
-        }
-
         await navigator.clipboard.writeText(
           shareUrl
         );
-      } catch (err: any) {
-        if (
-          err?.name ===
-          'AbortError'
-        ) {
-          return;
-        }
-
-        try {
-          await navigator.clipboard.writeText(
-            shareUrl
-          );
-        } catch (
+      } catch (clipboardErr) {
+        console.error(
+          'Failed to share Pin-ME',
           clipboardErr
-        ) {
-          console.error(
-            'Failed to share Pin-ME',
-            clipboardErr
-          );
-        }
+        );
       }
-    };
+    }
+  };
 
   return (
     <>
       <AnimatePresence>
-        {showSplash && (
-          <SplashScreen />
-        )}
+        {showSplash && <SplashScreen />}
       </AnimatePresence>
 
       {!showSplash &&
-        serverReady ===
-          'checking' && (
+        serverReady === 'checking' && (
           <WakingScreen />
         )}
 
       {!showSplash &&
-        serverReady ===
-          'ready' && (
+        serverReady === 'ready' && (
           <div className="relative min-h-[100dvh] w-full bg-background text-foreground flex flex-col font-sans">
-            <SeasonalBackdrop
-              season={season}
+            <SeasonalBackdrop season={season} />
+
+            {/* 🔔 Toast container — v2.1.0-ന്റെ താഴെ */}
+            <ToastContainer
+              toasts={toasts}
+              onDismiss={dismissToast}
             />
 
             <header className="sticky top-0 z-50 flex flex-col items-center gap-1 p-6 bg-background">
@@ -1973,7 +1731,6 @@ export default function App({
                   <span className="text-foreground">
                     pin
                   </span>
-
                   <span className="text-primary">
                     ME
                   </span>
@@ -1998,9 +1755,7 @@ export default function App({
                 </div>
 
                 <form
-                  onSubmit={
-                    handleSubmit
-                  }
+                  onSubmit={handleSubmit}
                   className="w-full space-y-4"
                 >
                   <div className="relative flex items-center">
@@ -2012,31 +1767,18 @@ export default function App({
                         setDisplayUrl(
                           e.target.value
                         );
-
-                        setUrl(
-                          e.target.value
-                        );
+                        setUrl(e.target.value);
                       }}
-                      onPaste={
-                        handleNativePaste
-                      }
-                      placeholder={t(
-                        'placeholder'
-                      )}
+                      onPaste={handleNativePaste}
+                      placeholder={t('placeholder')}
                       className={`w-full bg-input/50 border rounded-xl py-4 pl-4 pr-14 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner ${
                         isLinkFading
                           ? 'border-red-500 focus:ring-red-500/50'
                           : 'border-border'
                       }`}
-                      disabled={
-                        status ===
-                        'loading'
-                      }
+                      disabled={status === 'loading'}
                       style={{
-                        opacity:
-                          isLinkFading
-                            ? 0
-                            : 1,
+                        opacity: isLinkFading ? 0 : 1,
                         transition:
                           'opacity 1.5s ease-in-out',
                       }}
@@ -2045,15 +1787,10 @@ export default function App({
 
                     <button
                       type="button"
-                      onClick={
-                        handlePasteClick
-                      }
+                      onClick={handlePasteClick}
                       className="absolute right-2 p-2 text-muted-foreground hover:text-foreground transition-colors"
                       title="Paste from clipboard"
-                      disabled={
-                        status ===
-                        'loading'
-                      }
+                      disabled={status === 'loading'}
                       data-testid="button-paste"
                     >
                       <svg
@@ -2073,7 +1810,6 @@ export default function App({
                           stroke="currentColor"
                           strokeWidth="1.5"
                         />
-
                         <rect
                           x="1.5"
                           y="6.5"
@@ -2089,8 +1825,7 @@ export default function App({
                   </div>
 
                   <AnimatePresence mode="wait">
-                    {status ===
-                      'error' && (
+                    {status === 'error' && (
                       <motion.div
                         initial={{
                           opacity: 0,
@@ -2114,32 +1849,22 @@ export default function App({
 
                   <div className="pt-2 min-h-[92px] flex justify-center items-center w-full">
                     <AnimatePresence mode="wait">
-                      {status ===
-                      'loading' ? (
+                      {status === 'loading' ? (
                         <motion.div
                           key="loading"
-                          initial={{
-                            opacity: 1,
-                          }}
-                          exit={{
-                            opacity: 0,
-                          }}
+                          initial={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
                           className="w-full"
                         >
                           <ProgressLabel
                             label={
                               progressLabel ||
-                              t(
-                                'checkingMedia'
-                              )
+                              t('checkingMedia')
                             }
-                            progress={
-                              progress
-                            }
+                            progress={progress}
                           />
                         </motion.div>
-                      ) : status ===
-                        'success' ? (
+                      ) : status === 'success' ? (
                         <motion.div
                           key="success"
                           initial={{
@@ -2190,20 +1915,16 @@ export default function App({
                           type="submit"
                           disabled={
                             !url.trim() ||
-                            status ===
-                              'loading'
+                            status === 'loading'
                           }
                           className={`w-full ${
-                            season ===
-                            'default'
+                            season === 'default'
                               ? 'bg-primary hover:bg-primary/90 disabled:hover:bg-primary'
                               : `seasonal-button seasonal-button-${season}`
                           } disabled:opacity-50 text-primary-foreground py-4 rounded-xl font-semibold text-lg transition-colors shadow-[0_0_20px_rgba(230,0,35,0.2)]`}
                           data-testid="button-submit"
                         >
-                          {t(
-                            'downloadNow'
-                          )}
+                          {t('downloadNow')}
                         </motion.button>
                       )}
                     </AnimatePresence>
@@ -2211,9 +1932,7 @@ export default function App({
                 </form>
 
                 <p className="text-center text-xs text-muted-foreground leading-relaxed px-4">
-                  {t(
-                    'infoText'
-                  )}
+                  {t('infoText')}
                 </p>
 
                 <div className="flex justify-center pt-1">
@@ -2229,45 +1948,32 @@ export default function App({
                   onClick={() => {
                     window.location.hash =
                       'how-it-works';
-
                     onOpenHowItWorks?.();
                   }}
                   className="hover:text-foreground transition-colors"
                 >
-                  {t(
-                    'howItWorksHomeFooter'
-                  )}
+                  {t('howItWorksHomeFooter')}
                 </button>
 
                 <button
                   type="button"
-                  onClick={
-                    onOpenPrivacy
-                  }
+                  onClick={onOpenPrivacy}
                   className="hover:text-foreground transition-colors"
                 >
-                  {t(
-                    'privacyPolicy'
-                  )}
+                  {t('privacyPolicy')}
                 </button>
 
                 <button
                   type="button"
-                  onClick={
-                    onOpenTerms
-                  }
+                  onClick={onOpenTerms}
                   className="hover:text-foreground transition-colors"
                 >
-                  {t(
-                    'termsConditions'
-                  )}
+                  {t('termsConditions')}
                 </button>
 
                 <button
                   type="button"
-                  onClick={
-                    handleShare
-                  }
+                  onClick={handleShare}
                   aria-label="Share Pin-ME"
                   title="Share Pin-ME"
                   className="text-red-500 hover:text-red-400 hover:scale-110 transition-all duration-200 text-3xl leading-none"
