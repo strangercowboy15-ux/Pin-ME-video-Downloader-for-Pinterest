@@ -74,10 +74,6 @@ function playInvalidSound() {
       audioContext.destination
     );
 
-    /*
-     * Soft "ding" — two quick descending tones.
-     * Gentle, not aggressive.
-     */
     oscillator.type = 'sine';
 
     oscillator.frequency.setValueAtTime(
@@ -108,10 +104,6 @@ function playInvalidSound() {
       audioContext.currentTime + 0.2
     );
 
-    /*
-     * Close the AudioContext after
-     * the sound finishes to free memory.
-     */
     setTimeout(() => {
       audioContext.close();
     }, 300);
@@ -367,7 +359,7 @@ function AnimatedStageLabel({
   );
 }
 
-// ─── Circular progress indicator ────────────────────────────────────────────
+// ─── Circular progress indicator (WITH INNER COLOR GLOW) ─────────────────────
 
 function ProgressLabel({
   label,
@@ -463,6 +455,72 @@ function ProgressLabel({
               }
         }
       >
+        {/*
+         * Inner glow pulse — center-only.
+         * Red → Yellow → Green based on progress.
+         * Stays INSIDE the ring.
+         */}
+        <motion.div
+          aria-hidden="true"
+          className="absolute rounded-full"
+          style={{
+            width: '60%',
+            height: '60%',
+            background: `radial-gradient(circle, ${progressColor} 0%, ${progressColor}80 40%, transparent 75%)`,
+            filter: 'blur(4px)',
+          }}
+          animate={{
+            scale: [
+              0.7,
+              1.1,
+              0.7,
+            ],
+            opacity: [
+              0.35,
+              0.85,
+              0.35,
+            ],
+          }}
+          transition={{
+            duration: 1.6,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+
+        {/*
+         * Stronger inner flash — quick double-pulse
+         * also stays INSIDE the ring.
+         */}
+        <motion.div
+          aria-hidden="true"
+          className="absolute rounded-full"
+          style={{
+            width: '40%',
+            height: '40%',
+            background: `radial-gradient(circle, ${progressColor} 0%, transparent 70%)`,
+            filter: 'blur(3px)',
+          }}
+          animate={{
+            scale: [
+              0.5,
+              1.3,
+              0.5,
+            ],
+            opacity: [
+              0,
+              0.9,
+              0,
+            ],
+          }}
+          transition={{
+            duration: 1.2,
+            repeat: Infinity,
+            ease: 'easeOut',
+          }}
+        />
+
+        {/* Progress ring */}
         <svg
           width="80"
           height="80"
@@ -536,6 +594,7 @@ function ProgressLabel({
           )}
         </svg>
 
+        {/* Percentage text (on top) */}
         <motion.span
           key={clampedProgress}
           initial={{
@@ -1417,9 +1476,6 @@ export default function App({
   // ─── Invalid link (sound + link fade out) ─────────────────────────────────
 
   const showInvalidLinkError = () => {
-    /*
-     * Soft "ding" sound.
-     */
     playInvalidSound();
 
     setIsLinkFading(true);
