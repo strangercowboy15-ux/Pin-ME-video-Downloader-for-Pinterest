@@ -24,6 +24,42 @@ function applyTheme(theme: Theme) {
   root.classList.remove('light', 'dark');
   root.classList.add(theme);
   root.style.colorScheme = theme;
+
+  /*
+   * Update the PWA status bar / browser theme-color
+   * so it blends perfectly with the current theme.
+   *
+   * dark  → black status bar
+   * light → white status bar
+   */
+  const themeColor = theme === 'dark' ? '#0a0a0a' : '#ffffff';
+
+  const metaThemeColor = document.querySelector(
+    'meta[name="theme-color"]',
+  );
+
+  if (metaThemeColor) {
+    metaThemeColor.setAttribute('content', themeColor);
+  } else {
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = themeColor;
+    document.head.appendChild(meta);
+  }
+
+  /*
+   * Apple status bar style (iOS PWA).
+   */
+  const metaAppleStatus = document.querySelector(
+    'meta[name="apple-mobile-web-app-status-bar-style"]',
+  );
+
+  if (metaAppleStatus) {
+    metaAppleStatus.setAttribute(
+      'content',
+      theme === 'dark' ? 'black-translucent' : 'default',
+    );
+  }
 }
 
 type ThemeContextValue = {
