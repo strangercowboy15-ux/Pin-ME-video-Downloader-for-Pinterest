@@ -1280,7 +1280,30 @@ async function getPinMeta(
     (info.ext as string) || ""
   ).toLowerCase();
 
-  const isGif = ext === "gif";
+  // ─── Enhanced GIF detection ───
+  // Pinterest GIFs often come as .mp4 from yt-dlp.
+  // Check original input URL + all info URL fields for .gif pattern.
+  const originalInputUrl = url.toLowerCase();
+  const infoUrl = String(
+    (info.url as string) || ""
+  ).toLowerCase();
+  const infoImageUrl = String(
+    (info.image_url as string) || ""
+  ).toLowerCase();
+  const infoWebpageUrl = String(
+    (info.webpage_url as string) || ""
+  ).toLowerCase();
+
+  const gifUrlPattern =
+    /(?:\.gif(?:[?#]|$)|\/gif\/|\/gifs\/)/i;
+
+  const urlLooksLikeGif =
+    gifUrlPattern.test(originalInputUrl) ||
+    gifUrlPattern.test(infoUrl) ||
+    gifUrlPattern.test(infoImageUrl) ||
+    gifUrlPattern.test(infoWebpageUrl);
+
+  const isGif = ext === "gif" || urlLooksLikeGif;
 
   const isImage = [
     "jpg",
