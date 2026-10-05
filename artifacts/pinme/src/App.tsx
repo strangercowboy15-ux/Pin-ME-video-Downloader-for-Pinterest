@@ -1238,6 +1238,10 @@ export default function App({
   const [progress, setProgress] =
     useState(10);
 
+  // 👇 NEW: Fake progress for smooth UI
+  const [fakeProgress, setFakeProgress] =
+    useState(95);
+
   const [errorMsg, setErrorMsg] =
     useState('');
 
@@ -1297,6 +1301,30 @@ export default function App({
     };
   }, []);
 
+  // 👇 NEW: Fake progress animation
+  useEffect(() => {
+    if (status !== 'loading') {
+      setFakeProgress(95);
+      return;
+    }
+
+    if (progress < 95) {
+      setFakeProgress(progress);
+      return;
+    }
+
+    const id = setInterval(() => {
+      setFakeProgress((prev) => {
+        if (prev >= 99) return 99;
+        const increment =
+          prev < 97 ? 0.5 : 0.2;
+        return Math.min(99, prev + increment);
+      });
+    }, 200);
+
+    return () => clearInterval(id);
+  }, [status, progress]);
+
   // ─── Invalid link (sound + link fade out) ─────────────────────────────────
 
   const showInvalidLinkError = () => {
@@ -1344,6 +1372,7 @@ export default function App({
     setStatus('loading');
     setProgressLabel(t('checkingMedia'));
     setProgress(10);
+    setFakeProgress(10);
     setErrorMsg('');
     setIsLinkFading(false);
     setSuccessInfo({});
@@ -1428,9 +1457,6 @@ export default function App({
 
           setProgress(100);
 
-          /*
-           * Show custom browser notification.
-           */
           showDownloadNotification(
             event.mediaType,
             event.imageCount
@@ -1447,6 +1473,7 @@ export default function App({
             setStatus('idle');
             setProgressLabel('');
             setProgress(10);
+            setFakeProgress(95);
             setSuccessInfo({});
             resetTimerRef.current = null;
           }, 3000);
@@ -1732,7 +1759,13 @@ export default function App({
                               progressLabel ||
                               t('checkingMedia')
                             }
-                            progress={progress}
+                            progress={
+                              progress >= 95
+                                ? Math.round(
+                                    fakeProgress
+                                  )
+                                : progress
+                            }
                           />
                         </motion.div>
                       ) : status === 'success' ? (
