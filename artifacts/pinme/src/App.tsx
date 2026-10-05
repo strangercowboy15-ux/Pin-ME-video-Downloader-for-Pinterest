@@ -9,83 +9,6 @@ import { trackDownload } from './analytics';
 import { SeasonalBackdrop, useSeason } from './seasonal';
 import { useLanguage } from './useLanguage';
 
-// ─── Toast types + component ─────────────────────────────────────────────────
-
-type ToastType = 'success' | 'error' | 'info';
-
-interface ToastItem {
-  id: number;
-  message: string;
-  type: ToastType;
-}
-
-function ToastContainer({
-  toasts,
-  onDismiss,
-}: {
-  toasts: ToastItem[];
-  onDismiss: (id: number) => void;
-}) {
-  return (
-    <div
-      className="fixed left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-1.5 pointer-events-none"
-      style={{ top: '290px' }}
-      aria-live="polite"
-      aria-atomic="true"
-    >
-      <AnimatePresence mode="popLayout">
-        {toasts.map((toast) => (
-          <motion.div
-            key={toast.id}
-            initial={{
-              opacity: 0,
-              y: -8,
-              scale: 0.94,
-              filter: 'blur(6px)',
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-              scale: 1,
-              filter: 'blur(0px)',
-            }}
-            exit={{
-              opacity: 0,
-              y: -8,
-              scale: 0.94,
-              filter: 'blur(6px)',
-            }}
-            transition={{
-              duration: 0.4,
-              ease: [0.16, 1, 0.3, 1],
-            }}
-            onClick={() => onDismiss(toast.id)}
-            className="pointer-events-auto cursor-pointer text-[12px] text-blue-300 font-medium tracking-tight whitespace-nowrap"
-            role="status"
-          >
-            <motion.span
-              animate={{
-                textShadow: [
-                  '0 0 8px rgba(59, 130, 246, 0.4), 0 0 3px rgba(59, 130, 246, 0.3)',
-                  '0 0 16px rgba(59, 130, 246, 0.8), 0 0 6px rgba(59, 130, 246, 0.5)',
-                  '0 0 8px rgba(59, 130, 246, 0.4), 0 0 3px rgba(59, 130, 246, 0.3)',
-                ],
-              }}
-              transition={{
-                duration: 2.2,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              }}
-            >
-              {toast.message}
-            </motion.span>
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 // ─── API ─────────────────────────────────────────────────────────────────────
 
 const API_BASE =
@@ -1335,38 +1258,6 @@ export default function App({
     setIsLinkFading,
   ] = useState(false);
 
-  // ─── Toast state ──────────────────────────────────────────────────────────
-
-  const [toasts, setToasts] =
-    useState<ToastItem[]>([]);
-
-  const toastIdRef = useRef(0);
-
-  const showToast = (
-    message: string,
-    type: ToastType = 'info',
-    duration = 3500
-  ) => {
-    const id = ++toastIdRef.current;
-
-    setToasts((prev) => [
-      ...prev,
-      { id, message, type },
-    ]);
-
-    setTimeout(() => {
-      setToasts((prev) =>
-        prev.filter((toast) => toast.id !== id)
-      );
-    }, duration);
-  };
-
-  const dismissToast = (id: number) => {
-    setToasts((prev) =>
-      prev.filter((toast) => toast.id !== id)
-    );
-  };
-
   const inputRef =
     useRef<HTMLInputElement>(null);
 
@@ -1545,21 +1436,6 @@ export default function App({
             event.imageCount
           );
 
-          // 🔔 Toast ONLY for carousel
-          const isCarousel =
-            event.mediaType === 'carousel' ||
-            event.filename
-              ?.toLowerCase()
-              .endsWith('.zip');
-
-          if (isCarousel) {
-            showToast(
-              'Zip is ready, go to extract',
-              'info',
-              5000
-            );
-          }
-
           trackDownload();
 
           downloadTriggered = true;
@@ -1713,12 +1589,6 @@ export default function App({
         serverReady === 'ready' && (
           <div className="relative min-h-[100dvh] w-full bg-background text-foreground flex flex-col font-sans">
             <SeasonalBackdrop season={season} />
-
-            {/* 🔔 Carousel toast container */}
-            <ToastContainer
-              toasts={toasts}
-              onDismiss={dismissToast}
-            />
 
             <header className="sticky top-0 z-50 flex flex-col items-center gap-1 p-6 bg-background">
               <div className="flex items-center gap-2">
