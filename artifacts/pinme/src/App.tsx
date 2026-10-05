@@ -28,108 +28,59 @@ function ToastContainer({
 }) {
   return (
     <div
-      className="fixed left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-1.5 pointer-events-none"
-      style={{ top: '100px' }}
+      className="fixed left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-1.5 pointer-events-none"
+      style={{ top: '290px' }}
       aria-live="polite"
       aria-atomic="true"
     >
       <AnimatePresence mode="popLayout">
-        {toasts.map((toast) => {
-          const config = {
-            success: {
-              icon: '✓',
-              color: '#22c55e',
-              ring: 'rgba(34, 197, 94, 0.5)',
-            },
-            error: {
-              icon: '✕',
-              color: '#ef4444',
-              ring: 'rgba(239, 68, 68, 0.5)',
-            },
-            info: {
-              icon: 'i',
-              color: '#3b82f6',
-              ring: 'rgba(59, 130, 246, 0.5)',
-            },
-          }[toast.type];
-
-          return (
-            <motion.div
-              key={toast.id}
-              initial={{
-                opacity: 0,
-                y: -10,
-                scale: 0.9,
-                filter: 'blur(6px)',
-              }}
+        {toasts.map((toast) => (
+          <motion.div
+            key={toast.id}
+            initial={{
+              opacity: 0,
+              y: -8,
+              scale: 0.94,
+              filter: 'blur(6px)',
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              filter: 'blur(0px)',
+            }}
+            exit={{
+              opacity: 0,
+              y: -8,
+              scale: 0.94,
+              filter: 'blur(6px)',
+            }}
+            transition={{
+              duration: 0.4,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+            onClick={() => onDismiss(toast.id)}
+            className="pointer-events-auto cursor-pointer text-[12px] text-blue-300 font-medium tracking-tight whitespace-nowrap"
+            role="status"
+          >
+            <motion.span
               animate={{
-                opacity: 1,
-                y: 0,
-                scale: 1,
-                filter: 'blur(0px)',
-              }}
-              exit={{
-                opacity: 0,
-                y: -10,
-                scale: 0.9,
-                filter: 'blur(6px)',
+                textShadow: [
+                  '0 0 8px rgba(59, 130, 246, 0.4), 0 0 3px rgba(59, 130, 246, 0.3)',
+                  '0 0 16px rgba(59, 130, 246, 0.8), 0 0 6px rgba(59, 130, 246, 0.5)',
+                  '0 0 8px rgba(59, 130, 246, 0.4), 0 0 3px rgba(59, 130, 246, 0.3)',
+                ],
               }}
               transition={{
-                duration: 0.35,
-                ease: [0.16, 1, 0.3, 1],
+                duration: 2.2,
+                repeat: Infinity,
+                ease: 'easeInOut',
               }}
-              onClick={() => onDismiss(toast.id)}
-              className="pointer-events-auto relative overflow-hidden flex items-center gap-2 px-3 py-1.5 rounded-full cursor-pointer backdrop-blur-xl"
-              style={{
-                background: 'rgba(28, 28, 30, 0.85)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: `0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px ${config.ring}`,
-              }}
-              role="status"
             >
-              {/* Shine sweep */}
-              <motion.div
-                aria-hidden="true"
-                className="absolute inset-0 pointer-events-none"
-                initial={{ x: '-120%' }}
-                animate={{ x: '220%' }}
-                transition={{
-                  duration: 0.9,
-                  delay: 0.25,
-                  ease: 'easeInOut',
-                }}
-                style={{
-                  background:
-                    'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%)',
-                  width: '60%',
-                }}
-              />
-
-              {/* Tiny icon */}
-              <motion.span
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{
-                  delay: 0.08,
-                  duration: 0.4,
-                  ease: [0.16, 1, 0.3, 1],
-                }}
-                className="relative flex-shrink-0 text-xs font-bold leading-none"
-                style={{
-                  color: config.color,
-                  textShadow: `0 0 8px ${config.ring}`,
-                }}
-              >
-                {config.icon}
-              </motion.span>
-
-              {/* Compact message */}
-              <span className="text-[11px] text-white/90 font-medium tracking-tight whitespace-nowrap">
-                {toast.message}
-              </span>
-            </motion.div>
-          );
-        })}
+              {toast.message}
+            </motion.span>
+          </motion.div>
+        ))}
       </AnimatePresence>
     </div>
   );
