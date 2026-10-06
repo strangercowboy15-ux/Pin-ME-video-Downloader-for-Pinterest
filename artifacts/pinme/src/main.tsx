@@ -4,11 +4,12 @@ import App from './App';
 import Privacy from './Privacy';
 import Terms from './Terms';
 import HowItWorks from './HowItWorks';
+import Support from './Support';
 import './index.css';
 import { trackPageView } from './analytics';
 import { ThemeProvider, ThemeToggle } from './theme';
 
-type View = 'home' | 'privacy' | 'terms' | 'how-it-works';
+type View = 'home' | 'privacy' | 'terms' | 'how-it-works' | 'support';
 
 function getViewFromPath(): View {
   const path = window.location.pathname;
@@ -16,6 +17,7 @@ function getViewFromPath(): View {
   if (path === '/privacy') return 'privacy';
   if (path === '/terms') return 'terms';
   if (path === '/how-it-works') return 'how-it-works';
+  if (path === '/support') return 'support';
 
   return 'home';
 }
@@ -27,7 +29,8 @@ function Root() {
     () =>
       window.location.pathname === '/privacy' ||
       window.location.pathname === '/terms' ||
-      window.location.pathname === '/how-it-works',
+      window.location.pathname === '/how-it-works' ||
+      window.location.pathname === '/support',
   );
 
   const handleSplashComplete = React.useCallback(() => {
@@ -40,6 +43,7 @@ function Root() {
       privacy: '/privacy',
       terms: '/terms',
       'how-it-works': '/how-it-works',
+      support: '/support',
     };
 
     trackPageView(pathMap[view]);
@@ -92,6 +96,15 @@ function Root() {
 
       <div className={view === 'how-it-works' ? 'block' : 'hidden'}>
         <HowItWorks
+          onClose={() => {
+            window.history.replaceState(null, '', window.location.pathname);
+            setView('home');
+          }}
+        />
+      </div>
+
+      <div className={view === 'support' ? 'block' : 'hidden'}>
+        <Support
           onClose={() => {
             window.history.replaceState(null, '', window.location.pathname);
             setView('home');
