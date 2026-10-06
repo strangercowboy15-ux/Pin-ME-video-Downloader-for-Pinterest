@@ -861,9 +861,7 @@ async function* readSSE(
 function CoffeeButton() {
   return (
     <a
-      href="https://ko-fi.com/pinmedownload"
-      target="_blank"
-      rel="noopener noreferrer"
+      href="/support"
       aria-label="Buy me a coffee"
       className="relative flex items-center justify-center w-12 h-12 hover:scale-110 transition-transform duration-200"
     >
