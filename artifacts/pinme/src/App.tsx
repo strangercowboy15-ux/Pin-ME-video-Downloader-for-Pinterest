@@ -420,7 +420,7 @@ function AnimatedStageLabel({
   );
 }
 
-// ─── Circular progress indicator (WITH INNER COLOR GLOW) ─────────────────────
+// ─── Circular progress indicator ─────────────────────────────────────────────
 
 function ProgressLabel({
   label,
@@ -624,7 +624,7 @@ function ProgressLabel({
   );
 }
 
-// ─── Coffee success animation (hearts + sparkles) ──────────────────────────
+// ─── Download success animation ──────────────────────────────────────────────
 
 function CoffeeDownloadAnimation() {
   return (
@@ -856,63 +856,39 @@ async function* readSSE(
   }
 }
 
-// ─── Coffee button ───────────────────────────────────────────────────────────
+// ─── Support button ──────────────────────────────────────────────────────────
 
-function CoffeeButton() {
+function SupportButton() {
   return (
     <a
       href="/support"
-      aria-label="Buy me a coffee"
-      className="relative flex items-center justify-center w-12 h-12 hover:scale-110 transition-transform duration-200"
+      aria-label="Support pinME"
+      className="group relative inline-flex items-center justify-center text-sm text-muted-foreground hover:text-red-500 transition-colors duration-200"
     >
-      <span className="pointer-events-none absolute left-[18px] top-[2px] text-[10px] leading-none opacity-0 animate-coffee-steam">
-        ~
-      </span>
+      <span className="relative inline-block">
+        Support pinME
 
-      <span
-        className="pointer-events-none absolute left-[24px] top-[0px] text-[9px] leading-none opacity-0 animate-coffee-steam"
-        style={{ animationDelay: '0.45s' }}
-      >
-        ~
-      </span>
-
-      <span
-        className="pointer-events-none absolute left-[29px] top-[3px] text-[8px] leading-none opacity-0 animate-coffee-steam"
-        style={{ animationDelay: '0.9s' }}
-      >
-        ~
-      </span>
-
-      <span className="relative z-10 text-3xl leading-none text-[#f87171]">
-        ☕︎
+        <motion.span
+          aria-hidden="true"
+          className="absolute left-0 bottom-[-3px] h-[1px] bg-red-500"
+          initial={{ scaleX: 0, originX: 0 }}
+          animate={{ scaleX: [0, 1, 0] }}
+          transition={{
+            duration: 2.4,
+            repeat: Infinity,
+            repeatDelay: 2.8,
+            ease: 'easeInOut',
+          }}
+          style={{
+            width: '100%',
+          }}
+        />
       </span>
 
       <style>{`
-        @keyframes coffeeSteam {
-          0% {
-            opacity: 0;
-            transform: translateY(5px);
-          }
-          25% {
-            opacity: 0.45;
-          }
-          70% {
-            opacity: 0.2;
-          }
-          100% {
-            opacity: 0;
-            transform: translateY(-9px);
-          }
-        }
-
-        .animate-coffee-steam {
-          animation: coffeeSteam 2.4s ease-in-out infinite;
-        }
-
         @media (prefers-reduced-motion: reduce) {
-          .animate-coffee-steam {
+          .support-pinme-underline {
             animation: none;
-            opacity: 0;
           }
         }
       `}</style>
@@ -1236,7 +1212,6 @@ export default function App({
   const [progress, setProgress] =
     useState(10);
 
-  // 👇 NEW: Fake progress for smooth UI
   const [fakeProgress, setFakeProgress] =
     useState(95);
 
@@ -1299,7 +1274,6 @@ export default function App({
     };
   }, []);
 
-  // 👇 NEW: Fake progress animation
   useEffect(() => {
     if (status !== 'loading') {
       setFakeProgress(95);
@@ -1322,8 +1296,6 @@ export default function App({
 
     return () => clearInterval(id);
   }, [status, progress]);
-
-  // ─── Invalid link (sound + link fade out) ─────────────────────────────────
 
   const showInvalidLinkError = () => {
     playInvalidSound();
@@ -1837,8 +1809,9 @@ export default function App({
                   {t('infoText')}
                 </p>
 
+                {/* ─── Support pinME ─────────────────────────────────────── */}
                 <div className="flex justify-center pt-1">
-                  <CoffeeButton />
+                  <SupportButton />
                 </div>
               </div>
             </main>
