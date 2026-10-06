@@ -69,7 +69,9 @@ export default function Support({ onClose }: { onClose: () => void }) {
                 className="block rounded-xl border border-border bg-muted/20 p-5 hover:bg-primary/10 hover:border-primary/40 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">🌎</span>
+                  <span className="text-2xl font-bold italic text-[#003087]">
+                    P
+                  </span>
 
                   <div>
                     <h3 className="font-semibold">
@@ -87,7 +89,7 @@ export default function Support({ onClose }: { onClose: () => void }) {
 
           <div className="text-center pt-2">
             <p className="text-sm text-muted-foreground">
-              No pressure — pinME is free either way. ❤️
+              No pressure — pinME is free either way.
             </p>
           </div>
         </section>
