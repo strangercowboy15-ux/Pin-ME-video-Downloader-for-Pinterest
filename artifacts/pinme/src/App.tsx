@@ -624,147 +624,269 @@ function ProgressLabel({
   );
 }
 
-// ─── Download success animation ──────────────────────────────────────────────
+// ─── Helicopter → Support animation ──────────────────────────────────────────
 
-function CoffeeDownloadAnimation() {
+function HelicopterSupportAnimation() {
+  const [flight, setFlight] = useState<{
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let frame = 0;
+
+    const calculateFlight = () => {
+      const successElement =
+        document.querySelector(
+          '[data-testid="status-success"]'
+        );
+
+      const supportButton =
+        document.getElementById(
+          'support-pinme-button'
+        );
+
+      if (!successElement || !supportButton) {
+        return;
+      }
+
+      const successRect =
+        successElement.getBoundingClientRect();
+
+      const targetRect =
+        supportButton.getBoundingClientRect();
+
+      const startX =
+        successRect.left +
+        successRect.width / 2;
+
+      const startY =
+        successRect.top +
+        28;
+
+      const endX =
+        targetRect.left +
+        targetRect.width / 2;
+
+      const endY =
+        targetRect.top +
+        targetRect.height / 2;
+
+      setFlight({
+        startX,
+        startY,
+        endX,
+        endY,
+      });
+    };
+
+    frame = window.requestAnimationFrame(
+      calculateFlight
+    );
+
+    window.addEventListener(
+      'resize',
+      calculateFlight
+    );
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+
+      window.removeEventListener(
+        'resize',
+        calculateFlight
+      );
+    };
+  }, []);
+
+  if (!flight) {
+    return null;
+  }
+
+  const deltaX =
+    flight.endX - flight.startX;
+
+  const deltaY =
+    flight.endY - flight.startY;
+
+  const distance = Math.sqrt(
+    deltaX * deltaX +
+      deltaY * deltaY
+  );
+
+  const angle =
+    Math.atan2(
+      deltaY,
+      deltaX
+    ) *
+    (180 / Math.PI);
+
   return (
-    <div
-      className="relative w-[140px] h-[100px] mx-auto pointer-events-none overflow-visible flex items-center justify-center"
+    <motion.div
       aria-hidden="true"
+      className="fixed z-[80] pointer-events-none"
+      style={{
+        left: flight.startX - 24,
+        top: flight.startY - 20,
+      }}
+      initial={{
+        opacity: 0,
+        scale: 0.45,
+        x: 0,
+        y: 8,
+        rotate: -8,
+      }}
+      animate={{
+        opacity: [0, 1, 1, 1, 0],
+        scale: [0.45, 0.8, 0.9, 0.72, 0.25],
+        x: [
+          0,
+          deltaX * 0.25,
+          deltaX * 0.55,
+          deltaX * 0.82,
+          deltaX,
+        ],
+        y: [
+          8,
+          deltaY * 0.18 - 18,
+          deltaY * 0.42 - 34,
+          deltaY * 0.72 - 12,
+          deltaY,
+        ],
+        rotate: [
+          -8,
+          angle - 2,
+          angle + 3,
+          angle,
+          angle,
+        ],
+      }}
+      transition={{
+        duration: 2.25,
+        times: [0, 0.16, 0.48, 0.78, 1],
+        ease: 'easeInOut',
+      }}
     >
       <motion.div
-        initial={{
-          y: 20,
-          scale: 0.6,
-          opacity: 0,
-          rotate: -8,
-        }}
         animate={{
-          y: [20, 0, -3, 0],
-          scale: [0.6, 1, 1.05, 1],
-          opacity: [0, 1, 1, 1],
-          rotate: [-8, 0, 0, 0],
+          rotate: [0, -4, 4, -3, 0],
         }}
         transition={{
-          duration: 1.2,
-          times: [0, 0.4, 0.7, 1],
-          ease: 'easeOut',
+          duration: 0.18,
+          repeat: 12,
+          ease: 'easeInOut',
         }}
-        className="relative text-5xl leading-none"
+        className="relative w-12 h-10"
       >
-        ☕
-      </motion.div>
+        {/* Red glow */}
+        <div
+          className="absolute inset-0 rounded-full bg-red-500/30 blur-md"
+        />
 
-      <motion.div
-        initial={{
-          opacity: 0,
-          y: 10,
-          x: -12,
-          scale: 0.3,
-        }}
-        animate={{
-          opacity: [0, 1, 0.7, 0],
-          y: [10, -5, -20, -35],
-          x: [-12, -18, -14, -10],
-          scale: [0.3, 1, 1.3, 1.6],
-          rotate: [0, -15, 15, 0],
-        }}
-        transition={{
-          duration: 2.2,
-          delay: 0.5,
-          ease: 'easeOut',
-        }}
-        className="absolute top-0 left-[48px] text-pink-400 text-2xl leading-none"
-      >
-        ❤️
-      </motion.div>
+        {/* Helicopter SVG */}
+        <svg
+          width="48"
+          height="40"
+          viewBox="0 0 96 80"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="relative drop-shadow-[0_0_6px_rgba(239,68,68,0.55)]"
+        >
+          {/* Rotor */}
+          <motion.g
+            style={{
+              transformOrigin: '48px 17px',
+            }}
+            animate={{
+              rotate: [0, 360],
+            }}
+            transition={{
+              duration: 0.22,
+              repeat: Infinity,
+              ease: 'linear',
+            }}
+          >
+            <path
+              d="M19 16.5H77"
+              stroke="#ef4444"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
 
-      <motion.div
-        initial={{
-          opacity: 0,
-          y: 10,
-          x: 0,
-          scale: 0.3,
-        }}
-        animate={{
-          opacity: [0, 1, 0.7, 0],
-          y: [10, -8, -25, -40],
-          x: [0, 5, 0, -5],
-          scale: [0.3, 1.1, 1.4, 1.8],
-          rotate: [0, 10, -10, 0],
-        }}
-        transition={{
-          duration: 2.4,
-          delay: 0.7,
-          ease: 'easeOut',
-        }}
-        className="absolute top-0 left-[60px] text-pink-500 text-3xl leading-none"
-      >
-        ❤️
-      </motion.div>
+            <path
+              d="M35 13L61 20"
+              stroke="#ef4444"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              opacity="0.75"
+            />
+          </motion.g>
 
-      <motion.div
-        initial={{
-          opacity: 0,
-          y: 10,
-          x: 12,
-          scale: 0.3,
-        }}
-        animate={{
-          opacity: [0, 1, 0.7, 0],
-          y: [10, -6, -22, -38],
-          x: [12, 18, 14, 10],
-          scale: [0.3, 0.9, 1.2, 1.5],
-          rotate: [0, 15, -15, 0],
-        }}
-        transition={{
-          duration: 2.3,
-          delay: 0.9,
-          ease: 'easeOut',
-        }}
-        className="absolute top-0 left-[72px] text-pink-400 text-2xl leading-none"
-      >
-        ❤️
-      </motion.div>
+          {/* Rotor mast */}
+          <path
+            d="M48 18V28"
+            stroke="#ef4444"
+            strokeWidth="3"
+            strokeLinecap="round"
+          />
 
-      <motion.div
-        initial={{
-          opacity: 0,
-          scale: 0,
-        }}
-        animate={{
-          opacity: [0, 1, 0],
-          scale: [0, 1, 0],
-        }}
-        transition={{
-          duration: 1.5,
-          delay: 1.2,
-          ease: 'easeOut',
-        }}
-        className="absolute top-[30px] left-[20px] text-yellow-400 text-lg"
-      >
-        ✨
-      </motion.div>
+          {/* Main body */}
+          <path
+            d="M30 38C30 30.3 36.3 24 44 24H58C67.4 24 75 31.6 75 41V46H43C35.8 46 30 42.8 30 38Z"
+            fill="#ef4444"
+            fillOpacity="0.96"
+          />
 
-      <motion.div
-        initial={{
-          opacity: 0,
-          scale: 0,
-        }}
-        animate={{
-          opacity: [0, 1, 0],
-          scale: [0, 1, 0],
-        }}
-        transition={{
-          duration: 1.5,
-          delay: 1.5,
-          ease: 'easeOut',
-        }}
-        className="absolute top-[30px] right-[20px] text-yellow-400 text-lg"
-      >
-        ✨
+          {/* Cabin */}
+          <path
+            d="M36 35C36 30.6 39.6 27 44 27H55C60.5 27 65 31.5 65 37V39H36V35Z"
+            fill="currentColor"
+            className="text-background"
+          />
+
+          {/* Tail */}
+          <path
+            d="M74 38L91 31"
+            stroke="#ef4444"
+            strokeWidth="4"
+            strokeLinecap="round"
+          />
+
+          <path
+            d="M87 29L94 32L88 36"
+            stroke="#ef4444"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+
+          {/* Landing skid */}
+          <path
+            d="M35 47L31 54M68 47L72 54M27 54H76"
+            stroke="#ef4444"
+            strokeWidth="3"
+            strokeLinecap="round"
+          />
+
+          {/* Small red light */}
+          <motion.circle
+            cx="42"
+            cy="42"
+            r="2"
+            fill="#ef4444"
+            animate={{
+              opacity: [0.3, 1, 0.3],
+            }}
+            transition={{
+              duration: 0.55,
+              repeat: Infinity,
+            }}
+          />
+        </svg>
       </motion.div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -860,39 +982,66 @@ async function* readSSE(
 
 function SupportButton() {
   return (
-    <a
-      href="/support"
-      aria-label="Support pinME"
-      className="group relative inline-flex items-center justify-center text-sm text-muted-foreground hover:text-red-500 transition-colors duration-200"
-    >
-      <span className="relative inline-block">
-        Support pinME
+    <div className="relative inline-flex">
+      {/* Soft animated red glow around the board */}
+      <motion.span
+        aria-hidden="true"
+        className="absolute -inset-2 rounded-full bg-red-500/20 blur-md"
+        animate={{
+          opacity: [0.35, 0.75, 0.35],
+          scale: [0.96, 1.04, 0.96],
+        }}
+        transition={{
+          duration: 2.2,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+      />
+
+      <motion.span
+        aria-hidden="true"
+        className="absolute -inset-[1px] rounded-full border border-red-500/40"
+        animate={{
+          opacity: [0.45, 0.9, 0.45],
+          boxShadow: [
+            '0 0 6px rgba(239,68,68,0.12)',
+            '0 0 18px rgba(239,68,68,0.32)',
+            '0 0 6px rgba(239,68,68,0.12)',
+          ],
+        }}
+        transition={{
+          duration: 2.2,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+      />
+
+      <a
+        id="support-pinme-button"
+        href="/support"
+        aria-label="Support pinME"
+        className="group relative inline-flex items-center justify-center gap-2 rounded-full border border-red-500/50 bg-background/90 px-5 py-2.5 text-sm font-semibold text-red-500 backdrop-blur-sm transition-all duration-200 hover:border-red-500/80 hover:bg-red-500/5 hover:text-red-400 hover:shadow-[0_0_22px_rgba(239,68,68,0.28)] active:scale-95"
+      >
+        <span>
+          Support pinME
+        </span>
 
         <motion.span
           aria-hidden="true"
-          className="absolute left-0 bottom-[-3px] h-[1px] bg-red-500"
-          initial={{ scaleX: 0, originX: 0 }}
-          animate={{ scaleX: [0, 1, 0] }}
+          className="inline-block text-sm"
+          animate={{
+            x: [0, 3, 0],
+          }}
           transition={{
-            duration: 2.4,
+            duration: 1.5,
             repeat: Infinity,
-            repeatDelay: 2.8,
             ease: 'easeInOut',
           }}
-          style={{
-            width: '100%',
-          }}
-        />
-      </span>
-
-      <style>{`
-        @media (prefers-reduced-motion: reduce) {
-          .support-pinme-underline {
-            animation: none;
-          }
-        }
-      `}</style>
-    </a>
+        >
+          →
+        </motion.span>
+      </a>
+    </div>
   );
 }
 
@@ -1288,9 +1437,14 @@ export default function App({
     const id = setInterval(() => {
       setFakeProgress((prev) => {
         if (prev >= 99) return 99;
+
         const increment =
           prev < 97 ? 0.5 : 0.2;
-        return Math.min(99, prev + increment);
+
+        return Math.min(
+          99,
+          prev + increment
+        );
       });
     }, 200);
 
@@ -1299,10 +1453,13 @@ export default function App({
 
   const showInvalidLinkError = () => {
     playInvalidSound();
+
     setIsLinkFading(true);
+
     setErrorMsg(
       "This doesn't look like a Pinterest link."
     );
+
     setStatus('error');
 
     if (resetTimerRef.current) {
@@ -1399,7 +1556,8 @@ export default function App({
 
         if (event.type === 'error') {
           throw new Error(
-            event.message || t('errorGeneric')
+            event.message ||
+              t('errorGeneric')
           );
         }
 
@@ -1407,6 +1565,7 @@ export default function App({
           setProgressLabel(
             t('startingDownload')
           );
+
           setProgress(95);
 
           setSuccessInfo({
@@ -1435,31 +1594,36 @@ export default function App({
           trackDownload();
 
           downloadTriggered = true;
+
           setStatus('success');
 
-          resetTimerRef.current = setTimeout(() => {
-            setUrl('');
-            setDisplayUrl('');
-            setStatus('idle');
-            setProgressLabel('');
-            setProgress(10);
-            setFakeProgress(95);
-            setSuccessInfo({});
-            resetTimerRef.current = null;
-          }, 3000);
+          resetTimerRef.current =
+            setTimeout(() => {
+              setUrl('');
+              setDisplayUrl('');
+              setStatus('idle');
+              setProgressLabel('');
+              setProgress(10);
+              setFakeProgress(95);
+              setSuccessInfo({});
+              resetTimerRef.current = null;
+            }, 3000);
 
           break;
         }
       }
 
       if (!downloadTriggered) {
-        throw new Error(t('errorGeneric'));
+        throw new Error(
+          t('errorGeneric')
+        );
       }
     } catch (err: any) {
       setStatus('error');
 
       setErrorMsg(
-        err?.message || t('errorGeneric')
+        err?.message ||
+          t('errorGeneric')
       );
     } finally {
       downloadInProgress.current = false;
@@ -1487,6 +1651,7 @@ export default function App({
 
         setUrl(clean);
         setDisplayUrl(clean);
+
         await triggerDownload(clean);
       }
     } catch (err) {
@@ -1525,25 +1690,31 @@ export default function App({
     }, 50);
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = (
+    e: FormEvent
+  ) => {
     e.preventDefault();
 
     if (
       url.trim() &&
       status !== 'loading'
     ) {
-      triggerDownload(url.trim());
+      triggerDownload(
+        url.trim()
+      );
     }
   };
 
   const handleShare = async () => {
-    const shareUrl = 'https://pinme.download/';
+    const shareUrl =
+      'https://pinme.download/';
 
     try {
       if (navigator.share) {
         await navigator.share({
           title: 'pinME Downloade',
-          text: 'Fast & simple Pinterest Downloade',
+          text:
+            'Fast & simple Pinterest Downloade',
           url: shareUrl,
         });
 
@@ -1554,7 +1725,9 @@ export default function App({
         shareUrl
       );
     } catch (err: any) {
-      if (err?.name === 'AbortError') {
+      if (
+        err?.name === 'AbortError'
+      ) {
         return;
       }
 
@@ -1574,7 +1747,9 @@ export default function App({
   return (
     <>
       <AnimatePresence>
-        {showSplash && <SplashScreen />}
+        {showSplash && (
+          <SplashScreen />
+        )}
       </AnimatePresence>
 
       {!showSplash &&
@@ -1585,7 +1760,9 @@ export default function App({
       {!showSplash &&
         serverReady === 'ready' && (
           <div className="relative min-h-[100dvh] w-full bg-background text-foreground flex flex-col font-sans">
-            <SeasonalBackdrop season={season} />
+            <SeasonalBackdrop
+              season={season}
+            />
 
             <header className="sticky top-0 z-50 flex flex-col items-center gap-1 p-6 bg-background">
               <div className="flex items-center gap-2">
@@ -1599,6 +1776,7 @@ export default function App({
                   <span className="text-foreground">
                     pin
                   </span>
+
                   <span className="text-primary">
                     ME
                   </span>
@@ -1635,18 +1813,30 @@ export default function App({
                         setDisplayUrl(
                           e.target.value
                         );
-                        setUrl(e.target.value);
+
+                        setUrl(
+                          e.target.value
+                        );
                       }}
-                      onPaste={handleNativePaste}
-                      placeholder={t('placeholder')}
+                      onPaste={
+                        handleNativePaste
+                      }
+                      placeholder={t(
+                        'placeholder'
+                      )}
                       className={`w-full bg-input/50 border rounded-xl py-4 pl-4 pr-14 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner ${
                         isLinkFading
                           ? 'border-red-500 focus:ring-red-500/50'
                           : 'border-border'
                       }`}
-                      disabled={status === 'loading'}
+                      disabled={
+                        status === 'loading'
+                      }
                       style={{
-                        opacity: isLinkFading ? 0 : 1,
+                        opacity:
+                          isLinkFading
+                            ? 0
+                            : 1,
                         transition:
                           'opacity 1.5s ease-in-out',
                       }}
@@ -1655,10 +1845,14 @@ export default function App({
 
                     <button
                       type="button"
-                      onClick={handlePasteClick}
+                      onClick={
+                        handlePasteClick
+                      }
                       className="absolute right-2 p-2 text-muted-foreground hover:text-foreground transition-colors"
                       title="Paste from clipboard"
-                      disabled={status === 'loading'}
+                      disabled={
+                        status === 'loading'
+                      }
                       data-testid="button-paste"
                     >
                       <svg
@@ -1678,6 +1872,7 @@ export default function App({
                           stroke="currentColor"
                           strokeWidth="1.5"
                         />
+
                         <rect
                           x="1.5"
                           y="6.5"
@@ -1693,7 +1888,8 @@ export default function App({
                   </div>
 
                   <AnimatePresence mode="wait">
-                    {status === 'error' && (
+                    {status ===
+                      'error' && (
                       <motion.div
                         initial={{
                           opacity: 0,
@@ -1717,20 +1913,28 @@ export default function App({
 
                   <div className="pt-2 min-h-[92px] flex justify-center items-center w-full">
                     <AnimatePresence mode="wait">
-                      {status === 'loading' ? (
+                      {status ===
+                      'loading' ? (
                         <motion.div
                           key="loading"
-                          initial={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
+                          initial={{
+                            opacity: 1,
+                          }}
+                          exit={{
+                            opacity: 0,
+                          }}
                           className="w-full"
                         >
                           <ProgressLabel
                             label={
                               progressLabel ||
-                              t('checkingMedia')
+                              t(
+                                'checkingMedia'
+                              )
                             }
                             progress={
-                              progress >= 95
+                              progress >=
+                              95
                                 ? Math.round(
                                     fakeProgress
                                   )
@@ -1738,7 +1942,8 @@ export default function App({
                             }
                           />
                         </motion.div>
-                      ) : status === 'success' ? (
+                      ) : status ===
+                        'success' ? (
                         <motion.div
                           key="success"
                           initial={{
@@ -1752,8 +1957,38 @@ export default function App({
                           className="w-full flex flex-col items-center"
                           data-testid="status-success"
                         >
+                          {/* 🚁 Helicopter flight */}
+                          <HelicopterSupportAnimation />
+
                           <div className="h-[100px] w-full flex items-center justify-center overflow-visible">
-                            <CoffeeDownloadAnimation />
+                            <motion.div
+                              initial={{
+                                opacity: 0,
+                                scale: 0.7,
+                              }}
+                              animate={{
+                                opacity: [
+                                  0,
+                                  1,
+                                  1,
+                                ],
+                                scale: [
+                                  0.7,
+                                  1.05,
+                                  1,
+                                ],
+                              }}
+                              transition={{
+                                duration: 0.45,
+                                ease: 'easeOut',
+                              }}
+                              className="text-red-500 text-sm font-semibold"
+                            >
+                              Download complete
+                              <span className="ml-2">
+                                ✓
+                              </span>
+                            </motion.div>
                           </div>
 
                           <motion.div
@@ -1766,7 +2001,7 @@ export default function App({
                               y: 0,
                             }}
                             transition={{
-                              delay: 1.05,
+                              delay: 0.25,
                               duration: 0.22,
                             }}
                             className="w-full py-4 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2 px-3"
@@ -1789,16 +2024,20 @@ export default function App({
                           type="submit"
                           disabled={
                             !url.trim() ||
-                            status === 'loading'
+                            status ===
+                              'loading'
                           }
                           className={`w-full ${
-                            season === 'default'
+                            season ===
+                            'default'
                               ? 'bg-primary hover:bg-primary/90 disabled:hover:bg-primary'
                               : `seasonal-button seasonal-button-${season}`
                           } disabled:opacity-50 text-primary-foreground py-4 rounded-xl font-semibold text-lg transition-colors shadow-[0_0_20px_rgba(230,0,35,0.2)]`}
                           data-testid="button-submit"
                         >
-                          {t('downloadNow')}
+                          {t(
+                            'downloadNow'
+                          )}
                         </motion.button>
                       )}
                     </AnimatePresence>
@@ -1823,32 +2062,45 @@ export default function App({
                   onClick={() => {
                     window.location.hash =
                       'how-it-works';
+
                     onOpenHowItWorks?.();
                   }}
                   className="hover:text-foreground transition-colors"
                 >
-                  {t('howItWorksHomeFooter')}
+                  {t(
+                    'howItWorksHomeFooter'
+                  )}
                 </button>
 
                 <button
                   type="button"
-                  onClick={onOpenPrivacy}
+                  onClick={
+                    onOpenPrivacy
+                  }
                   className="hover:text-foreground transition-colors"
                 >
-                  {t('privacyPolicy')}
+                  {t(
+                    'privacyPolicy'
+                  )}
                 </button>
 
                 <button
                   type="button"
-                  onClick={onOpenTerms}
+                  onClick={
+                    onOpenTerms
+                  }
                   className="hover:text-foreground transition-colors"
                 >
-                  {t('termsConditions')}
+                  {t(
+                    'termsConditions'
+                  )}
                 </button>
 
                 <button
                   type="button"
-                  onClick={handleShare}
+                  onClick={
+                    handleShare
+                  }
                   aria-label="Share Pin-ME"
                   title="Share Pin-ME"
                   className="text-red-500 hover:text-red-400 hover:scale-110 transition-all duration-200 text-3xl leading-none"
@@ -1857,7 +2109,9 @@ export default function App({
                 </button>
 
                 <span className="text-[10px] text-muted-foreground/70">
-                  © 2026 pinME Downloade. All rights reserved.
+                  © 2026 pinME
+                  Downloade. All rights
+                  reserved.
                 </span>
               </div>
             </footer>
