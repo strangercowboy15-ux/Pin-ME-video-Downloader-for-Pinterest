@@ -51,6 +51,11 @@ export default function Support({ onClose }: { onClose: () => void }) {
             </p>
 
             <p className="mt-3">
+              Your support helps cover hosting, server, and domain costs
+              and keeps pinME free for everyone.
+            </p>
+
+            <p className="mt-3">
               If you find pinME useful, you can support the project with any
               amount you choose.
             </p>
