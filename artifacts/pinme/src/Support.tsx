@@ -7,7 +7,6 @@ export default function Support({
 }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* ─── Header ─────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 px-6 py-4 flex items-center gap-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <button
           type="button"
@@ -39,7 +38,6 @@ export default function Support({
         </button>
       </header>
 
-      {/* ─── Main content ────────────────────────────────────────────────── */}
       <main className="max-w-2xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-bold mb-2">
           Support pinME
@@ -50,10 +48,13 @@ export default function Support({
         </p>
 
         <section className="space-y-8 text-foreground leading-relaxed">
-          {/* ─── Introduction ───────────────────────────────────────────── */}
           <div>
             <p>
-              pinME is a free project built and maintained by one person.
+              Hi, I’m Ajesh Styles. I built pinME to keep Pinterest downloads
+              simple and free.
+            </p>
+
+            <p className="mt-3">
               Keeping it online and improving it takes time and money.
             </p>
 
@@ -68,14 +69,12 @@ export default function Support({
             </p>
           </div>
 
-          {/* ─── Support methods ─────────────────────────────────────────── */}
           <div>
             <h2 className="text-lg font-semibold text-foreground mb-4">
               Choose a support method
             </h2>
 
             <div className="space-y-4">
-              {/* ─── PayPal ──────────────────────────────────────────────── */}
               <a
                 href="https://www.paypal.com/ncp/payment/64BBX79BRA23S"
                 target="_blank"
@@ -83,7 +82,6 @@ export default function Support({
                 className="block rounded-xl border border-border bg-muted/20 p-5 hover:bg-primary/10 hover:border-primary/40 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  {/* PayPal-style P mark */}
                   <svg
                     width="30"
                     height="30"
@@ -118,7 +116,6 @@ export default function Support({
             </div>
           </div>
 
-          {/* ─── No pressure message ────────────────────────────────────── */}
           <div className="text-center pt-2">
             <p className="text-sm text-muted-foreground">
               No pressure — pinME is free either way.
@@ -127,7 +124,6 @@ export default function Support({
         </section>
       </main>
 
-      {/* ─── Footer ─────────────────────────────────────────────────────── */}
       <footer className="border-t border-border mt-16 px-6 py-6 text-center text-sm text-muted-foreground">
         © {new Date().getFullYear()} pinME Downloader ·{' '}
 
