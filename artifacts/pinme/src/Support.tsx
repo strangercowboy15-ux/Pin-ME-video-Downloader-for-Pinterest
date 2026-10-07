@@ -50,8 +50,8 @@ export default function Support({
         <section className="space-y-8 text-foreground leading-relaxed">
           <div>
             <p>
-              Hi, I’m Ajesh Styles. I built pinME to keep Pinterest downloads
-              simple and free.
+              Hi everyone! I’m Ajesh Styles. I built pinME to keep Pinterest
+              downloads simple and free.
             </p>
 
             <p className="mt-3">
