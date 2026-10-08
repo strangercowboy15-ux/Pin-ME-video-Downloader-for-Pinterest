@@ -15,30 +15,51 @@ declare global {
   }
 }
 
-const GA_ID = import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined;
+const GA_ID =
+  import.meta.env.VITE_GA_MEASUREMENT_ID as
+    | string
+    | undefined;
 
 function initGA(): void {
   if (!GA_ID) return; // not configured — silent no-op
 
   try {
     // Inject the async gtag script
-    const script = document.createElement('script');
+    const script =
+      document.createElement('script');
+
     script.async = true;
-    script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
+
+    script.src =
+      `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
+
     document.head.appendChild(script);
 
     // Bootstrap the dataLayer and gtag function
-    window.dataLayer = window.dataLayer || [];
+    window.dataLayer =
+      window.dataLayer || [];
+
     function gtag(...args: unknown[]) {
       window.dataLayer.push(args);
     }
-    window.gtag = gtag as typeof window.gtag;
 
-    gtag('js', new Date());
-    gtag('config', GA_ID, {
-      // Don't send the full URL path — hashes are routed client-side only
-      send_page_view: false,
-    });
+    window.gtag =
+      gtag as typeof window.gtag;
+
+    gtag(
+      'js',
+      new Date()
+    );
+
+    gtag(
+      'config',
+      GA_ID,
+      {
+        // Don't send the full URL path —
+        // hashes are routed client-side only
+        send_page_view: false,
+      }
+    );
   } catch {
     // blocked or failed — app continues normally
   }
@@ -49,28 +70,54 @@ initGA();
 
 /**
  * Fire a page_view event for a given path.
- * Call whenever the visible route changes (initial load + hash navigation).
+ * Call whenever the visible route changes
+ * (initial load + hash navigation).
  */
-export function trackPageView(path: string): void {
+export function trackPageView(
+  path: string
+): void {
   try {
-    window.gtag?.('event', 'page_view', {
-      page_path: path,
-      page_title: document.title,
-    });
+    window.gtag?.(
+      'event',
+      'page_view',
+      {
+        page_path: path,
+        page_title:
+          document.title,
+      }
+    );
   } catch {
     // silent
   }
 }
 
 /**
- * Fire a custom `download_video` event.
- * Call once the server confirms the video is ready and the download is triggered.
+ * Fire a custom `download` event
+ * with the type of media downloaded.
+ *
+ * Examples:
+ *   download + media_type: video
+ *   download + media_type: image
+ *   download + media_type: carousel
  */
-export function trackDownload(): void {
+export function trackDownload(
+  mediaType?:
+    | 'video'
+    | 'image'
+    | 'carousel'
+): void {
   try {
-    window.gtag?.('event', 'download_video', {
-      event_category: 'engagement',
-    });
+    window.gtag?.(
+      'event',
+      'download',
+      {
+        event_category:
+          'engagement',
+
+        media_type:
+          mediaType || 'unknown',
+      }
+    );
   } catch {
     // silent
   }
