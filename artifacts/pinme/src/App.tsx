@@ -1325,7 +1325,10 @@ export default function App({
             event.imageCount
           );
 
-          trackDownload();
+          // ─── GA4 download tracking ─────────────────────────────────
+          // Tracks the actual media type returned by the server:
+          // video / image / carousel
+          trackDownload(event.mediaType);
 
           downloadTriggered = true;
 
