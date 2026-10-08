@@ -185,10 +185,13 @@ async function sendTelegramFile(
   else if (mediaType === "gif") endpoint = "sendAnimation";
   else if (mediaType === "carousel") endpoint = "sendDocument";
   formData.append(
-    endpoint === "sendVideo" ? "video"
-      : endpoint === "sendPhoto" ? "photo"
-      : endpoint === "sendAnimation" ? "animation"
-      : "document",
+    endpoint === "sendVideo"
+      ? "video"
+      : endpoint === "sendPhoto"
+        ? "photo"
+        : endpoint === "sendAnimation"
+          ? "animation"
+          : "document",
     blob,
     fileName,
   );
@@ -292,9 +295,11 @@ async function handleTelegramMessage(
 
     await sendTelegramChatAction(
       chatId,
-      finalMediaType === "video" ? "upload_video"
-        : finalMediaType === "image" ? "upload_photo"
-        : "upload_document",
+      finalMediaType === "video"
+        ? "upload_video"
+        : finalMediaType === "image"
+          ? "upload_photo"
+          : "upload_document",
     );
 
     await sendTelegramFile(chatId, filePath, finalMediaType, caption);
@@ -497,7 +502,9 @@ function runYtDlp(
       if (code !== 0) {
         reject(
           Object.assign(new Error(`yt-dlp exit ${code}`), {
-            code, stdout, stderr,
+            code,
+            stdout,
+            stderr,
           }),
         );
       } else {
@@ -770,6 +777,23 @@ async function getPinMeta(url: string): Promise<PinMeta> {
     }
   }
 
+  // ─── Video URL detection (before image fallback) ───
+  // Pinterest videos sometimes come without formats array
+  const infoUrlStr = String(info.url || "").toLowerCase();
+  const isVideoExt = ["mp4", "webm", "mov", "m4v", "mkv"].includes(ext);
+  const infoUrlLooksVideo = /\.(mp4|webm|mov|m4v|mkv)(?:\?|#|$)/i.test(infoUrlStr);
+  const inputUrlLooksVideo = /\.(mp4|webm|mov|m4v|mkv)(?:\?|#|$)/i.test(
+    originalInputUrl,
+  );
+
+  if (isVideoExt || infoUrlLooksVideo || inputUrlLooksVideo) {
+    return {
+      id: (info.id as string) || randomBytes(4).toString("hex"),
+      title: (info.title as string) || null,
+      hasVideo: true,
+    };
+  }
+
   if (!hasVideoFormats || isImage || isGif) {
     return {
       id: (info.id as string) || randomBytes(4).toString("hex"),
@@ -777,8 +801,7 @@ async function getPinMeta(url: string): Promise<PinMeta> {
       hasVideo: false,
       isImage: true,
       isGif,
-      imageUrl:
-        (info.url as string) || (info.image_url as string) || null,
+      imageUrl: (info.url as string) || (info.image_url as string) || null,
     };
   }
 
@@ -831,7 +854,9 @@ function runGalleryDl(
       if (code !== 0) {
         reject(
           Object.assign(new Error(`gallery-dl exit ${code}`), {
-            code, stdout, stderr,
+            code,
+            stdout,
+            stderr,
           }),
         );
       } else {
@@ -1250,7 +1275,15 @@ function buildFilename(title: string | null, filePath: string): string {
   if (ext.toLowerCase() === "zip") {
     return `pinme-carousel-${Date.now()}.zip`;
   }
-  const genericTitles = new Set(["mp4", "mkv", "webm", "video", "watch", "pin", ""]);
+  const genericTitles = new Set([
+    "mp4",
+    "mkv",
+    "webm",
+    "video",
+    "watch",
+    "pin",
+    "",
+  ]);
   const cleaned = (title || "")
     .replace(/[^\w\s\-]/g, "")
     .replace(/\s+/g, "-")
@@ -1286,8 +1319,7 @@ function toUserError(msg: string): { status: number; error: string } {
   if (msg === "UNAVAILABLE") {
     return {
       status: 404,
-      error:
-        "Couldn't fetch this video. It may be unavailable or private.",
+      error: "Couldn't fetch this video. It may be unavailable or private.",
     };
   }
   if (msg === "TIMEOUT") {
@@ -1295,8 +1327,7 @@ function toUserError(msg: string): { status: number; error: string } {
   }
   return {
     status: 500,
-    error:
-      "Couldn't fetch this video. It may be unavailable or private.",
+    error: "Couldn't fetch this video. It may be unavailable or private.",
   };
 }
 
