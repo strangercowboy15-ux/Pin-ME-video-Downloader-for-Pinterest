@@ -1,4 +1,4 @@
-🫴🏽 import { Router } from "express";
+ import { Router } from "express";
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
