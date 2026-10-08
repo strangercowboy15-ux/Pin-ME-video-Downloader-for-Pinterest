@@ -1,12 +1,12 @@
-import { Router } from "express";
+🫴🏽 import { Router } from "express";
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath, URL } from "url";
 import {
-  createHmac,
-  randomBytes,
-  timingSafeEqual,
+createHmac,
+randomBytes,
+timingSafeEqual,
 } from "crypto";
 import archiver from "archiver";
 import sharp from "sharp";
@@ -14,7 +14,7 @@ import sharp from "sharp";
 const router = Router();
 
 const DOWNLOAD_TTL_MS =
-  30 * 60 * 1000;
+30 * 60 * 1000;
 
 // ============================================================
 // SPEED TUNING
@@ -25,86 +25,86 @@ const YTDLP_TIMEOUT_MS = 90_000;
 const YTDLP_CONCURRENT_FRAGMENTS = 8;
 
 const FILE_STREAM_HIGH_WATER_MARK =
-  2 * 1024 * 1024;
+2 * 1024 * 1024;
 
 const IMAGE_CONVERT_CONCURRENCY = 5;
 
 const TELEGRAM_MAX_FILE_SIZE =
-  50 * 1024 * 1024;
+50 * 1024 * 1024; // 50 MB
 
 // ============================================================
 // BOT PROTECTION
 // ============================================================
 
 const ALLOWED_ORIGINS = [
-  "https://pinme.download",
-  "https://www.pinme.download",
-  "http://localhost:5173",
-  "http://localhost:3000",
+'https://pinme.download',
+'https://www.pinme.download',
+'http://localhost:5173',
+'http://localhost:3000',
 ];
 
 const BOT_USER_AGENT_PATTERNS = [
-  /bot/i,
-  /crawl/i,
-  /spider/i,
-  /scrape/i,
-  /curl/i,
-  /wget/i,
-  /python-requests/i,
-  /python-urllib/i,
-  /axios\/\d/i,
-  /node-fetch/i,
-  /go-http-client/i,
-  /java\/\d/i,
-  /okhttp/i,
-  /headless/i,
-  /phantom/i,
-  /puppeteer/i,
-  /playwright/i,
-  /selenium/i,
-  /facebookexternalhit/i,
-  /whatsapp/i,
-  /telegrambot/i,
-  /discordbot/i,
-  /slackbot/i,
-  /twitterbot/i,
-  /linkedinbot/i,
-  /ahrefsbot/i,
-  /semrushbot/i,
-  /mj12bot/i,
-  /dotbot/i,
-  /petalbot/i,
-  /bytespider/i,
+/bot/i,
+/crawl/i,
+/spider/i,
+/scrape/i,
+/curl/i,
+/wget/i,
+/python-requests/i,
+/python-urllib/i,
+/axios/\d/i,
+/node-fetch/i,
+/go-http-client/i,
+/java/\d/i,
+/okhttp/i,
+/headless/i,
+/phantom/i,
+/puppeteer/i,
+/playwright/i,
+/selenium/i,
+/facebookexternalhit/i,
+/whatsapp/i,
+/telegrambot/i,
+/discordbot/i,
+/slackbot/i,
+/twitterbot/i,
+/linkedinbot/i,
+/ahrefsbot/i,
+/semrushbot/i,
+/mj12bot/i,
+/dotbot/i,
+/petalbot/i,
+/bytespider/i,
 ];
 
 function isBotRequest(
-  userAgent: string | undefined,
+userAgent: string | undefined,
 ): boolean {
-  if (!userAgent || !userAgent.trim()) {
-    return true;
-  }
+if (!userAgent || !userAgent.trim()) {
+return true;
+}
 
-  for (const pattern of BOT_USER_AGENT_PATTERNS) {
-    if (pattern.test(userAgent)) {
-      return true;
-    }
-  }
+for (const pattern of BOT_USER_AGENT_PATTERNS) {
+if (pattern.test(userAgent)) {
+return true;
+}
+}
 
-  if (!/mozilla/i.test(userAgent)) {
-    return true;
-  }
+if (!/mozilla/i.test(userAgent)) {
+return true;
+}
 
-  return false;
+return false;
 }
 
 function isAllowedOrigin(
-  origin: string | undefined,
+origin: string | undefined,
 ): boolean {
-  if (!origin) {
-    return true;
-  }
+if (!origin) {
+return true;
+}
 
-  return ALLOWED_ORIGINS.includes(origin);
+return ALLOWED_ORIGINS.includes(origin);
 }
 
 // ============================================================
@@ -112,41 +112,42 @@ function isAllowedOrigin(
 // ============================================================
 
 async function sendTelegramNotification(
-  message: string,
+message: string,
 ): Promise<void> {
-  const botToken =
-    process.env.TELEGRAM_BOT_TOKEN;
+const botToken =
+process.env.TELEGRAM_BOT_TOKEN;
 
-  const chatId =
-    process.env.TELEGRAM_CHAT_ID;
+const chatId =
+process.env.TELEGRAM_CHAT_ID;
 
-  if (!botToken || !chatId) {
-    return;
-  }
+if (!botToken || !chatId) {
+return;
+}
 
-  try {
-    const url =
-      `https://api.telegram.org/bot${botToken}/sendMessage`;
+try {
+const url =
+https://api.telegram.org/bot${botToken}/sendMessage;
 
-    await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type":
-          "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-      }),
-    });
-  } catch (err) {
-    console.error(
-      "Telegram notification failed:",
-      err,
-    );
-  }
+await fetch(url, {  
+  method: "POST",  
+  headers: {  
+    "Content-Type":  
+      "application/json",  
+  },  
+  body: JSON.stringify({  
+    chat_id: chatId,  
+    text: message,  
+    parse_mode: "HTML",  
+    disable_web_page_preview: true,  
+  }),  
+});
+
+} catch (err) {
+console.error(
+"Telegram notification failed:",
+err,
+);
+}
 }
 
 // ============================================================
@@ -154,202 +155,202 @@ async function sendTelegramNotification(
 // ============================================================
 
 async function sendTelegramMessage(
-  chatId: number | string,
-  text: string,
+chatId: number | string,
+text: string,
 ): Promise<void> {
-  const botToken =
-    process.env.TELEGRAM_BOT_TOKEN;
+const botToken =
+process.env.TELEGRAM_BOT_TOKEN;
 
-  if (!botToken) return;
+if (!botToken) return;
 
-  try {
-    await fetch(
-      `https://api.telegram.org/bot${botToken}/sendMessage`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: "HTML",
-          disable_web_page_preview: true,
-        }),
-      },
-    );
-  } catch (err) {
-    console.error(
-      "sendTelegramMessage failed:",
-      err,
-    );
-  }
+try {
+await fetch(
+https://api.telegram.org/bot${botToken}/sendMessage,
+{
+method: "POST",
+headers: {
+"Content-Type":
+"application/json",
+},
+body: JSON.stringify({
+chat_id: chatId,
+text,
+parse_mode: "HTML",
+disable_web_page_preview: true,
+}),
+},
+);
+} catch (err) {
+console.error(
+"sendTelegramMessage failed:",
+err,
+);
+}
 }
 
 async function sendTelegramChatAction(
-  chatId: number | string,
-  action: string = "upload_document",
+chatId: number | string,
+action: string = "upload_document",
 ): Promise<void> {
-  const botToken =
-    process.env.TELEGRAM_BOT_TOKEN;
+const botToken =
+process.env.TELEGRAM_BOT_TOKEN;
 
-  if (!botToken) return;
+if (!botToken) return;
 
-  try {
-    await fetch(
-      `https://api.telegram.org/bot${botToken}/sendChatAction`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-        body: JSON.stringify({
-          chat_id: chatId,
-          action,
-        }),
-      },
-    );
-  } catch {
-    /* best-effort */
-  }
+try {
+await fetch(
+https://api.telegram.org/bot${botToken}/sendChatAction,
+{
+method: "POST",
+headers: {
+"Content-Type":
+"application/json",
+},
+body: JSON.stringify({
+chat_id: chatId,
+action,
+}),
+},
+);
+} catch {
+/* best-effort */
+}
 }
 
 async function sendTelegramFile(
-  chatId: number | string,
-  filePath: string,
-  mediaType:
-    | "video"
-    | "image"
-    | "carousel"
-    | "gif",
-  caption?: string,
+chatId: number | string,
+filePath: string,
+mediaType:
+| "video"
+| "image"
+| "carousel"
+| "gif",
+caption?: string,
 ): Promise<void> {
-  const botToken =
-    process.env.TELEGRAM_BOT_TOKEN;
+const botToken =
+process.env.TELEGRAM_BOT_TOKEN;
 
-  if (!botToken) return;
+if (!botToken) return;
 
-  const stat = fs.statSync(filePath);
+const stat = fs.statSync(filePath);
 
-  if (stat.size > TELEGRAM_MAX_FILE_SIZE) {
-    await sendTelegramMessage(
-      chatId,
-      `❌ <b>File too large</b>\n\n` +
-        `The file is ${Math.round(
-          stat.size / 1024 / 1024,
-        )} MB, which exceeds Telegram's 50 MB bot limit.\n\n` +
-        `Please use our website:\n` +
-        `https://pinme.download`,
-    );
+if (stat.size > TELEGRAM_MAX_FILE_SIZE) {
+await sendTelegramMessage(
+chatId,
+❌ <b>File too large</b>\n\n +
+The file is ${Math.round(   stat.size / 1024 / 1024,   )} MB, which exceeds Telegram's 50 MB bot limit.\n\n +
+Please use our website:\n +
+https://pinme.download,
+);
 
-    return;
-  }
+return;
 
-  const fileName =
-    path.basename(filePath);
+}
 
-  const fileBuffer =
-    fs.readFileSync(filePath);
+const fileName =
+path.basename(filePath);
 
-  const blob = new Blob(
-    [fileBuffer],
-  );
+const fileBuffer =
+fs.readFileSync(filePath);
 
-  const formData = new FormData();
+const blob = new Blob(
+[fileBuffer],
+);
 
-  formData.append(
-    "chat_id",
-    String(chatId),
-  );
+const formData = new FormData();
 
-  if (caption) {
-    formData.append("caption", caption);
-    formData.append("parse_mode", "HTML");
-  }
+formData.append(
+"chat_id",
+String(chatId),
+);
 
-  let endpoint = "sendDocument";
+if (caption) {
+formData.append("caption", caption);
+formData.append("parse_mode", "HTML");
+}
 
-  if (mediaType === "video") {
-    endpoint = "sendVideo";
-  } else if (mediaType === "image") {
-    endpoint = "sendPhoto";
-  } else if (mediaType === "gif") {
-    endpoint = "sendAnimation";
-  } else if (mediaType === "carousel") {
-    endpoint = "sendDocument";
-  }
+let endpoint = "sendDocument";
 
-  formData.append(
-    endpoint === "sendVideo"
-      ? "video"
-      : endpoint === "sendPhoto"
-        ? "photo"
-        : endpoint === "sendAnimation"
-          ? "animation"
-          : "document",
-    blob,
-    fileName,
-  );
+if (mediaType === "video") {
+endpoint = "sendVideo";
+} else if (mediaType === "image") {
+endpoint = "sendPhoto";
+} else if (mediaType === "gif") {
+endpoint = "sendAnimation";
+} else if (mediaType === "carousel") {
+endpoint = "sendDocument";
+}
 
-  try {
-    const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/${endpoint}`,
-      {
-        method: "POST",
-        body: formData,
-      },
-    );
+formData.append(
+endpoint === "sendVideo"
+? "video"
+: endpoint === "sendPhoto"
+? "photo"
+: endpoint === "sendAnimation"
+? "animation"
+: "document",
+blob,
+fileName,
+);
 
-    if (!response.ok) {
-      const errText =
-        await response.text();
+try {
+const response = await fetch(
+https://api.telegram.org/bot${botToken}/${endpoint},
+{
+method: "POST",
+body: formData,
+},
+);
 
-      console.error(
-        "Telegram file send failed:",
-        errText,
-      );
+if (!response.ok) {  
+  const errText =  
+    await response.text();  
 
-      const fallbackForm =
-        new FormData();
+  console.error(  
+    "Telegram file send failed:",  
+    errText,  
+  );  
 
-      fallbackForm.append(
-        "chat_id",
-        String(chatId),
-      );
+  const fallbackForm =  
+    new FormData();  
 
-      if (caption) {
-        fallbackForm.append(
-          "caption",
-          caption,
-        );
-        fallbackForm.append(
-          "parse_mode",
-          "HTML",
-        );
-      }
+  fallbackForm.append(  
+    "chat_id",  
+    String(chatId),  
+  );  
 
-      fallbackForm.append(
-        "document",
-        blob,
-        fileName,
-      );
+  if (caption) {  
+    fallbackForm.append(  
+      "caption",  
+      caption,  
+    );  
+    fallbackForm.append(  
+      "parse_mode",  
+      "HTML",  
+    );  
+  }  
 
-      await fetch(
-        `https://api.telegram.org/bot${botToken}/sendDocument`,
-        {
-          method: "POST",
-          body: fallbackForm,
-        },
-      );
-    }
-  } catch (err) {
-    console.error(
-      "sendTelegramFile error:",
-      err,
-    );
-  }
+  fallbackForm.append(  
+    "document",  
+    blob,  
+    fileName,  
+  );  
+
+  await fetch(  
+    `https://api.telegram.org/bot${botToken}/sendDocument`,  
+    {  
+      method: "POST",  
+      body: fallbackForm,  
+    },  
+  );  
+}
+
+} catch (err) {
+console.error(
+"sendTelegramFile error:",
+err,
+);
+}
 }
 
 // ============================================================
@@ -357,156 +358,158 @@ async function sendTelegramFile(
 // ============================================================
 
 async function handleTelegramMessage(
-  chatId: number,
-  text: string,
+chatId: number,
+text: string,
 ): Promise<void> {
-  const trimmed = text.trim();
+const trimmed = text.trim();
 
-  if (
-    trimmed === "/start" ||
-    trimmed === "/help"
-  ) {
-    await sendTelegramMessage(
-      chatId,
-      `👋 <b>Welcome to pinME Downloader!</b>\n\n` +
-        `Send me any Pinterest link and I'll download the video, image, GIF, or carousel for you.\n\n` +
-        `<b>How to use:</b>\n` +
-        `1. Copy a Pinterest link 📎\n` +
-        `2. Paste it here 📥\n` +
-        `3. Wait for the file 📦\n\n` +
-        `<b>Limits:</b>\n` +
-        `• Max file size: 50 MB\n` +
-        `• Large files: use pinme.download\n\n` +
-        `<i>Powered by pinme.download</i>`,
-    );
+if (
+trimmed === "/start" ||
+trimmed === "/help"
+) {
+await sendTelegramMessage(
+chatId,
+👋 <b>Welcome to pinME Downloader!</b>\n\n +
+Send me any Pinterest link and I'll download the video, image, GIF, or carousel for you.\n\n +
+<b>How to use:</b>\n +
+1. Copy a Pinterest link 📎\n +
+2. Paste it here 📥\n +
+3. Wait for the file 📦\n\n +
+<b>Limits:</b>\n +
+• Max file size: 50 MB\n +
+• Large files: use pinme.download\n\n +
+<i>Powered by pinme.download</i>,
+);
 
-    return;
-  }
+return;
 
-  if (!isPinterestUrl(trimmed)) {
-    await sendTelegramMessage(
-      chatId,
-      `❌ <b>This doesn't look like a Pinterest link.</b>\n\n` +
-        `Please send a valid Pinterest URL.\n\n` +
-        `Example:\n` +
-        `<code>https://pin.it/4rSqMOGlu</code>`,
-    );
+}
 
-    return;
-  }
+if (!isPinterestUrl(trimmed)) {
+await sendTelegramMessage(
+chatId,
+❌ <b>This doesn't look like a Pinterest link.</b>\n\n +
+Please send a valid Pinterest URL.\n\n +
+Example:\n +
+<code>https://pin.it/4rSqMOGlu</code>,
+);
 
-  await sendTelegramMessage(
-    chatId,
-    `⏳ <b>Processing your link...</b>\n\n` +
-      `<code>${trimmed}</code>\n\n` +
-      `This may take 10-60 seconds.`,
-  );
+return;
 
-  try {
-    const meta = await getPinMeta(trimmed);
+}
 
-    let filePath: string;
-    let mediaType:
-      | "video"
-      | "image"
-      | "carousel";
-    let imageCount: number | undefined;
+await sendTelegramMessage(
+chatId,
+⏳ <b>Processing your link...</b>\n\n +
+<code>${trimmed}</code>\n\n +
+This may take 10-60 seconds.,
+);
 
-    if (
-      meta.isImage ||
-      meta.isCarousel
-    ) {
-      const result =
-        await downloadImageOrCarousel(
-          trimmed,
-          meta.id,
-          undefined,
-          meta.imageUrl,
-          "png",
-          meta.isGif
-            ? "gif"
-            : meta.isCarousel
-              ? "carousel"
-              : "image",
-        );
+try {
+const meta = await getPinMeta(trimmed);
 
-      filePath = result.filePath;
-      mediaType = result.mediaType;
-      imageCount = result.imageCount;
-    } else {
-      const vid = await downloadVideo(
-        trimmed,
-        meta.id,
-        undefined,
-        meta.videoUrl,
-      );
+let filePath: string;  
+let mediaType:  
+  | "video"  
+  | "image"  
+  | "carousel";  
+let imageCount: number | undefined;  
 
-      filePath = vid.filePath;
-      mediaType = "video";
-    }
+if (  
+  meta.isImage ||  
+  meta.isCarousel  
+) {  
+  const result =  
+    await downloadImageOrCarousel(  
+      trimmed,  
+      meta.id,  
+      undefined,  
+      meta.imageUrl,  
+      "png",  
+      meta.isGif  
+        ? "gif"  
+        : meta.isCarousel  
+          ? "carousel"  
+          : "image",  
+    );  
 
-    let finalMediaType:
-      | "video"
-      | "image"
-      | "carousel"
-      | "gif" = mediaType;
+  filePath = result.filePath;  
+  mediaType = result.mediaType;  
+  imageCount = result.imageCount;  
+} else {  
+  const vid = await downloadVideo(  
+    trimmed,  
+    meta.id,  
+  );  
 
-    if (
-      meta.isGif ||
-      filePath.toLowerCase().endsWith(".gif")
-    ) {
-      finalMediaType = "gif";
-    }
+  filePath = vid.filePath;  
+  mediaType = "video";  
+}  
 
-    const caption =
-      `✅ <b>Downloaded successfully!</b>\n\n` +
-      `${meta.title ? `📝 <b>Title:</b> ${meta.title}\n` : ""}` +
-      `📁 <b>Type:</b> ${mediaType}\n` +
-      `${imageCount ? `🖼️ <b>Images:</b> ${imageCount}\n` : ""}` +
-      `🌐 <b>Source:</b> pinme.download`;
+let finalMediaType:  
+  | "video"  
+  | "image"  
+  | "carousel"  
+  | "gif" = mediaType;  
 
-    await sendTelegramChatAction(
-      chatId,
-      finalMediaType === "video"
-        ? "upload_video"
-        : finalMediaType === "image"
-          ? "upload_photo"
-          : "upload_document",
-    );
+if (  
+  meta.isGif ||  
+  filePath.toLowerCase().endsWith(".gif")  
+) {  
+  finalMediaType = "gif";  
+}  
 
-    await sendTelegramFile(
-      chatId,
-      filePath,
-      finalMediaType,
-      caption,
-    );
+const caption =  
+  `✅ <b>Downloaded successfully!</b>\n\n` +  
+  `${meta.title ? `📝 <b>Title:</b> ${meta.title}\n` : ""}` +  
+  `📁 <b>Type:</b> ${mediaType}\n` +  
+  `${imageCount ? `🖼️ <b>Images:</b> ${imageCount}\n` : ""}` +  
+  `🌐 <b>Source:</b> pinme.download`;  
 
-    try {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    } catch {
-      /* best-effort */
-    }
-  } catch (err) {
-    const msg =
-      err instanceof Error
-        ? err.message
-        : String(err);
+await sendTelegramChatAction(  
+  chatId,  
+  finalMediaType === "video"  
+    ? "upload_video"  
+    : finalMediaType === "image"  
+      ? "upload_photo"  
+      : "upload_document",  
+);  
 
-    console.error(
-      "Telegram handler failed:",
-      msg,
-    );
+await sendTelegramFile(  
+  chatId,  
+  filePath,  
+  finalMediaType,  
+  caption,  
+);  
 
-    await sendTelegramMessage(
-      chatId,
-      `❌ <b>Download failed</b>\n\n` +
-        `The link couldn't be processed. It may be unavailable or private.\n\n` +
-        `Please try another link or use:\n` +
-        `https://pinme.download`,
-    );
-  }
+try {  
+  if (fs.existsSync(filePath)) {  
+    fs.unlinkSync(filePath);  
+  }  
+} catch {  
+  /* best-effort */  
+}
+
+} catch (err) {
+const msg =
+err instanceof Error
+? err.message
+: String(err);
+
+console.error(  
+  "Telegram handler failed:",  
+  msg,  
+);  
+
+await sendTelegramMessage(  
+  chatId,  
+  `❌ <b>Download failed</b>\n\n` +  
+    `The link couldn't be processed. It may be unavailable or private.\n\n` +  
+    `Please try another link or use:\n` +  
+    `https://pinme.download`,  
+);
+
+}
 }
 
 // ============================================================
@@ -516,11 +519,11 @@ async function handleTelegramMessage(
 type ImageFormat = "png" | "svg";
 
 function normalizeImageFormat(
-  value: unknown,
+value: unknown,
 ): ImageFormat {
-  return value === "svg"
-    ? "svg"
-    : "png";
+return value === "svg"
+? "svg"
+: "png";
 }
 
 // ============================================================
@@ -528,10 +531,10 @@ function normalizeImageFormat(
 // ============================================================
 
 const bundledYtDlpPath = path.resolve(
-  path.dirname(
-    fileURLToPath(import.meta.url),
-  ),
-  "../vendor/yt-dlp",
+path.dirname(
+fileURLToPath(import.meta.url),
+),
+"../vendor/yt-dlp",
 );
 
 // ============================================================
@@ -539,59 +542,63 @@ const bundledYtDlpPath = path.resolve(
 // ============================================================
 
 type DownloadTokenPayload = {
-  url: string;
-  pinId: string;
-  filename: string;
-  expiresAt: number;
-  mediaType:
-    | "video"
-    | "image"
-    | "carousel";
-  imageFormat?: ImageFormat;
+url: string;
+pinId: string;
+filename: string;
+expiresAt: number;
+mediaType:
+| "video"
+| "image"
+| "carousel";
+imageFormat?: ImageFormat;
 };
 
 const pendingDownloads = new Map<
-  string,
-  {
-    filePath: string;
-    filename: string;
-    expiresAt: number;
-  }
->();
+string,
+{
+filePath: string;
+filename: string;
+expiresAt: number;
+}
+
+> ();
+
+
 
 // ============================================================
 // CLEANUP
 // ============================================================
 
 setInterval(() => {
-  const now = Date.now();
+const now = Date.now();
 
-  for (
-    const [token, entry] of
-    pendingDownloads.entries()
-  ) {
-    if (
-      entry.expiresAt < now
-    ) {
-      try {
-        if (
-          fs.existsSync(
-            entry.filePath,
-          )
-        ) {
-          fs.unlinkSync(
-            entry.filePath,
-          );
-        }
-      } catch {
-        // best-effort cleanup
-      }
+for (
+const [token, entry] of
+pendingDownloads.entries()
+) {
+if (
+entry.expiresAt < now
+) {
+try {
+if (
+fs.existsSync(
+entry.filePath,
+)
+) {
+fs.unlinkSync(
+entry.filePath,
+);
+}
+} catch {
+// best-effort cleanup
+}
 
-      pendingDownloads.delete(
-        token,
-      );
-    }
-  }
+pendingDownloads.delete(  
+    token,  
+  );  
+}
+
+}
 }, 2 * 60 * 1000);
 
 // ============================================================
@@ -599,126 +606,127 @@ setInterval(() => {
 // ============================================================
 
 function getTokenSecret(): string {
-  const secret =
-    process.env.SESSION_SECRET;
+const secret =
+process.env.SESSION_SECRET;
 
-  if (!secret) {
-    throw new Error(
-      "SESSION_SECRET_UNAVAILABLE",
-    );
-  }
+if (!secret) {
+throw new Error(
+"SESSION_SECRET_UNAVAILABLE",
+);
+}
 
-  return secret;
+return secret;
 }
 
 function createDownloadToken(
-  payload: DownloadTokenPayload,
+payload: DownloadTokenPayload,
 ): string {
-  const encodedPayload =
-    Buffer.from(
-      JSON.stringify(payload),
-    ).toString(
-      "base64url",
-    );
+const encodedPayload =
+Buffer.from(
+JSON.stringify(payload),
+).toString(
+"base64url",
+);
 
-  const signature =
-    createHmac(
-      "sha256",
-      getTokenSecret(),
-    )
-      .update(
-        encodedPayload,
-      )
-      .digest(
-        "base64url",
-      );
+const signature =
+createHmac(
+"sha256",
+getTokenSecret(),
+)
+.update(
+encodedPayload,
+)
+.digest(
+"base64url",
+);
 
-  return `${encodedPayload}.${signature}`;
+return ${encodedPayload}.${signature};
 }
 
 function parseDownloadToken(
-  token: string,
+token: string,
 ): DownloadTokenPayload | null {
-  const [
-    encodedPayload,
-    encodedSignature,
-  ] = token.split(".");
+const [
+encodedPayload,
+encodedSignature,
+] = token.split(".");
 
-  if (
-    !encodedPayload ||
-    !encodedSignature
-  ) {
-    return null;
-  }
+if (
+!encodedPayload ||
+!encodedSignature
+) {
+return null;
+}
 
-  try {
-    const expectedSignature =
-      createHmac(
-        "sha256",
-        getTokenSecret(),
-      )
-        .update(
-          encodedPayload,
-        )
-        .digest();
+try {
+const expectedSignature =
+createHmac(
+"sha256",
+getTokenSecret(),
+)
+.update(
+encodedPayload,
+)
+.digest();
 
-    const providedSignature =
-      Buffer.from(
-        encodedSignature,
-        "base64url",
-      );
+const providedSignature =  
+  Buffer.from(  
+    encodedSignature,  
+    "base64url",  
+  );  
 
-    if (
-      providedSignature.length !==
-        expectedSignature.length ||
-      !timingSafeEqual(
-        providedSignature,
-        expectedSignature,
-      )
-    ) {
-      return null;
-    }
+if (  
+  providedSignature.length !==  
+    expectedSignature.length ||  
+  !timingSafeEqual(  
+    providedSignature,  
+    expectedSignature,  
+  )  
+) {  
+  return null;  
+}  
 
-    const payload =
-      JSON.parse(
-        Buffer.from(
-          encodedPayload,
-          "base64url",
-        ).toString(
-          "utf8",
-        ),
-      ) as Partial<DownloadTokenPayload>;
+const payload =  
+  JSON.parse(  
+    Buffer.from(  
+      encodedPayload,  
+      "base64url",  
+    ).toString(  
+      "utf8",  
+    ),  
+  ) as Partial<DownloadTokenPayload>;  
 
-    if (
-      typeof payload.url !==
-        "string" ||
-      typeof payload.pinId !==
-        "string" ||
-      typeof payload.filename !==
-        "string" ||
-      typeof payload.expiresAt !==
-        "number" ||
-      ![
-        "video",
-        "image",
-        "carousel",
-      ].includes(
-        payload.mediaType as string,
-      )
-    ) {
-      return null;
-    }
+if (  
+  typeof payload.url !==  
+    "string" ||  
+  typeof payload.pinId !==  
+    "string" ||  
+  typeof payload.filename !==  
+    "string" ||  
+  typeof payload.expiresAt !==  
+    "number" ||  
+  ![  
+    "video",  
+    "image",  
+    "carousel",  
+  ].includes(  
+    payload.mediaType as string,  
+  )  
+) {  
+  return null;  
+}  
 
-    return {
-      ...payload,
-      imageFormat:
-        normalizeImageFormat(
-          payload.imageFormat,
-        ),
-    } as DownloadTokenPayload;
-  } catch {
-    return null;
-  }
+return {  
+  ...payload,  
+  imageFormat:  
+    normalizeImageFormat(  
+      payload.imageFormat,  
+    ),  
+} as DownloadTokenPayload;
+
+} catch {
+return null;
+}
 }
 
 // ============================================================
@@ -726,61 +734,62 @@ function parseDownloadToken(
 // ============================================================
 
 function isPinterestUrl(
-  rawUrl: string,
+rawUrl: string,
 ): boolean {
-  try {
-    const parsed =
-      new URL(rawUrl);
+try {
+const parsed =
+new URL(rawUrl);
 
-    const host =
-      parsed.hostname.toLowerCase();
+const host =  
+  parsed.hostname.toLowerCase();  
 
-    return (
-      host === "pin.it" ||
-      host === "pinterest.com" ||
-      host.endsWith(
-        ".pinterest.com",
-      ) ||
-      host.endsWith(
-        ".pinterest.ca",
-      ) ||
-      host.endsWith(
-        ".pinterest.co.uk",
-      ) ||
-      host.endsWith(
-        ".pinterest.fr",
-      ) ||
-      host.endsWith(
-        ".pinterest.de",
-      ) ||
-      host.endsWith(
-        ".pinterest.it",
-      ) ||
-      host.endsWith(
-        ".pinterest.es",
-      ) ||
-      host.endsWith(
-        ".pinterest.se",
-      ) ||
-      host.endsWith(
-        ".pinterest.pt",
-      ) ||
-      host.endsWith(
-        ".pinterest.nz",
-      ) ||
-      host.endsWith(
-        ".pinterest.at",
-      ) ||
-      host.endsWith(
-        ".pinterest.mx",
-      ) ||
-      host.endsWith(
-        ".pinterest.jp",
-      )
-    );
-  } catch {
-    return false;
-  }
+return (  
+  host === "pin.it" ||  
+  host === "pinterest.com" ||  
+  host.endsWith(  
+    ".pinterest.com",  
+  ) ||  
+  host.endsWith(  
+    ".pinterest.ca",  
+  ) ||  
+  host.endsWith(  
+    ".pinterest.co.uk",  
+  ) ||  
+  host.endsWith(  
+    ".pinterest.fr",  
+  ) ||  
+  host.endsWith(  
+    ".pinterest.de",  
+  ) ||  
+  host.endsWith(  
+    ".pinterest.it",  
+  ) ||  
+  host.endsWith(  
+    ".pinterest.es",  
+  ) ||  
+  host.endsWith(  
+    ".pinterest.se",  
+  ) ||  
+  host.endsWith(  
+    ".pinterest.pt",  
+  ) ||  
+  host.endsWith(  
+    ".pinterest.nz",  
+  ) ||  
+  host.endsWith(  
+    ".pinterest.at",  
+  ) ||  
+  host.endsWith(  
+    ".pinterest.mx",  
+  ) ||  
+  host.endsWith(  
+    ".pinterest.jp",  
+  )  
+);
+
+} catch {
+return false;
+}
 }
 
 // ============================================================
@@ -788,162 +797,163 @@ function isPinterestUrl(
 // ============================================================
 
 function getYtDlpCommand(): string {
-  if (
-    process.env.YT_DLP_PATH
-  ) {
-    return process.env.YT_DLP_PATH;
-  }
+if (
+process.env.YT_DLP_PATH
+) {
+return process.env.YT_DLP_PATH;
+}
 
-  if (
-    fs.existsSync(
-      bundledYtDlpPath,
-    )
-  ) {
-    return bundledYtDlpPath;
-  }
+if (
+fs.existsSync(
+bundledYtDlpPath,
+)
+) {
+return bundledYtDlpPath;
+}
 
-  return "yt-dlp";
+return "yt-dlp";
 }
 
 function runYtDlp(
-  args: string[],
-  onStderrLine?: (
-    line: string,
-  ) => void,
+args: string[],
+onStderrLine?: (
+line: string,
+) => void,
 ): Promise<{
-  stdout: string;
-  stderr: string;
+stdout: string;
+stderr: string;
 }> {
-  return new Promise(
-    (
-      resolve,
-      reject,
-    ) => {
-      const proc =
-        spawn(
-          getYtDlpCommand(),
-          args,
-          {
-            stdio: [
-              "ignore",
-              "pipe",
-              "pipe",
-            ],
-          },
-        );
+return new Promise(
+(
+resolve,
+reject,
+) => {
+const proc =
+spawn(
+getYtDlpCommand(),
+args,
+{
+stdio: [
+"ignore",
+"pipe",
+"pipe",
+],
+},
+);
 
-      const timeout =
-        setTimeout(
-          () => {
-            proc.kill(
-              "SIGKILL",
-            );
+const timeout =  
+    setTimeout(  
+      () => {  
+        proc.kill(  
+          "SIGKILL",  
+        );  
 
-            reject(
-              new Error(
-                "TIMEOUT",
-              ),
-            );
-          },
-          YTDLP_TIMEOUT_MS,
-        );
+        reject(  
+          new Error(  
+            "TIMEOUT",  
+          ),  
+        );  
+      },  
+      YTDLP_TIMEOUT_MS,  
+    );  
 
-      let stdout = "";
-      let stderr = "";
-      let stderrBuf = "";
+  let stdout = "";  
+  let stderr = "";  
+  let stderrBuf = "";  
 
-      proc.stdout.on(
-        "data",
-        (
-          d: Buffer,
-        ) => {
-          stdout +=
-            d.toString();
-        },
-      );
+  proc.stdout.on(  
+    "data",  
+    (  
+      d: Buffer,  
+    ) => {  
+      stdout +=  
+        d.toString();  
+    },  
+  );  
 
-      proc.stderr.on(
-        "data",
-        (
-          d: Buffer,
-        ) => {
-          const chunk =
-            d.toString();
+  proc.stderr.on(  
+    "data",  
+    (  
+      d: Buffer,  
+    ) => {  
+      const chunk =  
+        d.toString();  
 
-          stderr += chunk;
+      stderr += chunk;  
 
-          if (
-            onStderrLine
-          ) {
-            stderrBuf +=
-              chunk;
+      if (  
+        onStderrLine  
+      ) {  
+        stderrBuf +=  
+          chunk;  
 
-            const lines =
-              stderrBuf.split(
-                "\n",
-              );
+        const lines =  
+          stderrBuf.split(  
+            "\n",  
+          );  
 
-            stderrBuf =
-              lines.pop() ??
-              "";
+        stderrBuf =  
+          lines.pop() ??  
+          "";  
 
-            for (
-              const line of
-              lines
-            ) {
-              onStderrLine(
-                line,
-              );
-            }
-          }
-        },
-      );
+        for (  
+          const line of  
+          lines  
+        ) {  
+          onStderrLine(  
+            line,  
+          );  
+        }  
+      }  
+    },  
+  );  
 
-      proc.on(
-        "close",
-        (
-          code: number | null,
-        ) => {
-          clearTimeout(
-            timeout,
-          );
+  proc.on(  
+    "close",  
+    (  
+      code: number | null,  
+    ) => {  
+      clearTimeout(  
+        timeout,  
+      );  
 
-          if (
-            code !== 0
-          ) {
-            reject(
-              Object.assign(
-                new Error(
-                  `yt-dlp exit ${code}`,
-                ),
-                {
-                  code,
-                  stdout,
-                  stderr,
-                },
-              ),
-            );
-          } else {
-            resolve({
-              stdout,
-              stderr,
-            });
-          }
-        },
-      );
+      if (  
+        code !== 0  
+      ) {  
+        reject(  
+          Object.assign(  
+            new Error(  
+              `yt-dlp exit ${code}`,  
+            ),  
+            {  
+              code,  
+              stdout,  
+              stderr,  
+            },  
+          ),  
+        );  
+      } else {  
+        resolve({  
+          stdout,  
+          stderr,  
+        });  
+      }  
+    },  
+  );  
 
-      proc.on(
-        "error",
-        (err) => {
-          clearTimeout(
-            timeout,
-          );
+  proc.on(  
+    "error",  
+    (err) => {  
+      clearTimeout(  
+        timeout,  
+      );  
 
-          reject(err);
-        },
-      );
-    },
-  );
+      reject(err);  
+    },  
+  );  
+},
+
+);
 }
 
 // ============================================================
@@ -951,287 +961,71 @@ function runYtDlp(
 // ============================================================
 
 async function fetchPinterestCarouselImages(
-  pinUrl: string,
+pinUrl: string,
 ): Promise<string[]> {
-  try {
-    const response = await fetch(pinUrl, {
-      method: "GET",
-      redirect: "follow",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept":
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language":
-          "en-US,en;q=0.9",
-      },
-    });
+try {
+const response = await fetch(pinUrl, {
+method: "GET",
+redirect: "follow",
+headers: {
+"User-Agent":
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+"Accept":
+"text/html,application/xhtml+xml,application/xml;q=0.9,/;q=0.8",
+"Accept-Language": "en-US,en;q=0.9",
+},
+});
 
-    if (!response.ok) {
-      return [];
-    }
+if (!response.ok) {  
+  return [];  
+}  
 
-    const html =
-      await response.text();
+const html = await response.text();  
 
-    const seenIds =
-      new Set<string>();
+const seenIds = new Set<string>();  
+const urls: string[] = [];  
 
-    const urls: string[] = [];
+const originalsRegex =  
+  /https:\/\/i\.pinimg\.com\/originals\/([a-f0-9]+)\/[^"'\s\\<>]+\.(?:jpg|jpeg|png|webp)/gi;  
 
-    const originalsRegex =
-      /https:\/\/i\.pinimg\.com\/originals\/([a-f0-9]+)\/[^"'\s\\<>]+\.(?:jpg|jpeg|png|webp)/gi;
+for (const m of html.matchAll(originalsRegex)) {  
+  const fullUrl = m[0];  
+  const pinId = m[1];  
 
-    for (
-      const m of html.matchAll(
-        originalsRegex,
-      )
-    ) {
-      const fullUrl = m[0];
-      const pinId = m[1];
+  if (!seenIds.has(pinId)) {  
+    seenIds.add(pinId);  
+    urls.push(fullUrl);  
+  }  
+}  
 
-      if (!seenIds.has(pinId)) {
-        seenIds.add(pinId);
-        urls.push(fullUrl);
-      }
-    }
+if (urls.length < 2) {  
+  const mediumRegex =  
+    /https:\/\/i\.pinimg\.com\/(?:736x|564x|474x)\/([a-f0-9]+)\/[^"'\s\\<>]+\.(?:jpg|jpeg|png|webp)/gi;  
 
-    if (urls.length < 2) {
-      const mediumRegex =
-        /https:\/\/i\.pinimg\.com\/(?:736x|564x|474x)\/([a-f0-9]+)\/[^"'\s\\<>]+\.(?:jpg|jpeg|png|webp)/gi;
+  for (const m of html.matchAll(mediumRegex)) {  
+    const fullUrl = m[0];  
+    const pinId = m[1];  
 
-      for (
-        const m of html.matchAll(
-          mediumRegex,
-        )
-      ) {
-        const fullUrl = m[0];
-        const pinId = m[1];
+    if (!seenIds.has(pinId)) {  
+      seenIds.add(pinId);  
+      urls.push(fullUrl);  
+    }  
+  }  
+}  
 
-        if (!seenIds.has(pinId)) {
-          seenIds.add(pinId);
-          urls.push(fullUrl);
-        }
-      }
-    }
+return urls;
 
-    return urls;
-  } catch (err) {
-    console.error(
-      "fetchPinterestCarouselImages failed:",
-      err instanceof Error
-        ? err.message
-        : String(err),
-    );
+} catch (err) {
+console.error(
+"fetchPinterestCarouselImages failed:",
+err instanceof Error
+? err.message
+: String(err),
+);
 
-    return [];
-  }
+return [];
+
 }
-
-// ============================================================
-// PINTEREST VIDEO HTML FALLBACK
-// ============================================================
-
-async function fetchPinterestVideoUrl(
-  pinUrl: string,
-): Promise<string | null> {
-  try {
-    const response = await fetch(pinUrl, {
-      method: "GET",
-      redirect: "follow",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept":
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language":
-          "en-US,en;q=0.9",
-      },
-    });
-
-    if (!response.ok) {
-      console.error(
-        "Pinterest video HTML request failed:",
-        response.status,
-      );
-
-      return null;
-    }
-
-    const html =
-      await response.text();
-
-    /*
-     * Pinterest embeds media information in HTML/JSON.
-     * Depending on the current Pinterest response, URLs may
-     * be escaped as \/ or \u002F.
-     */
-    const decoded =
-      html
-        .replace(
-          /\\u002F/gi,
-          "/",
-        )
-        .replace(
-          /\\u0026/gi,
-          "&",
-        )
-        .replace(
-          /\\\//g,
-          "/",
-        )
-        .replace(
-          /&amp;/gi,
-          "&",
-        );
-
-    const candidates: string[] = [];
-
-    // --------------------------------------------------------
-    // HLS / M3U8
-    // --------------------------------------------------------
-
-    const m3u8Regex =
-      /https?:\/\/[^"'\\\s<>]+\.m3u8(?:\?[^"'\\\s<>]*)?/gi;
-
-    for (
-      const match of decoded.matchAll(
-        m3u8Regex,
-      )
-    ) {
-      candidates.push(
-        match[0],
-      );
-    }
-
-    // --------------------------------------------------------
-    // Direct MP4
-    // --------------------------------------------------------
-
-    const mp4Regex =
-      /https?:\/\/[^"'\\\s<>]+\.mp4(?:\?[^"'\\\s<>]*)?/gi;
-
-    for (
-      const match of decoded.matchAll(
-        mp4Regex,
-      )
-    ) {
-      candidates.push(
-        match[0],
-      );
-    }
-
-    const cleaned =
-      candidates
-        .map((value) =>
-          value
-            .replace(
-              /\\u0026/gi,
-              "&",
-            )
-            .replace(
-              /\\\//g,
-              "/",
-            )
-            .replace(
-              /&amp;/gi,
-              "&",
-            ),
-        )
-        .filter((value) =>
-          /^https?:\/\//i.test(
-            value,
-          ),
-        );
-
-    // Prefer HLS.
-    const hls =
-      cleaned.find((value) =>
-        /\.m3u8(?:\?|$)/i.test(
-          value,
-        ),
-      );
-
-    if (hls) {
-      console.log(
-        "Pinterest HTML fallback found HLS video URL",
-      );
-
-      return hls;
-    }
-
-    const mp4 =
-      cleaned.find((value) =>
-        /\.mp4(?:\?|$)/i.test(
-          value,
-        ),
-      );
-
-    if (mp4) {
-      console.log(
-        "Pinterest HTML fallback found MP4 video URL",
-      );
-
-      return mp4;
-    }
-
-    /*
-     * Extra escaped URL pass.
-     */
-    const escapedVideoRegex =
-      /https?:\\?\/\\?\/[^"'\\\s<>]+(?:\.m3u8|\.mp4)(?:\\?[^"'\\\s<>]*)?/gi;
-
-    for (
-      const match of decoded.matchAll(
-        escapedVideoRegex,
-      )
-    ) {
-      const candidate =
-        match[0]
-          .replace(
-            /\\\//g,
-            "/",
-          )
-          .replace(
-            /\\u0026/gi,
-            "&",
-          )
-          .replace(
-            /&amp;/gi,
-            "&",
-          );
-
-      if (
-        /\.m3u8(?:\?|$)/i.test(
-          candidate,
-        ) ||
-        /\.mp4(?:\?|$)/i.test(
-          candidate,
-        )
-      ) {
-        console.log(
-          "Pinterest escaped video URL found",
-        );
-
-        return candidate;
-      }
-    }
-
-    console.log(
-      "Pinterest HTML fallback found no video URL",
-    );
-
-    return null;
-  } catch (err) {
-    console.error(
-      "fetchPinterestVideoUrl failed:",
-      err instanceof Error
-        ? err.message
-        : String(err),
-    );
-
-    return null;
-  }
 }
 
 // ============================================================
@@ -1239,682 +1033,459 @@ async function fetchPinterestVideoUrl(
 // ============================================================
 
 interface PinMeta {
-  id: string;
-  title: string | null;
-  hasVideo: boolean;
-  isImage?: boolean;
-  isGif?: boolean;
-  isCarousel?: boolean;
-  imageUrl?: string | null;
-  carouselImages?: string[];
-  videoUrl?: string | null;
+id: string;
+title: string | null;
+hasVideo: boolean;
+isImage?: boolean;
+isGif?: boolean;
+isCarousel?: boolean;
+imageUrl?: string | null;
+carouselImages?: string[];
 }
 
 function isImageLikeEntry(
-  entry: Record<string, unknown>,
+entry: Record<string, unknown>,
 ): boolean {
-  const entryExt =
-    String(
-      entry.ext || "",
-    ).toLowerCase();
+const entryExt =
+String(
+entry.ext || "",
+).toLowerCase();
 
-  const entryUrl =
-    String(
-      entry.url || "",
-    ).toLowerCase();
+const entryUrl =
+String(
+entry.url || "",
+).toLowerCase();
 
-  const entryFormats =
-    (entry.formats as Array<
-      Record<string, unknown>
-    >) || [];
+const entryFormats =
+(entry.formats as Array<
+Record<string, unknown>
+>) || [];
 
-  const hasVideo =
-    entryFormats.some(
-      (f) =>
-        f.vcodec &&
-        f.vcodec !== "none" &&
-        f.vcodec !== null,
-    );
+const hasVideo =
+entryFormats.some(
+(f) =>
+f.vcodec &&
+f.vcodec !==
+"none" &&
+f.vcodec !== null,
+);
 
-  if (hasVideo) return false;
+if (hasVideo) return false;
 
-  if (
-    [
-      "jpg",
-      "jpeg",
-      "png",
-      "webp",
-      "gif",
-    ].includes(entryExt)
-  ) {
-    return true;
-  }
+if (
+[
+"jpg",
+"jpeg",
+"png",
+"webp",
+"gif",
+].includes(entryExt)
+) {
+return true;
+}
 
-  if (
-    /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(
-      entryUrl,
-    )
-  ) {
-    return true;
-  }
+if (
+/.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(
+entryUrl,
+)
+) {
+return true;
+}
 
-  const directImage =
-    entry.image_url ||
-    entry.thumbnail ||
-    entry.url;
+const directImage =
+entry.image_url ||
+entry.thumbnail ||
+entry.url;
 
-  return (
-    typeof directImage ===
-      "string" &&
-    directImage.length > 0
-  );
+return (
+typeof directImage ===
+"string" &&
+directImage.length > 0
+);
 }
 
 function countImageCollection(
-  value: unknown,
+value: unknown,
 ): number {
-  if (Array.isArray(value)) {
-    return value.filter((item) => {
-      if (typeof item === "string") {
-        return true;
-      }
+if (Array.isArray(value)) {
+return value.filter((item) => {
+if (typeof item === "string") return true;
 
-      if (
-        item &&
-        typeof item === "object"
-      ) {
-        const obj =
-          item as Record<
-            string,
-            unknown
-          >;
+if (  
+    item &&  
+    typeof item === "object"  
+  ) {  
+    const obj =  
+      item as Record<  
+        string,  
+        unknown  
+      >;  
 
-        const url =
-          obj.url ||
-          obj.image_url ||
-          obj.src ||
-          obj.thumbnail;
+    const url =  
+      obj.url ||  
+      obj.image_url ||  
+      obj.src ||  
+      obj.thumbnail;  
 
-        if (
-          typeof url === "string" &&
-          /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(
-            url,
-          )
-        ) {
-          return true;
-        }
+    if (  
+      typeof url === "string" &&  
+      /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(  
+        url,  
+      )  
+    ) {  
+      return true;  
+    }  
 
-        return (
-          typeof obj.url ===
-            "string" ||
-          typeof obj.image_url ===
-            "string"
-        );
-      }
+    return (  
+      typeof obj.url === "string" ||  
+      typeof obj.image_url ===  
+        "string"  
+    );  
+  }  
 
-      return false;
-    }).length;
-  }
+  return false;  
+}).length;
 
-  if (
-    !value ||
-    typeof value !== "object"
-  ) {
-    return 0;
-  }
+}
 
-  const obj =
-    value as Record<
-      string,
-      unknown
-    >;
+if (!value || typeof value !== "object") {
+return 0;
+}
 
-  let count = 0;
+const obj =
+value as Record<
+string,
+unknown
+>;
 
-  for (
-    const child of Object.values(
-      obj,
-    )
-  ) {
-    if (
-      typeof child === "string"
-    ) {
-      if (
-        /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(
-          child,
-        )
-      ) {
-        count++;
-      }
+let count = 0;
 
-      continue;
-    }
+for (const child of Object.values(obj)) {
+if (typeof child === "string") {
+if (
+/.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(
+child,
+)
+) {
+count++;
+}
+continue;
+}
 
-    if (
-      child &&
-      typeof child === "object"
-    ) {
-      const childObj =
-        child as Record<
-          string,
-          unknown
-        >;
+if (child && typeof child === "object") {  
+  const childObj =  
+    child as Record<  
+      string,  
+      unknown  
+    >;  
 
-      const childUrl =
-        childObj.url ||
-        childObj.image_url ||
-        childObj.src ||
-        childObj.thumbnail;
+  const childUrl =  
+    childObj.url ||  
+    childObj.image_url ||  
+    childObj.src ||  
+    childObj.thumbnail;  
 
-      if (
-        typeof childUrl ===
-          "string" &&
-        /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(
-          childUrl,
-        )
-      ) {
-        count++;
-      }
-    }
-  }
+  if (  
+    typeof childUrl === "string" &&  
+    /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(  
+      childUrl,  
+    )  
+  ) {  
+    count++;  
+  }  
+}
 
-  return count;
+}
+
+return count;
 }
 
 async function getPinMeta(
-  url: string,
+url: string,
 ): Promise<PinMeta> {
-  let stdout: string;
+let stdout: string;
 
-  try {
-    ({ stdout } = await runYtDlp([
-      "--dump-json",
-      "--no-warnings",
-      url,
-    ]));
-  } catch (err) {
-    const e = err as {
-      stderr?: string;
-      stdout?: string;
-    };
+try {
+({ stdout } = await runYtDlp([
+"--dump-json",
+"--no-warnings",
+url,
+]));
+} catch (err) {
+const e = err as {
+stderr?: string;
+stdout?: string;
+};
 
-    const errLower = (
-      e.stderr || ""
-    ).toLowerCase();
+const errLower = (  
+  e.stderr || ""  
+).toLowerCase();  
 
-    /*
-     * IMPORTANT:
-     *
-     * Previously Pinterest yt-dlp failures such as
-     * "unsupported url", "no video", or "not a video"
-     * were automatically classified as IMAGE.
-     *
-     * That is unsafe because Pinterest can fail to return
-     * metadata even when the actual video is still public.
-     *
-     * Try direct Pinterest HTML extraction first.
-     */
+if (  
+  errLower.includes(  
+    "unsupported url",  
+  ) ||  
+  errLower.includes("no video") ||  
+  errLower.includes("not a video")  
+) {  
+  return {  
+    id: randomBytes(4).toString("hex"),  
+    title: null,  
+    hasVideo: false,  
+    isImage: true,  
+  };  
+}  
 
-    if (
-      errLower.includes(
-        "unsupported url",
-      ) ||
-      errLower.includes(
-        "no video",
-      ) ||
-      errLower.includes(
-        "not a video",
-      ) ||
-      errLower.includes(
-        "no video formats",
-      )
-    ) {
-      console.log(
-        "yt-dlp Pinterest metadata failed; trying HTML video fallback...",
-      );
+if (  
+  errLower.includes("private") ||  
+  errLower.includes("unavailable") ||  
+  errLower.includes("not available") ||  
+  errLower.includes("not exist") ||  
+  errLower.includes("login required")  
+) {  
+  throw new Error("UNAVAILABLE");  
+}  
 
-      const fallbackVideoUrl =
-        await fetchPinterestVideoUrl(
-          url,
-        );
+throw err;
 
-      if (fallbackVideoUrl) {
-        return {
-          id: randomBytes(
-            4,
-          ).toString("hex"),
-          title: null,
-          hasVideo: true,
-          videoUrl:
-            fallbackVideoUrl,
-        };
-      }
+}
 
-      /*
-       * If there is no video, check the page for images.
-       * This preserves image/carousel support.
-       */
-      const carouselImages =
-        await fetchPinterestCarouselImages(
-          url,
-        );
+const lines = stdout
+.trim()
+.split("\n");
 
-      if (
-        carouselImages.length > 1
-      ) {
-        return {
-          id: randomBytes(
-            4,
-          ).toString("hex"),
-          title: null,
-          hasVideo: false,
-          isCarousel: true,
-          carouselImages,
-        };
-      }
+let info:
+| Record<string, unknown>
+| null = null;
 
-      if (
-        carouselImages.length === 1
-      ) {
-        return {
-          id: randomBytes(
-            4,
-          ).toString("hex"),
-          title: null,
-          hasVideo: false,
-          isImage: true,
-          imageUrl:
-            carouselImages[0],
-        };
-      }
+for (let i = lines.length - 1; i >= 0; i--) {
+try {
+const parsed = JSON.parse(
+lines[i].trim(),
+);
 
-      throw new Error(
-        "UNAVAILABLE",
-      );
-    }
+if (  
+    parsed &&  
+    typeof parsed === "object"  
+  ) {  
+    info = parsed;  
+    break;  
+  }  
+} catch {  
+  /* skip */  
+}
 
-    /*
-     * Private/unavailable links get one final direct-media
-     * attempt before being declared unavailable.
-     */
-    if (
-      errLower.includes(
-        "private",
-      ) ||
-      errLower.includes(
-        "unavailable",
-      ) ||
-      errLower.includes(
-        "not available",
-      ) ||
-      errLower.includes(
-        "not exist",
-      ) ||
-      errLower.includes(
-        "login required",
-      )
-    ) {
-      const fallbackVideoUrl =
-        await fetchPinterestVideoUrl(
-          url,
-        );
+}
 
-      if (fallbackVideoUrl) {
-        return {
-          id: randomBytes(
-            4,
-          ).toString("hex"),
-          title: null,
-          hasVideo: true,
-          videoUrl:
-            fallbackVideoUrl,
-        };
-      }
+if (!info) {
+throw new Error("PARSE_ERROR");
+}
 
-      throw new Error(
-        "UNAVAILABLE",
-      );
-    }
+const formats =
+(info.formats as Array<
+Record<string, unknown>
+>) || [];
 
-    throw err;
-  }
+const hasVideoFormats =
+formats.some(
+(f) =>
+f.vcodec &&
+f.vcodec !== "none" &&
+f.vcodec !== null,
+);
 
-  const lines = stdout
-    .trim()
-    .split("\n");
+const ext = (
+(info.ext as string) || ""
+).toLowerCase();
 
-  let info:
-    | Record<string, unknown>
-    | null = null;
+// ─── Enhanced GIF detection ───
+// Pinterest GIFs often come as .mp4 from yt-dlp.
+// Check original input URL + all info URL fields for .gif pattern.
+const originalInputUrl = url.toLowerCase();
+const infoUrl = String(
+(info.url as string) || ""
+).toLowerCase();
+const infoImageUrl = String(
+(info.image_url as string) || ""
+).toLowerCase();
+const infoWebpageUrl = String(
+(info.webpage_url as string) || ""
+).toLowerCase();
 
-  for (
-    let i = lines.length - 1;
-    i >= 0;
-    i--
-  ) {
-    try {
-      const parsed =
-        JSON.parse(
-          lines[i].trim(),
-        );
+const gifUrlPattern =
+/(?:.gif(?:[?#]|$)|/gif/|/gifs/)/i;
 
-      if (
-        parsed &&
-        typeof parsed === "object"
-      ) {
-        info = parsed;
-        break;
-      }
-    } catch {
-      /* skip */
-    }
-  }
+const urlLooksLikeGif =
+gifUrlPattern.test(originalInputUrl) ||
+gifUrlPattern.test(infoUrl) ||
+gifUrlPattern.test(infoImageUrl) ||
+gifUrlPattern.test(infoWebpageUrl);
 
-  if (!info) {
-    throw new Error(
-      "PARSE_ERROR",
-    );
-  }
+const isGif = ext === "gif" || urlLooksLikeGif;
 
-  const formats =
-    (info.formats as Array<
-      Record<string, unknown>
-    >) || [];
+const isImage = [
+"jpg",
+"jpeg",
+"png",
+"webp",
+].includes(ext);
 
-  const hasVideoFormats =
-    formats.some(
-      (f) =>
-        f.vcodec &&
-        f.vcodec !== "none" &&
-        f.vcodec !== null,
-    );
+const entries =
+info.entries as
+| Array<
+Record<string, unknown>
+>
+| undefined;
 
-  const ext = (
-    (info.ext as string) || ""
-  ).toLowerCase();
+const infoType = String(
+info._type || "",
+).toLowerCase();
 
-  // ========================================================
-  // GIF DETECTION
-  // ========================================================
+if (
+infoType === "playlist" &&
+Array.isArray(entries)
+) {
+const imageEntries =
+entries.filter((entry) =>
+isImageLikeEntry(entry),
+);
 
-  const originalInputUrl =
-    url.toLowerCase();
+if (imageEntries.length > 1) {  
+  return {  
+    id:  
+      (info.id as string) ||  
+      randomBytes(4).toString("hex"),  
+    title:  
+      (info.title as string) || null,  
+    hasVideo: false,  
+    isCarousel: true,  
+  };  
+}  
 
-  const infoUrl = String(
-    (info.url as string) || "",
-  ).toLowerCase();
+if (  
+  entries.length > 1 &&  
+  imageEntries.length >= 1  
+) {  
+  return {  
+    id:  
+      (info.id as string) ||  
+      randomBytes(4).toString("hex"),  
+    title:  
+      (info.title as string) || null,  
+    hasVideo: false,  
+    isCarousel: true,  
+  };  
+}
 
-  const infoImageUrl = String(
-    (info.image_url as string) || "",
-  ).toLowerCase();
+}
 
-  const infoWebpageUrl = String(
-    (info.webpage_url as string) || "",
-  ).toLowerCase();
+if (
+Array.isArray(entries) &&
+entries.length > 1
+) {
+const imageEntries =
+entries.filter((entry) =>
+isImageLikeEntry(entry),
+);
 
-  const gifUrlPattern =
-    /(?:\.gif(?:[?#]|$)|\/gif\/|\/gifs\/)/i;
+if (imageEntries.length > 1) {  
+  return {  
+    id:  
+      (info.id as string) ||  
+      randomBytes(4).toString("hex"),  
+    title:  
+      (info.title as string) || null,  
+    hasVideo: false,  
+    isCarousel: true,  
+  };  
+}
 
-  const urlLooksLikeGif =
-    gifUrlPattern.test(
-      originalInputUrl,
-    ) ||
-    gifUrlPattern.test(
-      infoUrl,
-    ) ||
-    gifUrlPattern.test(
-      infoImageUrl,
-    ) ||
-    gifUrlPattern.test(
-      infoWebpageUrl,
-    );
+}
 
-  const isGif =
-    ext === "gif" ||
-    urlLooksLikeGif;
+const imageCollectionCount =
+countImageCollection(info.images);
 
-  const isImage = [
-    "jpg",
-    "jpeg",
-    "png",
-    "webp",
-  ].includes(ext);
+const thumbnailCollectionCount =
+countImageCollection(
+info.thumbnails,
+);
 
-  const entries =
-    info.entries as
-      | Array<
-          Record<string, unknown>
-        >
-      | undefined;
+if (imageCollectionCount > 1) {
+return {
+id:
+(info.id as string) ||
+randomBytes(4).toString("hex"),
+title:
+(info.title as string) || null,
+hasVideo: false,
+isCarousel: true,
+};
+}
 
-  const infoType = String(
-    info._type || "",
-  ).toLowerCase();
+if (
+thumbnailCollectionCount > 1 &&
+!hasVideoFormats
+) {
+return {
+id:
+(info.id as string) ||
+randomBytes(4).toString("hex"),
+title:
+(info.title as string) || null,
+hasVideo: false,
+isCarousel: true,
+};
+}
 
-  // ========================================================
-  // PLAYLIST / CAROUSEL
-  // ========================================================
+// ─── HTML-based carousel detection ───
+if (!hasVideoFormats) {
+const carouselImages =
+await fetchPinterestCarouselImages(url);
 
-  if (
-    infoType === "playlist" &&
-    Array.isArray(entries)
-  ) {
-    const imageEntries =
-      entries.filter(
-        (entry) =>
-          isImageLikeEntry(entry),
-      );
+if (carouselImages.length > 1) {  
+  return {  
+    id:  
+      (info.id as string) ||  
+      randomBytes(4).toString("hex"),  
+    title:  
+      (info.title as string) || null,  
+    hasVideo: false,  
+    isCarousel: true,  
+    carouselImages,  
+  };  
+}
 
-    if (
-      imageEntries.length > 1
-    ) {
-      return {
-        id:
-          (info.id as string) ||
-          randomBytes(
-            4,
-          ).toString("hex"),
-        title:
-          (info.title as string) ||
-          null,
-        hasVideo: false,
-        isCarousel: true,
-      };
-    }
+}
 
-    if (
-      entries.length > 1 &&
-      imageEntries.length >= 1
-    ) {
-      return {
-        id:
-          (info.id as string) ||
-          randomBytes(
-            4,
-          ).toString("hex"),
-        title:
-          (info.title as string) ||
-          null,
-        hasVideo: false,
-        isCarousel: true,
-      };
-    }
-  }
+if (
+!hasVideoFormats ||
+isImage ||
+isGif
+) {
+return {
+id:
+(info.id as string) ||
+randomBytes(4).toString("hex"),
+title:
+(info.title as string) || null,
+hasVideo: false,
+isImage: true,
+isGif,
+imageUrl:
+(info.url as string) ||
+(info.image_url as string) ||
+null,
+};
+}
 
-  if (
-    Array.isArray(entries) &&
-    entries.length > 1
-  ) {
-    const imageEntries =
-      entries.filter(
-        (entry) =>
-          isImageLikeEntry(entry),
-      );
-
-    if (
-      imageEntries.length > 1
-    ) {
-      return {
-        id:
-          (info.id as string) ||
-          randomBytes(
-            4,
-          ).toString("hex"),
-        title:
-          (info.title as string) ||
-          null,
-        hasVideo: false,
-        isCarousel: true,
-      };
-    }
-  }
-
-  const imageCollectionCount =
-    countImageCollection(
-      info.images,
-    );
-
-  const thumbnailCollectionCount =
-    countImageCollection(
-      info.thumbnails,
-    );
-
-  if (
-    imageCollectionCount > 1
-  ) {
-    return {
-      id:
-        (info.id as string) ||
-        randomBytes(
-          4,
-        ).toString("hex"),
-      title:
-        (info.title as string) ||
-        null,
-      hasVideo: false,
-      isCarousel: true,
-    };
-  }
-
-  if (
-    thumbnailCollectionCount > 1 &&
-    !hasVideoFormats
-  ) {
-    return {
-      id:
-        (info.id as string) ||
-        randomBytes(
-          4,
-        ).toString("hex"),
-      title:
-        (info.title as string) ||
-        null,
-      hasVideo: false,
-      isCarousel: true,
-    };
-  }
-
-  // ========================================================
-  // HTML-BASED CAROUSEL DETECTION
-  // ========================================================
-
-  if (!hasVideoFormats) {
-    const carouselImages =
-      await fetchPinterestCarouselImages(
-        url,
-      );
-
-    if (
-      carouselImages.length > 1
-    ) {
-      return {
-        id:
-          (info.id as string) ||
-          randomBytes(
-            4,
-          ).toString("hex"),
-        title:
-          (info.title as string) ||
-          null,
-        hasVideo: false,
-        isCarousel: true,
-        carouselImages,
-      };
-    }
-
-    /*
-     * IMPORTANT:
-     *
-     * If yt-dlp returned metadata but did not expose video
-     * formats, try the Pinterest HTML video fallback before
-     * treating the pin as an image.
-     */
-    const fallbackVideoUrl =
-      await fetchPinterestVideoUrl(
-        url,
-      );
-
-    if (fallbackVideoUrl) {
-      return {
-        id:
-          (info.id as string) ||
-          randomBytes(
-            4,
-          ).toString("hex"),
-        title:
-          (info.title as string) ||
-          null,
-        hasVideo: true,
-        videoUrl:
-          fallbackVideoUrl,
-      };
-    }
-  }
-
-  // ========================================================
-  // IMAGE / GIF
-  // ========================================================
-
-  if (
-    !hasVideoFormats ||
-    isImage ||
-    isGif
-  ) {
-    return {
-      id:
-        (info.id as string) ||
-        randomBytes(
-          4,
-        ).toString("hex"),
-      title:
-        (info.title as string) ||
-        null,
-      hasVideo: false,
-      isImage: true,
-      isGif,
-      imageUrl:
-        (info.url as string) ||
-        (info.image_url as string) ||
-        null,
-    };
-  }
-
-  // ========================================================
-  // NORMAL VIDEO
-  // ========================================================
-
-  return {
-    id:
-      (info.id as string) ||
-      randomBytes(
-        4,
-      ).toString("hex"),
-    title:
-      (info.title as string) ||
-      null,
-    hasVideo: true,
-    videoUrl: null,
-  };
+return {
+id:
+(info.id as string) ||
+randomBytes(4).toString("hex"),
+title:
+(info.title as string) || null,
+hasVideo: true,
+};
 }
 
 // ============================================================
@@ -1922,1378 +1493,914 @@ async function getPinMeta(
 // ============================================================
 
 function getGalleryDlCommand(): string {
-  if (process.env.GALLERY_DL_PATH) {
-    return process.env.GALLERY_DL_PATH;
-  }
+if (process.env.GALLERY_DL_PATH) {
+return process.env.GALLERY_DL_PATH;
+}
 
-  return "gallery-dl";
+return "gallery-dl";
 }
 
 function runGalleryDl(
-  args: string[],
-  onStderrLine?: (
-    line: string,
-  ) => void,
+args: string[],
+onStderrLine?: (
+line: string,
+) => void,
 ): Promise<{
-  stdout: string;
-  stderr: string;
+stdout: string;
+stderr: string;
 }> {
-  return new Promise(
-    (
-      resolve,
-      reject,
-    ) => {
-      const proc =
-        spawn(
-          getGalleryDlCommand(),
-          args,
-          {
-            stdio: [
-              "ignore",
-              "pipe",
-              "pipe",
-            ],
-          },
-        );
+return new Promise((resolve, reject) => {
+const proc = spawn(
+getGalleryDlCommand(),
+args,
+{
+stdio: [
+"ignore",
+"pipe",
+"pipe",
+],
+},
+);
 
-      const timeout =
-        setTimeout(
-          () => {
-            proc.kill(
-              "SIGKILL",
-            );
+const timeout = setTimeout(() => {  
+  proc.kill("SIGKILL");  
+  reject(new Error("TIMEOUT"));  
+}, YTDLP_TIMEOUT_MS);  
 
-            reject(
-              new Error(
-                "TIMEOUT",
-              ),
-            );
-          },
-          YTDLP_TIMEOUT_MS,
-        );
+let stdout = "";  
+let stderr = "";  
+let stderrBuf = "";  
 
-      let stdout = "";
-      let stderr = "";
-      let stderrBuf = "";
+proc.stdout.on(  
+  "data",  
+  (d: Buffer) => {  
+    stdout += d.toString();  
+  },  
+);  
 
-      proc.stdout.on(
-        "data",
-        (
-          d: Buffer,
-        ) => {
-          stdout +=
-            d.toString();
-        },
-      );
+proc.stderr.on(  
+  "data",  
+  (d: Buffer) => {  
+    const chunk = d.toString();  
+    stderr += chunk;  
 
-      proc.stderr.on(
-        "data",
-        (
-          d: Buffer,
-        ) => {
-          const chunk =
-            d.toString();
+    if (onStderrLine) {  
+      stderrBuf += chunk;  
+      const lines = stderrBuf.split("\n");  
+      stderrBuf = lines.pop() ?? "";  
 
-          stderr += chunk;
+      for (const line of lines) {  
+        onStderrLine(line);  
+      }  
+    }  
+  },  
+);  
 
-          if (
-            onStderrLine
-          ) {
-            stderrBuf +=
-              chunk;
+proc.on(  
+  "close",  
+  (code: number | null) => {  
+    clearTimeout(timeout);  
 
-            const lines =
-              stderrBuf.split(
-                "\n",
-              );
+    if (code !== 0) {  
+      reject(  
+        Object.assign(  
+          new Error(  
+            `gallery-dl exit ${code}`,  
+          ),  
+          { code, stdout, stderr },  
+        ),  
+      );  
+    } else {  
+      resolve({ stdout, stderr });  
+    }  
+  },  
+);  
 
-            stderrBuf =
-              lines.pop() ?? "";
+proc.on("error", (err) => {  
+  clearTimeout(timeout);  
+  reject(err);  
+});
 
-            for (
-              const line of
-              lines
-            ) {
-              onStderrLine(
-                line,
-              );
-            }
-          }
-        },
-      );
-
-      proc.on(
-        "close",
-        (
-          code: number | null,
-        ) => {
-          clearTimeout(
-            timeout,
-          );
-
-          if (
-            code !== 0
-          ) {
-            reject(
-              Object.assign(
-                new Error(
-                  `gallery-dl exit ${code}`,
-                ),
-                {
-                  code,
-                  stdout,
-                  stderr,
-                },
-              ),
-            );
-          } else {
-            resolve({
-              stdout,
-              stderr,
-            });
-          }
-        },
-      );
-
-      proc.on(
-        "error",
-        (err) => {
-          clearTimeout(
-            timeout,
-          );
-
-          reject(err);
-        },
-      );
-    },
-  );
+});
 }
 
 // ============================================================
 // IMAGE HELPERS
 // ============================================================
 
-function findAllImages(
-  dir: string,
-): string[] {
-  const results: string[] = [];
+function findAllImages(dir: string): string[] {
+const results: string[] = [];
 
-  if (!fs.existsSync(dir)) {
-    return results;
-  }
-
-  const entries =
-    fs.readdirSync(
-      dir,
-      {
-        withFileTypes: true,
-      },
-    );
-
-  for (
-    const entry of entries
-  ) {
-    const fullPath =
-      path.join(
-        dir,
-        entry.name,
-      );
-
-    if (entry.isFile()) {
-      if (
-        /\.(jpg|jpeg|png|webp|gif)$/i.test(
-          entry.name,
-        )
-      ) {
-        results.push(
-          fullPath,
-        );
-      }
-    } else if (
-      entry.isDirectory()
-    ) {
-      results.push(
-        ...findAllImages(
-          fullPath,
-        ),
-      );
-    }
-  }
-
-  return results.sort(
-    (a, b) =>
-      a.localeCompare(
-        b,
-        undefined,
-        {
-          numeric: true,
-          sensitivity:
-            "base",
-        },
-      ),
-  );
+if (!fs.existsSync(dir)) {
+return results;
 }
 
-function escapeXml(
-  value: string,
-): string {
-  return value
-    .replace(
-      /&/g,
-      "&amp;",
-    )
-    .replace(
-      /"/g,
-      "&quot;",
-    )
-    .replace(
-      /</g,
-      "&lt;",
-    )
-    .replace(
-      />/g,
-      "&gt;",
-    );
+const entries = fs.readdirSync(dir, {
+withFileTypes: true,
+});
+
+for (const entry of entries) {
+const fullPath = path.join(
+dir,
+entry.name,
+);
+
+if (entry.isFile()) {  
+  if (  
+    /\.(jpg|jpeg|png|webp|gif)$/i.test(  
+      entry.name,  
+    )  
+  ) {  
+    results.push(fullPath);  
+  }  
+} else if (entry.isDirectory()) {  
+  results.push(  
+    ...findAllImages(fullPath),  
+  );  
+}
+
+}
+
+return results.sort((a, b) =>
+a.localeCompare(b, undefined, {
+numeric: true,
+sensitivity: "base",
+}),
+);
+}
+
+function escapeXml(value: string): string {
+return value
+.replace(/&/g, "&")
+.replace(/"/g, """)
+.replace(/</g, "<")
+.replace(/>/g, ">");
 }
 
 function getImageMimeType(
-  filePath: string,
+filePath: string,
 ): string {
-  const ext =
-    path
-      .extname(filePath)
-      .toLowerCase();
+const ext = path
+.extname(filePath)
+.toLowerCase();
 
-  if (ext === ".png")
-    return "image/png";
+if (ext === ".png") return "image/png";
+if (ext === ".webp") return "image/webp";
+if (ext === ".gif") return "image/gif";
 
-  if (ext === ".webp")
-    return "image/webp";
-
-  if (ext === ".gif")
-    return "image/gif";
-
-  return "image/jpeg";
+return "image/jpeg";
 }
 
 async function convertImageToPng(
-  inputPath: string,
+inputPath: string,
 ): Promise<string> {
-  const inputExt =
-    path
-      .extname(inputPath)
-      .toLowerCase();
+const inputExt = path
+.extname(inputPath)
+.toLowerCase();
 
-  if (inputExt === ".png") {
-    return inputPath;
-  }
+if (inputExt === ".png") {
+return inputPath;
+}
 
-  const outputPath =
-    path.join(
-      path.dirname(inputPath),
-      `${path.basename(
-        inputPath,
-        path.extname(inputPath),
-      )}-converted-${Date.now()}-${randomBytes(
-        3,
-      ).toString("hex")}.png`,
-    );
+const outputPath = path.join(
+path.dirname(inputPath),
+${path.basename(   inputPath,   path.extname(inputPath),   )}-converted-${Date.now()}-${randomBytes(   3,   ).toString("hex")}.png,
+);
 
-  if (
-    path.resolve(inputPath) ===
-    path.resolve(outputPath)
-  ) {
-    return inputPath;
-  }
+if (
+path.resolve(inputPath) ===
+path.resolve(outputPath)
+) {
+return inputPath;
+}
 
-  await sharp(
-    inputPath,
-    {
-      animated: false,
-    },
-  )
-    .png({
-      compressionLevel: 3,
-      adaptiveFiltering:
-        false,
-    })
-    .toFile(outputPath);
+await sharp(inputPath, {
+animated: false,
+})
+.png({
+compressionLevel: 3,
+adaptiveFiltering: false,
+})
+.toFile(outputPath);
 
-  if (
-    inputPath !== outputPath &&
-    fs.existsSync(inputPath)
-  ) {
-    try {
-      fs.unlinkSync(
-        inputPath,
-      );
-    } catch {
-      /* best-effort */
-    }
-  }
+if (
+inputPath !== outputPath &&
+fs.existsSync(inputPath)
+) {
+try {
+fs.unlinkSync(inputPath);
+} catch {
+/* best-effort */
+}
+}
 
-  return outputPath;
+return outputPath;
 }
 
 async function convertImageToSvg(
-  inputPath: string,
+inputPath: string,
 ): Promise<string> {
-  const buffer =
-    fs.readFileSync(
-      inputPath,
-    );
+const buffer = fs.readFileSync(inputPath);
 
-  const metadata =
-    await sharp(
-      inputPath,
-      {
-        animated: false,
-      },
-    ).metadata();
+const metadata = await sharp(
+inputPath,
+{ animated: false },
+).metadata();
 
-  const width =
-    metadata.width || 1;
+const width = metadata.width || 1;
+const height = metadata.height || 1;
 
-  const height =
-    metadata.height || 1;
+const mime = getImageMimeType(inputPath);
+const base64 = buffer.toString("base64");
 
-  const mime =
-    getImageMimeType(
-      inputPath,
-    );
+const outputPath = path.join(
+path.dirname(inputPath),
+${path.basename(   inputPath,   path.extname(inputPath),   )}-converted-${Date.now()}-${randomBytes(   3,   ).toString("hex")}.svg,
+);
 
-  const base64 =
-    buffer.toString(
-      "base64",
-    );
+const svg = <?xml version="1.0" encoding="UTF-8"?>   <svg xmlns="http://www.w3.org/2000/svg"   xmlns:xlink="http://www.w3.org/1999/xlink"   width="${width}"   height="${height}"   viewBox="0 0 ${width} ${height}">   <image   width="${width}"   height="${height}"   preserveAspectRatio="none"   href="data:${escapeXml(mime)};base64,${base64}"   />   </svg>   ;
 
-  const outputPath =
-    path.join(
-      path.dirname(inputPath),
-      `${path.basename(
-        inputPath,
-        path.extname(inputPath),
-      )}-converted-${Date.now()}-${randomBytes(
-        3,
-      ).toString("hex")}.svg`,
-    );
+fs.writeFileSync(outputPath, svg, "utf8");
 
-  const svg =
-    `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg"
-     xmlns:xlink="http://www.w3.org/1999/xlink"
-     width="${width}"
-     height="${height}"
-     viewBox="0 0 ${width} ${height}">
-  <image
-    width="${width}"
-    height="${height}"
-    preserveAspectRatio="none"
-    href="data:${escapeXml(mime)};base64,${base64}"
-  />
-</svg>
-`;
+if (
+inputPath !== outputPath &&
+fs.existsSync(inputPath)
+) {
+try {
+fs.unlinkSync(inputPath);
+} catch {
+/* best-effort */
+}
+}
 
-  fs.writeFileSync(
-    outputPath,
-    svg,
-    "utf8",
-  );
-
-  if (
-    inputPath !== outputPath &&
-    fs.existsSync(inputPath)
-  ) {
-    try {
-      fs.unlinkSync(
-        inputPath,
-      );
-    } catch {
-      /* best-effort */
-    }
-  }
-
-  return outputPath;
+return outputPath;
 }
 
 async function convertImage(
-  inputPath: string,
-  format: ImageFormat,
+inputPath: string,
+format: ImageFormat,
 ): Promise<string> {
-  const ext =
-    path
-      .extname(inputPath)
-      .toLowerCase();
+const ext = path
+.extname(inputPath)
+.toLowerCase();
 
-  if (ext === ".gif") {
-    return inputPath;
-  }
+if (ext === ".gif") {
+return inputPath;
+}
 
-  if (format === "svg") {
-    return convertImageToSvg(
-      inputPath,
-    );
-  }
+if (format === "svg") {
+return convertImageToSvg(inputPath);
+}
 
-  return convertImageToPng(
-    inputPath,
-  );
+return convertImageToPng(inputPath);
 }
 
 async function downloadDirectImage(
-  imageUrl: string,
-  outputDir: string,
-  pinId: string,
-): Promise<{
-  filePath: string;
-}> {
-  const response =
-    await fetch(
-      imageUrl,
-      {
-        redirect: "follow",
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          Referer:
-            "https://www.pinterest.com/",
-          Accept:
-            "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        },
-      },
-    );
+imageUrl: string,
+outputDir: string,
+pinId: string,
+): Promise<{ filePath: string }> {
+const response = await fetch(imageUrl, {
+redirect: "follow",
+headers: {
+"User-Agent":
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+Referer:
+"https://www.pinterest.com/",
+Accept:
+"image/avif,image/webp,image/apng,image/svg+xml,image/,/*;q=0.8",
+},
+});
 
-  if (!response.ok) {
-    throw new Error(
-      `IMAGE_FETCH_${response.status}`,
-    );
-  }
+if (!response.ok) {
+throw new Error(
+IMAGE_FETCH_${response.status},
+);
+}
 
-  const contentType = (
-    response.headers.get(
-      "content-type",
-    ) || ""
-  ).toLowerCase();
+const contentType = (
+response.headers.get("content-type") ||
+""
+).toLowerCase();
 
-  let ext = "jpg";
+let ext = "jpg";
 
-  if (
-    contentType.includes(
-      "image/png",
-    )
-  ) {
-    ext = "png";
-  } else if (
-    contentType.includes(
-      "image/webp",
-    )
-  ) {
-    ext = "webp";
-  } else if (
-    contentType.includes(
-      "image/gif",
-    )
-  ) {
-    ext = "gif";
-  } else if (
-    contentType.includes(
-      "image/jpeg",
-    )
-  ) {
-    ext = "jpg";
-  } else {
-    const urlExt =
-      imageUrl.match(
-        /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i,
-      );
+if (contentType.includes("image/png")) {
+ext = "png";
+} else if (
+contentType.includes("image/webp")
+) {
+ext = "webp";
+} else if (
+contentType.includes("image/gif")
+) {
+ext = "gif";
+} else if (
+contentType.includes("image/jpeg")
+) {
+ext = "jpg";
+} else {
+const urlExt = imageUrl.match(
+/.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i,
+);
 
-    if (urlExt) {
-      ext =
-        urlExt[1].toLowerCase();
+if (urlExt) {  
+  ext = urlExt[1].toLowerCase();  
+  if (ext === "jpeg") ext = "jpg";  
+}
 
-      if (ext === "jpeg") {
-        ext = "jpg";
-      }
-    }
-  }
+}
 
-  const buffer =
-    Buffer.from(
-      await response.arrayBuffer(),
-    );
+const buffer = Buffer.from(
+await response.arrayBuffer(),
+);
 
-  if (buffer.length < 100) {
-    throw new Error(
-      "EMPTY_IMAGE",
-    );
-  }
+if (buffer.length < 100) {
+throw new Error("EMPTY_IMAGE");
+}
 
-  const filePath =
-    path.join(
-      outputDir,
-      `${pinId}.${ext}`,
-    );
+const filePath = path.join(
+outputDir,
+${pinId}.${ext},
+);
 
-  fs.writeFileSync(
-    filePath,
-    buffer,
-  );
+fs.writeFileSync(filePath, buffer);
 
-  return {
-    filePath,
-  };
+return { filePath };
 }
 
 async function downloadImageOrCarousel(
-  url: string,
-  pinId: string,
-  onStage?: (
-    label: string,
-  ) => void,
-  imageUrl?: string | null,
-  imageFormat: ImageFormat = "png",
-  mediaKind:
-    | "image"
-    | "gif"
-    | "carousel" = "image",
+url: string,
+pinId: string,
+onStage?: (label: string) => void,
+imageUrl?: string | null,
+imageFormat: ImageFormat = "png",
+mediaKind:
+| "image"
+| "gif"
+| "carousel" = "image",
 ): Promise<{
-  filePath: string;
-  mediaType:
-    | "image"
-    | "carousel";
-  imageCount: number;
+filePath: string;
+mediaType: "image" | "carousel";
+imageCount: number;
 }> {
-  const outputDir =
-    `/tmp/pinme-img-${pinId}`;
+const outputDir =
+/tmp/pinme-img-${pinId};
 
-  fs.mkdirSync(
-    outputDir,
-    {
-      recursive: true,
-    },
-  );
+fs.mkdirSync(outputDir, {
+recursive: true,
+});
 
-  if (
-    imageUrl &&
-    mediaKind !== "carousel"
-  ) {
-    try {
-      onStage?.(
-        mediaKind === "gif"
-          ? "Downloading GIF..."
-          : "Downloading image...",
-      );
+if (
+imageUrl &&
+mediaKind !== "carousel"
+) {
+try {
+onStage?.(
+mediaKind === "gif"
+? "Downloading GIF..."
+: "Downloading image...",
+);
 
-      const direct =
-        await downloadDirectImage(
-          imageUrl,
-          outputDir,
-          pinId,
-        );
+const direct =  
+    await downloadDirectImage(  
+      imageUrl,  
+      outputDir,  
+      pinId,  
+    );  
 
-      const ext =
-        path
-          .extname(
-            direct.filePath,
-          )
-          .toLowerCase();
+  const ext = path  
+    .extname(direct.filePath)  
+    .toLowerCase();  
 
-      if (ext === ".gif") {
-        return {
-          filePath:
-            direct.filePath,
-          mediaType:
-            "image",
-          imageCount: 1,
-        };
-      }
+  if (ext === ".gif") {  
+    return {  
+      filePath: direct.filePath,  
+      mediaType: "image",  
+      imageCount: 1,  
+    };  
+  }  
 
-      onStage?.(
-        imageFormat === "svg"
-          ? "Converting image to SVG..."
-          : "Converting image to PNG...",
-      );
+  onStage?.(  
+    imageFormat === "svg"  
+      ? "Converting image to SVG..."  
+      : "Converting image to PNG...",  
+  );  
 
-      const converted =
-        await convertImage(
-          direct.filePath,
-          imageFormat,
-        );
+  const converted = await convertImage(  
+    direct.filePath,  
+    imageFormat,  
+  );  
 
-      return {
-        filePath:
-          converted,
-        mediaType:
-          "image",
-        imageCount: 1,
-      };
-    } catch (err) {
-      console.log(
-        "Direct image fetch failed:",
-        err,
-      );
-    }
-  }
-
-  if (
-    mediaKind === "carousel"
-  ) {
-    onStage?.(
-      "Downloading carousel...",
-    );
-  } else {
-    onStage?.(
-      mediaKind === "gif"
-        ? "Downloading GIF..."
-        : "Downloading image...",
-    );
-  }
-
-  try {
-    await runGalleryDl([
-      "-d",
-      outputDir,
-      "--no-part",
-      "--user-agent",
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      url,
-    ]);
-  } catch (err) {
-    console.error(
-      "gallery-dl failed:",
-      err,
-    );
-  }
-
-  let images =
-    findAllImages(
-      outputDir,
-    );
-
-  // ========================================================
-  // HTML FALLBACK FOR MISSING CAROUSEL IMAGES
-  // ========================================================
-
-  if (
-    mediaKind === "carousel" &&
-    images.length < 2
-  ) {
-    try {
-      onStage?.(
-        "Recovering missing images...",
-      );
-
-      const allImageUrls =
-        await fetchPinterestCarouselImages(
-          url,
-        );
-
-      console.log(
-        "DEBUG: HTML fallback found",
-        allImageUrls.length,
-        "image URLs (gallery-dl got",
-        images.length,
-        ")",
-      );
-
-      if (
-        allImageUrls.length >
-        images.length
-      ) {
-        const batchSize =
-          IMAGE_CONVERT_CONCURRENCY;
-
-        for (
-          let i = 0;
-          i < allImageUrls.length;
-          i += batchSize
-        ) {
-          const batch =
-            allImageUrls.slice(
-              i,
-              i + batchSize,
-            );
-
-          await Promise.all(
-            batch.map(
-              async (
-                imgUrl,
-                idx,
-              ) => {
-                try {
-                  const response =
-                    await fetch(
-                      imgUrl,
-                      {
-                        redirect:
-                          "follow",
-                        headers: {
-                          "User-Agent":
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                          Referer:
-                            "https://www.pinterest.com/",
-                          Accept:
-                            "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-                        },
-                      },
-                    );
-
-                  if (
-                    !response.ok
-                  ) {
-                    console.error(
-                      `Fallback image ${i + idx + 1} failed: ${response.status}`,
-                    );
-
-                    return;
-                  }
-
-                  const contentType =
-                    (
-                      response.headers.get(
-                        "content-type",
-                      ) || ""
-                    ).toLowerCase();
-
-                  let ext =
-                    "jpg";
-
-                  if (
-                    contentType.includes(
-                      "image/png",
-                    )
-                  ) {
-                    ext =
-                      "png";
-                  } else if (
-                    contentType.includes(
-                      "image/webp",
-                    )
-                  ) {
-                    ext =
-                      "webp";
-                  } else if (
-                    contentType.includes(
-                      "image/gif",
-                    )
-                  ) {
-                    ext =
-                      "gif";
-                  }
-
-                  const buffer =
-                    Buffer.from(
-                      await response.arrayBuffer(),
-                    );
-
-                  if (
-                    buffer.length <
-                    100
-                  ) {
-                    return;
-                  }
-
-                  const filePath =
-                    path.join(
-                      outputDir,
-                      `fallback-${String(
-                        i + idx + 1,
-                      ).padStart(
-                        3,
-                        "0",
-                      )}.${ext}`,
-                    );
-
-                  fs.writeFileSync(
-                    filePath,
-                    buffer,
-                  );
-
-                  console.log(
-                    `DEBUG: Fallback downloaded image ${i + idx + 1}`,
-                  );
-                } catch (err) {
-                  console.error(
-                    `Fallback image ${i + idx + 1} error:`,
-                    err,
-                  );
-                }
-              },
-            ),
-          );
-        }
-
-        const allImages =
-          findAllImages(
-            outputDir,
-          );
-
-        if (
-          allImages.length >
-          images.length
-        ) {
-          images =
-            allImages;
-
-          console.log(
-            "DEBUG: After fallback:",
-            images.length,
-            "images",
-          );
-        }
-      }
-    } catch (err) {
-      console.error(
-        "HTML fallback failed:",
-        err,
-      );
-    }
-  }
-
-  if (
-    images.length === 0
-  ) {
-    throw new Error(
-      "NO_FILE: no image found",
-    );
-  }
-
-  if (
-    images.length > 1
-  ) {
-    onStage?.(
-      imageFormat === "svg"
-        ? "Converting carousel to SVG..."
-        : "Converting carousel to PNG...",
-    );
-
-    const batchSize =
-      IMAGE_CONVERT_CONCURRENCY;
-
-    const convertedImages: string[] =
-      [];
-
-    for (
-      let i = 0;
-      i < images.length;
-      i += batchSize
-    ) {
-      const batch =
-        images.slice(
-          i,
-          i + batchSize,
-        );
-
-      const batchResults =
-        await Promise.all(
-          batch.map(
-            async (
-              imagePath,
-            ) => {
-              const ext =
-                path
-                  .extname(
-                    imagePath,
-                  )
-                  .toLowerCase();
-
-              if (
-                ext === ".gif"
-              ) {
-                return imagePath;
-              }
-
-              try {
-                return await convertImage(
-                  imagePath,
-                  imageFormat,
-                );
-              } catch {
-                return imagePath;
-              }
-            },
-          ),
-        );
-
-      convertedImages.push(
-        ...batchResults,
-      );
-    }
-
-    images =
-      convertedImages.sort(
-        (a, b) =>
-          a.localeCompare(
-            b,
-            undefined,
-            {
-              numeric: true,
-              sensitivity:
-                "base",
-            },
-          ),
-      );
-
-    onStage?.(
-      "Packaging carousel...",
-    );
-
-    const zipPath =
-      path.join(
-        outputDir,
-        `pinme-carousel-${pinId}.zip`,
-      );
-
-    await new Promise<void>(
-      (
-        resolve,
-        reject,
-      ) => {
-        const output =
-          fs.createWriteStream(
-            zipPath,
-          );
-
-        const archive =
-          archiver(
-            "zip",
-            {
-              store: true,
-            },
-          );
-
-        output.on(
-          "close",
-          () => resolve(),
-        );
-
-        output.on(
-          "error",
-          (err) =>
-            reject(err),
-        );
-
-        archive.on(
-          "error",
-          (err) =>
-            reject(err),
-        );
-
-        archive.pipe(
-          output,
-        );
-
-        images.forEach(
-          (
-            imgPath,
-            index,
-          ) => {
-            const ext =
-              path.extname(
-                imgPath,
-              );
-
-            archive.file(
-              imgPath,
-              {
-                name: `image-${String(
-                  index + 1,
-                ).padStart(
-                  2,
-                  "0",
-                )}${ext}`,
-              },
-            );
-          },
-        );
-
-        archive.finalize();
-      },
-    );
-
-    return {
-      filePath:
-        zipPath,
-      mediaType:
-        "carousel",
-      imageCount:
-        images.length,
-    };
-  }
-
-  if (
-    images.length === 1
-  ) {
-    const single =
-      images[0];
-
-    const ext =
-      path
-        .extname(
-          single,
-        )
-        .toLowerCase();
-
-    if (
-      ext === ".gif"
-    ) {
-      return {
-        filePath:
-          single,
-        mediaType:
-          "image",
-        imageCount: 1,
-      };
-    }
-
-    onStage?.(
-      imageFormat === "svg"
-        ? "Converting image to SVG..."
-        : "Converting image to PNG...",
-    );
-
-    const converted =
-      await convertImage(
-        single,
-        imageFormat,
-      );
-
-    return {
-      filePath:
-        converted,
-      mediaType:
-        "image",
-      imageCount: 1,
-    };
-  }
-
-  throw new Error(
-    "NO_FILE: no image found",
-  );
+  return {  
+    filePath: converted,  
+    mediaType: "image",  
+    imageCount: 1,  
+  };  
+} catch (err) {  
+  console.log(  
+    "Direct image fetch failed:",  
+    err,  
+  );  
 }
 
-// ============================================================
-// VIDEO DOWNLOAD
-// ============================================================
+}
+
+if (mediaKind === "carousel") {
+onStage?.("Downloading carousel...");
+} else {
+onStage?.(
+mediaKind === "gif"
+? "Downloading GIF..."
+: "Downloading image...",
+);
+}
+
+try {
+await runGalleryDl([
+"-d",
+outputDir,
+"--no-part",
+"--user-agent",
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+url,
+]);
+} catch (err) {
+console.error(
+"gallery-dl failed:",
+err,
+);
+}
+
+let images = findAllImages(outputDir);
+
+// ─── HTML fallback for missing carousel images ───
+if (
+mediaKind === "carousel" &&
+images.length < 2
+) {
+try {
+onStage?.("Recovering missing images...");
+
+const allImageUrls =  
+    await fetchPinterestCarouselImages(url);  
+
+  console.log(  
+    "DEBUG: HTML fallback found",  
+    allImageUrls.length,  
+    "image URLs (gallery-dl got",  
+    images.length,  
+    ")",  
+  );  
+
+  if (allImageUrls.length > images.length) {  
+    const batchSize = IMAGE_CONVERT_CONCURRENCY;  
+
+    for (  
+      let i = 0;  
+      i < allImageUrls.length;  
+      i += batchSize  
+    ) {  
+      const batch = allImageUrls.slice(  
+        i,  
+        i + batchSize,  
+      );  
+
+      await Promise.all(  
+        batch.map(async (imgUrl, idx) => {  
+          try {  
+            const response = await fetch(  
+              imgUrl,  
+              {  
+                redirect: "follow",  
+                headers: {  
+                  "User-Agent":  
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",  
+                  Referer:  
+                    "https://www.pinterest.com/",  
+                  Accept:  
+                    "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",  
+                },  
+              },  
+            );  
+
+            if (!response.ok) {  
+              console.error(  
+                `Fallback image ${i + idx + 1} failed: ${response.status}`,  
+              );  
+              return;  
+            }  
+
+            const contentType = (  
+              response.headers.get(  
+                "content-type",  
+              ) || ""  
+            ).toLowerCase();  
+
+            let ext = "jpg";  
+            if (  
+              contentType.includes(  
+                "image/png",  
+              )  
+            )  
+              ext = "png";  
+            else if (  
+              contentType.includes(  
+                "image/webp",  
+              )  
+            )  
+              ext = "webp";  
+            else if (  
+              contentType.includes(  
+                "image/gif",  
+              )  
+            )  
+              ext = "gif";  
+
+            const buffer = Buffer.from(  
+              await response.arrayBuffer(),  
+            );  
+
+            if (buffer.length < 100)  
+              return;  
+
+            const filePath = path.join(  
+              outputDir,  
+              `fallback-${String(  
+                i + idx + 1,  
+              ).padStart(3, "0")}.${ext}`,  
+            );  
+
+            fs.writeFileSync(  
+              filePath,  
+              buffer,  
+            );  
+
+            console.log(  
+              `DEBUG: Fallback downloaded image ${i + idx + 1}`,  
+            );  
+          } catch (err) {  
+            console.error(  
+              `Fallback image ${i + idx + 1} error:`,  
+              err,  
+            );  
+          }  
+        }),  
+      );  
+    }  
+
+    const allImages =  
+      findAllImages(outputDir);  
+
+    if (allImages.length > images.length) {  
+      images = allImages;  
+      console.log(  
+        "DEBUG: After fallback:",  
+        images.length,  
+        "images",  
+      );  
+    }  
+  }  
+} catch (err) {  
+  console.error(  
+    "HTML fallback failed:",  
+    err,  
+  );  
+}
+
+}
+
+if (images.length === 0) {
+throw new Error(
+"NO_FILE: no image found",
+);
+}
+
+if (images.length > 1) {
+onStage?.(
+imageFormat === "svg"
+? "Converting carousel to SVG..."
+: "Converting carousel to PNG...",
+);
+
+const batchSize =  
+  IMAGE_CONVERT_CONCURRENCY;  
+
+const convertedImages: string[] = [];  
+
+for (  
+  let i = 0;  
+  i < images.length;  
+  i += batchSize  
+) {  
+  const batch = images.slice(  
+    i,  
+    i + batchSize,  
+  );  
+
+  const batchResults =  
+    await Promise.all(  
+      batch.map(async (imagePath) => {  
+        const ext = path  
+          .extname(imagePath)  
+          .toLowerCase();  
+
+        if (ext === ".gif") {  
+          return imagePath;  
+        }  
+
+        try {  
+          return await convertImage(  
+            imagePath,  
+            imageFormat,  
+          );  
+        } catch {  
+          return imagePath;  
+        }  
+      }),  
+    );  
+
+  convertedImages.push(  
+    ...batchResults,  
+  );  
+}  
+
+images = convertedImages.sort(  
+  (a, b) =>  
+    a.localeCompare(b, undefined, {  
+      numeric: true,  
+      sensitivity: "base",  
+    }),  
+);  
+
+onStage?.("Packaging carousel...");  
+
+const zipPath = path.join(  
+  outputDir,  
+  `pinme-carousel-${pinId}.zip`,  
+);  
+
+await new Promise<void>(  
+  (resolve, reject) => {  
+    const output =  
+      fs.createWriteStream(zipPath);  
+
+    const archive = archiver("zip", {  
+      store: true,  
+    });  
+
+    output.on("close", () => resolve());  
+    output.on("error", (err) =>  
+      reject(err),  
+    );  
+    archive.on("error", (err) =>  
+      reject(err),  
+    );  
+
+    archive.pipe(output);  
+
+    images.forEach((imgPath, index) => {  
+      const ext = path.extname(imgPath);  
+
+      archive.file(imgPath, {  
+        name: `image-${String(  
+          index + 1,  
+        ).padStart(2, "0")}${ext}`,  
+      });  
+    });  
+
+    archive.finalize();  
+  },  
+);  
+
+return {  
+  filePath: zipPath,  
+  mediaType: "carousel",  
+  imageCount: images.length,  
+};
+
+}
+
+if (images.length === 1) {
+const single = images[0];
+const ext = path
+.extname(single)
+.toLowerCase();
+
+if (ext === ".gif") {  
+  return {  
+    filePath: single,  
+    mediaType: "image",  
+    imageCount: 1,  
+  };  
+}  
+
+onStage?.(  
+  imageFormat === "svg"  
+    ? "Converting image to SVG..."  
+    : "Converting image to PNG...",  
+);  
+
+const converted = await convertImage(  
+  single,  
+  imageFormat,  
+);  
+
+return {  
+  filePath: converted,  
+  mediaType: "image",  
+  imageCount: 1,  
+};
+
+}
+
+throw new Error(
+"NO_FILE: no image found",
+);
+}
 
 async function downloadVideo(
-  url: string,
-  pinId: string,
-  onStage?: (
-    label: string,
-  ) => void,
-  directVideoUrl?: string | null,
-): Promise<{
-  filePath: string;
-}> {
-  const outputTemplate =
-    `/tmp/pinme-${pinId}.%(ext)s`;
+url: string,
+pinId: string,
+onStage?: (label: string) => void,
+): Promise<{ filePath: string }> {
+const outputTemplate =
+/tmp/pinme-${pinId}.%(ext)s;
 
-  let mergeSignalled =
-    false;
+let mergeSignalled = false;
 
-  /*
-   * If Pinterest HTML fallback found a direct .m3u8/.mp4,
-   * download that URL instead of sending the original
-   * Pinterest URL back through the broken extractor.
-   */
-  const downloadUrl =
-    directVideoUrl ||
-    url;
+await runYtDlp(
+[
+"--no-playlist",
+"--no-warnings",
+"--concurrent-fragments",
+String(YTDLP_CONCURRENT_FRAGMENTS),
+"--retries",
+"2",
+"--fragment-retries",
+"2",
+"--socket-timeout",
+"15",
+"--format",
+"bestvideo+bestaudio/best",
+"--merge-output-format",
+"mp4",
+"-o",
+outputTemplate,
+url,
+],
+(line) => {
+if (
+!mergeSignalled &&
+line.includes("[Merger]")
+) {
+mergeSignalled = true;
+onStage?.("Processing video...");
+}
+},
+);
 
-  console.log(
-    directVideoUrl
-      ? "Downloading video using Pinterest direct-media fallback"
-      : "Downloading video using yt-dlp Pinterest extractor",
-  );
+const preferredPath =
+/tmp/pinme-${pinId}.mp4;
 
-  await runYtDlp(
-    [
-      "--no-playlist",
-      "--no-warnings",
-      "--concurrent-fragments",
-      String(
-        YTDLP_CONCURRENT_FRAGMENTS,
-      ),
-      "--retries",
-      "2",
-      "--fragment-retries",
-      "2",
-      "--socket-timeout",
-      "15",
-      "--format",
-      directVideoUrl
-        ? "best"
-        : "bestvideo+bestaudio/best",
-      "--merge-output-format",
-      "mp4",
-      "-o",
-      outputTemplate,
-      downloadUrl,
-    ],
-    (line) => {
-      if (
-        !mergeSignalled &&
-        line.includes(
-          "[Merger]",
-        )
-      ) {
-        mergeSignalled =
-          true;
+if (fs.existsSync(preferredPath)) {
+const stat = fs.statSync(preferredPath);
 
-        onStage?.(
-          "Processing video...",
-        );
-      }
-    },
-  );
+if (stat.size < 10_000) {  
+  fs.unlinkSync(preferredPath);  
+  throw new Error("NO_VIDEO");  
+}  
 
-  const preferredPath =
-    `/tmp/pinme-${pinId}.mp4`;
+return { filePath: preferredPath };
 
-  if (
-    fs.existsSync(
-      preferredPath,
-    )
-  ) {
-    const stat =
-      fs.statSync(
-        preferredPath,
-      );
-
-    if (
-      stat.size < 10_000
-    ) {
-      fs.unlinkSync(
-        preferredPath,
-      );
-
-      throw new Error(
-        "NO_VIDEO",
-      );
-    }
-
-    return {
-      filePath:
-        preferredPath,
-    };
-  }
-
-  const files =
-    fs.readdirSync(
-      "/tmp",
-    );
-
-  for (
-    const f of files
-  ) {
-    if (
-      f.startsWith(
-        `pinme-${pinId}.`,
-      ) &&
-      !f.endsWith(
-        ".part",
-      ) &&
-      !f.endsWith(
-        ".ytdl",
-      )
-    ) {
-      const fp =
-        path.join(
-          "/tmp",
-          f,
-        );
-
-      const stat =
-        fs.statSync(
-          fp,
-        );
-
-      if (
-        stat.size >=
-        10_000
-      ) {
-        return {
-          filePath: fp,
-        };
-      }
-
-      try {
-        fs.unlinkSync(
-          fp,
-        );
-      } catch {
-        /* best-effort */
-      }
-
-      throw new Error(
-        "NO_VIDEO",
-      );
-    }
-  }
-
-  throw new Error(
-    "NO_FILE: output file not found",
-  );
 }
 
-// ============================================================
-// FILENAME
-// ============================================================
+const files = fs.readdirSync("/tmp");
+
+for (const f of files) {
+if (
+f.startsWith(pinme-${pinId}.) &&
+!f.endsWith(".part") &&
+!f.endsWith(".ytdl")
+) {
+const fp = path.join("/tmp", f);
+const stat = fs.statSync(fp);
+
+if (stat.size >= 10_000) {  
+    return { filePath: fp };  
+  }  
+
+  try {  
+    fs.unlinkSync(fp);  
+  } catch {  
+    /* best-effort */  
+  }  
+
+  throw new Error("NO_VIDEO");  
+}
+
+}
+
+throw new Error(
+"NO_FILE: output file not found",
+);
+}
 
 function buildFilename(
-  title: string | null,
-  filePath: string,
+title: string | null,
+filePath: string,
 ): string {
-  const ext =
-    path
-      .extname(
-        filePath,
-      )
-      .slice(1) ||
-    "mp4";
+const ext =
+path.extname(filePath).slice(1) ||
+"mp4";
 
-  if (
-    ext.toLowerCase() ===
-    "zip"
-  ) {
-    return `pinme-carousel-${Date.now()}.zip`;
-  }
-
-  const genericTitles =
-    new Set([
-      "mp4",
-      "mkv",
-      "webm",
-      "video",
-      "watch",
-      "pin",
-      "",
-    ]);
-
-  const cleaned =
-    (title || "")
-      .replace(
-        /[^\w\s\-]/g,
-        "",
-      )
-      .replace(
-        /\s+/g,
-        "-",
-      )
-      .replace(
-        /^-+|-+$/g,
-        "",
-      )
-      .toLowerCase();
-
-  if (
-    !cleaned ||
-    genericTitles.has(
-      cleaned,
-    ) ||
-    cleaned.length < 3
-  ) {
-    return `pinme-download-${Date.now()}.${ext}`;
-  }
-
-  return `${cleaned.slice(
-    0,
-    60,
-  )}.${ext}`;
+if (ext.toLowerCase() === "zip") {
+return pinme-carousel-${Date.now()}.zip;
 }
 
-// ============================================================
-// MIME
-// ============================================================
+const genericTitles = new Set([
+"mp4",
+"mkv",
+"webm",
+"video",
+"watch",
+"pin",
+"",
+]);
 
-function getMimeType(
-  filename: string,
-): string {
-  const ext =
-    path
-      .extname(
-        filename,
-      )
-      .toLowerCase();
+const cleaned = (title || "")
+.replace(/[^\w\s-]/g, "")
+.replace(/\s+/g, "-")
+.replace(/^-+|-+$/g, "")
+.toLowerCase();
 
-  const types: Record<
-    string,
-    string
-  > = {
-    ".mp4":
-      "video/mp4",
-    ".webm":
-      "video/webm",
-    ".mov":
-      "video/quicktime",
-    ".jpg":
-      "image/jpeg",
-    ".jpeg":
-      "image/jpeg",
-    ".png":
-      "image/png",
-    ".webp":
-      "image/webp",
-    ".gif":
-      "image/gif",
-    ".svg":
-      "image/svg+xml",
-    ".zip":
-      "application/zip",
-  };
-
-  return (
-    types[ext] ||
-    "application/octet-stream"
-  );
+if (
+!cleaned ||
+genericTitles.has(cleaned) ||
+cleaned.length < 3
+) {
+return pinme-download-${Date.now()}.${ext};
 }
 
-// ============================================================
-// USER ERROR
-// ============================================================
+return ${cleaned.slice(0, 60)}.${ext};
+}
 
-function toUserError(
-  msg: string,
-): {
-  status: number;
-  error: string;
+function getMimeType(filename: string): string {
+const ext = path
+.extname(filename)
+.toLowerCase();
+
+const types: Record<string, string> = {
+".mp4": "video/mp4",
+".webm": "video/webm",
+".mov": "video/quicktime",
+".jpg": "image/jpeg",
+".jpeg": "image/jpeg",
+".png": "image/png",
+".webp": "image/webp",
+".gif": "image/gif",
+".svg": "image/svg+xml",
+".zip": "application/zip",
+};
+
+return (
+types[ext] || "application/octet-stream"
+);
+}
+
+function toUserError(msg: string): {
+status: number;
+error: string;
 } {
-  if (
-    msg === "NO_VIDEO"
-  ) {
-    return {
-      status: 400,
-      error:
-        "This pin doesn't contain a video.",
-    };
-  }
+if (msg === "NO_VIDEO") {
+return {
+status: 400,
+error:
+"This pin doesn't contain a video.",
+};
+}
 
-  if (
-    msg === "UNAVAILABLE"
-  ) {
-    return {
-      status: 404,
-      error:
-        "Couldn't fetch this video. It may be unavailable or private.",
-    };
-  }
+if (msg === "UNAVAILABLE") {
+return {
+status: 404,
+error:
+"Couldn't fetch this video. It may be unavailable or private.",
+};
+}
 
-  if (
-    msg === "TIMEOUT"
-  ) {
-    return {
-      status: 504,
-      error:
-        "Request timed out. Please try again.",
-    };
-  }
+if (msg === "TIMEOUT") {
+return {
+status: 504,
+error:
+"Request timed out. Please try again.",
+};
+}
 
-  return {
-    status: 500,
-    error:
-      "Couldn't fetch this video. It may be unavailable or private.",
-  };
+return {
+status: 500,
+error:
+"Couldn't fetch this video. It may be unavailable or private.",
+};
 }
 
 // ============================================================
@@ -3301,330 +2408,233 @@ function toUserError(
 // ============================================================
 
 router.post(
-  "/get-pin",
-  async (
-    req,
-    res,
-  ) => {
-    const userAgent =
-      req.headers[
-        "user-agent"
-      ] as
-        | string
-        | undefined;
+"/get-pin",
+async (req, res) => {
+const userAgent = req.headers[
+"user-agent"
+] as string | undefined;
 
-    const origin =
-      req.headers[
-        "origin"
-      ] as
-        | string
-        | undefined;
+const origin = req.headers[  
+  "origin"  
+] as string | undefined;  
 
-    if (
-      isBotRequest(
-        userAgent,
-      ) ||
-      !isAllowedOrigin(
-        origin,
-      )
-    ) {
-      req.log?.warn(
-        {
-          userAgent,
-          origin,
-        },
-        "Blocked bot request (silent)",
-      );
+if (  
+  isBotRequest(userAgent) ||  
+  !isAllowedOrigin(origin)  
+) {  
+  req.log?.warn(  
+    { userAgent, origin },  
+    "Blocked bot request (silent)",  
+  );  
 
-      res.status(200).json({
-        error:
-          "Server is busy. Please try again later.",
-      });
+  res.status(200).json({  
+    error:  
+      "Server is busy. Please try again later.",  
+  });  
 
-      return;
-    }
+  return;  
+}  
 
-    const {
-      url,
-      imageFormat,
-    } = req.body as {
-      url?: string;
-      imageFormat?: ImageFormat;
-    };
+const { url, imageFormat } =  
+  req.body as {  
+    url?: string;  
+    imageFormat?: ImageFormat;  
+  };  
 
-    if (
-      !url ||
-      typeof url !==
-        "string" ||
-      !url.trim()
-    ) {
-      res.status(400).json({
-        error:
-          "This doesn't look like a Pinterest link.",
-      });
+if (  
+  !url ||  
+  typeof url !== "string" ||  
+  !url.trim()  
+) {  
+  res.status(400).json({  
+    error:  
+      "This doesn't look like a Pinterest link.",  
+  });  
+  return;  
+}  
 
-      return;
-    }
+const trimmed = url.trim();  
 
-    const trimmed =
-      url.trim();
+if (!isPinterestUrl(trimmed)) {  
+  res.status(400).json({  
+    error:  
+      "This doesn't look like a Pinterest link.",  
+  });  
+  return;  
+}  
 
-    if (
-      !isPinterestUrl(
-        trimmed,
-      )
-    ) {
-      res.status(400).json({
-        error:
-          "This doesn't look like a Pinterest link.",
-      });
+const selectedImageFormat =  
+  normalizeImageFormat(imageFormat);  
 
-      return;
-    }
+res.setHeader(  
+  "Content-Type",  
+  "text/event-stream",  
+);  
+res.setHeader(  
+  "Cache-Control",  
+  "no-cache",  
+);  
+res.setHeader(  
+  "Connection",  
+  "keep-alive",  
+);  
+res.flushHeaders();  
 
-    const selectedImageFormat =
-      normalizeImageFormat(
-        imageFormat,
-      );
+const send = (data: object) => {  
+  if (!res.writableEnded) {  
+    res.write(  
+      `data: ${JSON.stringify(data)}\n\n`,  
+    );  
+  }  
+};  
 
-    res.setHeader(
-      "Content-Type",
-      "text/event-stream",
-    );
+try {  
+  send({  
+    type: "stage",  
+    label: "Checking media type...",  
+  });  
 
-    res.setHeader(
-      "Cache-Control",
-      "no-cache",
-    );
+  const meta = await getPinMeta(trimmed);  
 
-    res.setHeader(
-      "Connection",
-      "keep-alive",
-    );
+  if (meta.isCarousel) {  
+    send({  
+      type: "stage",  
+      label:  
+        "Fetching carousel info...",  
+    });  
+  } else if (meta.isGif) {  
+    send({  
+      type: "stage",  
+      label: "Fetching GIF info...",  
+    });  
+  } else if (meta.isImage) {  
+    send({  
+      type: "stage",  
+      label:  
+        "Fetching image info...",  
+    });  
+  } else {  
+    send({  
+      type: "stage",  
+      label:  
+        "Fetching video info...",  
+    });  
+  }  
 
-    res.flushHeaders();
+  let filePath: string;  
+  let mediaType:  
+    | "video"  
+    | "image"  
+    | "carousel";  
+  let imageCount: number | undefined;  
 
-    const send = (
-      data: object,
-    ) => {
-      if (
-        !res.writableEnded
-      ) {
-        res.write(
-          `data: ${JSON.stringify(
-            data,
-          )}\n\n`,
-        );
-      }
-    };
+  if (  
+    meta.isImage ||  
+    meta.isCarousel  
+  ) {  
+    const result =  
+      await downloadImageOrCarousel(  
+        trimmed,  
+        meta.id,  
+        (label) =>  
+          send({ type: "stage", label }),  
+        meta.imageUrl,  
+        selectedImageFormat,  
+        meta.isGif  
+          ? "gif"  
+          : meta.isCarousel  
+            ? "carousel"  
+            : "image",  
+      );  
 
-    try {
-      send({
-        type: "stage",
-        label:
-          "Checking media type...",
-      });
+    filePath = result.filePath;  
+    mediaType = result.mediaType;  
+    imageCount = result.imageCount;  
+  } else {  
+    send({  
+      type: "stage",  
+      label: "Downloading video...",  
+    });  
 
-      const meta =
-        await getPinMeta(
-          trimmed,
-        );
+    const vid = await downloadVideo(  
+      trimmed,  
+      meta.id,  
+      (label) =>  
+        send({ type: "stage", label }),  
+    );  
 
-      if (
-        meta.isCarousel
-      ) {
-        send({
-          type: "stage",
-          label:
-            "Fetching carousel info...",
-        });
-      } else if (
-        meta.isGif
-      ) {
-        send({
-          type: "stage",
-          label:
-            "Fetching GIF info...",
-        });
-      } else if (
-        meta.isImage
-      ) {
-        send({
-          type: "stage",
-          label:
-            "Fetching image info...",
-        });
-      } else {
-        send({
-          type: "stage",
-          label:
-            "Fetching video info...",
-        });
-      }
+    filePath = vid.filePath;  
+    mediaType = "video";  
+  }  
 
-      let filePath: string;
+  send({  
+    type: "stage",  
+    label: "Preparing download...",  
+  });  
 
-      let mediaType:
-        | "video"
-        | "image"
-        | "carousel";
+  const filename = buildFilename(  
+    meta.title,  
+    filePath,  
+  );  
 
-      let imageCount:
-        | number
-        | undefined;
+  const expiresAt =  
+    Date.now() + DOWNLOAD_TTL_MS;  
 
-      if (
-        meta.isImage ||
-        meta.isCarousel
-      ) {
-        const result =
-          await downloadImageOrCarousel(
-            trimmed,
-            meta.id,
-            (
-              label,
-            ) =>
-              send({
-                type: "stage",
-                label,
-              }),
-            meta.imageUrl,
-            selectedImageFormat,
-            meta.isGif
-              ? "gif"
-              : meta.isCarousel
-                ? "carousel"
-                : "image",
-          );
+  const token = createDownloadToken({  
+    url: trimmed,  
+    pinId: meta.id,  
+    filename,  
+    expiresAt,  
+    mediaType,  
+    imageFormat: selectedImageFormat,  
+  });  
 
-        filePath =
-          result.filePath;
+  pendingDownloads.set(token, {  
+    filePath,  
+    filename,  
+    expiresAt,  
+  });  
 
-        mediaType =
-          result.mediaType;
+  send({  
+    type: "ready",  
+    token,  
+    filename,  
+    title: meta.title ?? null,  
+    mediaType,  
+    imageCount,  
+    imageFormat: selectedImageFormat,  
+  });  
 
-        imageCount =
-          result.imageCount;
-      } else {
-        send({
-          type: "stage",
-          label:
-            "Downloading video...",
-        });
+  sendTelegramNotification(  
+    `🎉 <b>New Download</b>\n\n` +  
+      `📁 <b>Type:</b> ${mediaType}\n` +  
+      `📄 <b>File:</b> <code>${filename}</code>\n` +  
+      `${meta.title ? `📝 <b>Title:</b> ${meta.title}\n` : ""}` +  
+      `${imageCount ? `🖼️ <b>Images:</b> ${imageCount}\n` : ""}` +  
+      `🔗 <b>URL:</b> ${trimmed}`,  
+  );  
+} catch (err) {  
+  const msg =  
+    err instanceof Error  
+      ? err.message  
+      : String(err);  
 
-        const vid =
-          await downloadVideo(
-            trimmed,
-            meta.id,
-            (
-              label,
-            ) =>
-              send({
-                type: "stage",
-                label,
-              }),
-            meta.videoUrl,
-          );
+  req.log?.error(  
+    { err: msg, url: trimmed },  
+    "get-pin failed",  
+  );  
 
-        filePath =
-          vid.filePath;
+  const { error } = toUserError(msg);  
 
-        mediaType =
-          "video";
-      }
+  send({  
+    type: "error",  
+    message: error,  
+  });  
+} finally {  
+  res.end();  
+}
 
-      send({
-        type: "stage",
-        label:
-          "Preparing download...",
-      });
-
-      const filename =
-        buildFilename(
-          meta.title,
-          filePath,
-        );
-
-      const expiresAt =
-        Date.now() +
-        DOWNLOAD_TTL_MS;
-
-      const token =
-        createDownloadToken({
-          url: trimmed,
-          pinId: meta.id,
-          filename,
-          expiresAt,
-          mediaType,
-          imageFormat:
-            selectedImageFormat,
-        });
-
-      pendingDownloads.set(
-        token,
-        {
-          filePath,
-          filename,
-          expiresAt,
-        },
-      );
-
-      send({
-        type: "ready",
-        token,
-        filename,
-        title:
-          meta.title ??
-          null,
-        mediaType,
-        imageCount,
-        imageFormat:
-          selectedImageFormat,
-      });
-
-      sendTelegramNotification(
-        `🎉 <b>New Download</b>\n\n` +
-          `📁 <b>Type:</b> ${mediaType}\n` +
-          `📄 <b>File:</b> <code>${filename}</code>\n` +
-          `${
-            meta.title
-              ? `📝 <b>Title:</b> ${meta.title}\n`
-              : ""
-          }` +
-          `${
-            imageCount
-              ? `🖼️ <b>Images:</b> ${imageCount}\n`
-              : ""
-          }` +
-          `🔗 <b>URL:</b> ${trimmed}`,
-      );
-    } catch (err) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : String(err);
-
-      req.log?.error(
-        {
-          err: msg,
-          url: trimmed,
-        },
-        "get-pin failed",
-      );
-
-      const { error } =
-        toUserError(
-          msg,
-        );
-
-      send({
-        type: "error",
-        message: error,
-      });
-    } finally {
-      res.end();
-    }
-  },
+},
 );
 
 // ============================================================
@@ -3632,62 +2642,47 @@ router.post(
 // ============================================================
 
 router.post(
-  "/telegram/webhook",
-  async (
-    req,
-    res,
-  ) => {
-    try {
-      const update =
-        req.body;
+"/telegram/webhook",
+async (req, res) => {
+try {
+const update = req.body;
 
-      res.status(200).json({
-        ok: true,
-      });
+res.status(200).json({ ok: true });  
 
-      if (
-        !update?.message
-      ) {
-        return;
-      }
+  if (!update?.message) {  
+    return;  
+  }  
 
-      const chatId =
-        update.message.chat?.id;
+  const chatId =  
+    update.message.chat?.id;  
 
-      const text =
-        update.message.text;
+  const text =  
+    update.message.text;  
 
-      if (
-        typeof chatId !==
-          "number" ||
-        typeof text !==
-          "string"
-      ) {
-        return;
-      }
+  if (  
+    typeof chatId !== "number" ||  
+    typeof text !== "string"  
+  ) {  
+    return;  
+  }  
 
-      handleTelegramMessage(
-        chatId,
-        text,
-      ).catch(
-        (err) => {
-          console.error(
-            "Telegram handler error:",
-            err,
-          );
-        },
-      );
-    } catch (err) {
-      console.error(
-        "Telegram webhook error:",
-        err,
-      );
+  handleTelegramMessage(chatId, text).catch(  
+    (err) => {  
+      console.error(  
+        "Telegram handler error:",  
+        err,  
+      );  
+    },  
+  );  
+} catch (err) {  
+  console.error(  
+    "Telegram webhook error:",  
+    err,  
+  );  
+  res.status(200).json({ ok: true });  
+}
 
-      res.status(200).json({
-        ok: true,
-      });
-    }
-  },
+},
 );
 
 // ============================================================
@@ -3695,328 +2690,216 @@ router.post(
 // ============================================================
 
 router.get(
-  "/stream/:token",
-  async (
-    req,
-    res,
-  ): Promise<void> => {
-    const {
-      token,
-    } = req.params;
+"/stream/:token",
+async (req, res): Promise<void> => {
+const { token } = req.params;
+const payload = parseDownloadToken(token);
 
-    const payload =
-      parseDownloadToken(
-        token,
-      );
+if (  
+  !payload ||  
+  payload.expiresAt <= Date.now()  
+) {  
+  res.status(404).json({  
+    error:  
+      "Download link expired. Please try again.",  
+  });  
+  return;  
+}  
 
-    if (
-      !payload ||
-      payload.expiresAt <=
-        Date.now()
-    ) {
-      res.status(404).json({
-        error:
-          "Download link expired. Please try again.",
-      });
+const entry =  
+  pendingDownloads.get(token);  
 
-      return;
-    }
+let filePath: string;  
+let filename = payload.filename;  
 
-    const entry =
-      pendingDownloads.get(
-        token,
-      );
+if (  
+  entry &&  
+  fs.existsSync(entry.filePath)  
+) {  
+  filePath = entry.filePath;  
+  filename = entry.filename;  
+} else {  
+  try {  
+    req.log?.warn(  
+      "Prepared download was unavailable; fetching a fresh copy",  
+    );  
 
-    let filePath: string;
+    const retryPinId = `retry-${randomBytes(  
+      8,  
+    ).toString("hex")}`;  
 
-    let filename =
-      payload.filename;
+    if (  
+      payload.mediaType === "carousel"  
+    ) {  
+      const carousel =  
+        await downloadImageOrCarousel(  
+          payload.url,  
+          retryPinId,  
+          undefined,  
+          undefined,  
+          normalizeImageFormat(  
+            payload.imageFormat,  
+          ),  
+          "carousel",  
+        );  
 
-    if (
-      entry &&
-      fs.existsSync(
-        entry.filePath,
-      )
-    ) {
-      filePath =
-        entry.filePath;
+      filePath = carousel.filePath;  
+      filename = buildFilename(  
+        null,  
+        filePath,  
+      );  
+    } else if (  
+      payload.mediaType === "image"  
+    ) {  
+      const image =  
+        await downloadImageOrCarousel(  
+          payload.url,  
+          retryPinId,  
+          undefined,  
+          undefined,  
+          normalizeImageFormat(  
+            payload.imageFormat,  
+          ),  
+          "image",  
+        );  
 
-      filename =
-        entry.filename;
-    } else {
-      try {
-        req.log?.warn(
-          "Prepared download was unavailable; fetching a fresh copy",
-        );
+      filePath = image.filePath;  
+      filename = buildFilename(  
+        null,  
+        filePath,  
+      );  
+    } else {  
+      const fresh = await downloadVideo(  
+        payload.url,  
+        retryPinId,  
+      );  
 
-        const retryPinId =
-          `retry-${randomBytes(
-            8,
-          ).toString("hex")}`;
+      filePath = fresh.filePath;  
+      filename = buildFilename(  
+        null,  
+        filePath,  
+      );  
+    }  
 
-        if (
-          payload.mediaType ===
-          "carousel"
-        ) {
-          const carousel =
-            await downloadImageOrCarousel(
-              payload.url,
-              retryPinId,
-              undefined,
-              undefined,
-              normalizeImageFormat(
-                payload.imageFormat,
-              ),
-              "carousel",
-            );
+    pendingDownloads.set(token, {  
+      filePath,  
+      filename,  
+      expiresAt: payload.expiresAt,  
+    });  
+  } catch (err) {  
+    const msg =  
+      err instanceof Error  
+        ? err.message  
+        : String(err);  
 
-          filePath =
-            carousel.filePath;
+    req.log?.error(  
+      { err: msg },  
+      "Fresh download retry failed",  
+    );  
 
-          filename =
-            buildFilename(
-              null,
-              filePath,
-            );
-        } else if (
-          payload.mediaType ===
-          "image"
-        ) {
-          const image =
-            await downloadImageOrCarousel(
-              payload.url,
-              retryPinId,
-              undefined,
-              undefined,
-              normalizeImageFormat(
-                payload.imageFormat,
-              ),
-              "image",
-            );
+    const { status, error } =  
+      toUserError(msg);  
 
-          filePath =
-            image.filePath;
+    res.status(status).json({ error });  
+    return;  
+  }  
+}  
 
-          filename =
-            buildFilename(
-              null,
-              filePath,
-            );
-        } else {
-          /*
-           * Re-run metadata detection so that a Pinterest
-           * direct-media fallback URL is recovered if needed.
-           */
-          const freshMeta =
-            await getPinMeta(
-              payload.url,
-            );
+if (!fs.existsSync(filePath)) {  
+  pendingDownloads.delete(token);  
 
-          const fresh =
-            await downloadVideo(
-              payload.url,
-              retryPinId,
-              undefined,
-              freshMeta.videoUrl,
-            );
+  res.status(404).json({  
+    error:  
+      "File not found. Please try again.",  
+  });  
+  return;  
+}  
 
-          filePath =
-            fresh.filePath;
+let stat: fs.Stats;  
 
-          filename =
-            buildFilename(
-              null,
-              filePath,
-            );
-        }
+try {  
+  stat = fs.statSync(filePath);  
+} catch {  
+  pendingDownloads.delete(token);  
 
-        pendingDownloads.set(
-          token,
-          {
-            filePath,
-            filename,
-            expiresAt:
-              payload.expiresAt,
-          },
-        );
-      } catch (err) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : String(err);
+  res.status(500).json({  
+    error:  
+      "Failed to read download file.",  
+  });  
+  return;  
+}  
 
-        req.log?.error(
-          {
-            err: msg,
-          },
-          "Fresh download retry failed",
-        );
+res.setHeader(  
+  "Content-Type",  
+  getMimeType(filename),  
+);  
+res.setHeader(  
+  "Content-Disposition",  
+  `attachment; filename="${filename}"`,  
+);  
+res.setHeader(  
+  "Content-Length",  
+  stat.size,  
+);  
+res.setHeader(  
+  "Cache-Control",  
+  "no-store",  
+);  
 
-        const {
-          status,
-          error,
-        } =
-          toUserError(
-            msg,
-          );
+const fileStream = fs.createReadStream(  
+  filePath,  
+  {  
+    highWaterMark:  
+      FILE_STREAM_HIGH_WATER_MARK,  
+  },  
+);  
 
-        res
-          .status(status)
-          .json({
-            error,
-          });
+const removeFailedDownload = () => {  
+  pendingDownloads.delete(token);  
 
-        return;
-      }
-    }
+  try {  
+    if (fs.existsSync(filePath)) {  
+      fs.unlinkSync(filePath);  
+    }  
+  } catch {  
+    /* best-effort */  
+  }  
+};  
 
-    if (
-      !fs.existsSync(
-        filePath,
-      )
-    ) {
-      pendingDownloads.delete(
-        token,
-      );
+fileStream.on("error", (err) => {  
+  req.log?.error(  
+    { err },  
+    "stream read error",  
+  );  
 
-      res.status(404).json({
-        error:
-          "File not found. Please try again.",
-      });
+  removeFailedDownload();  
 
-      return;
-    }
+  if (!res.headersSent) {  
+    res.status(500).end();  
+  }  
+});  
 
-    let stat: fs.Stats;
+res.on("close", () => {  
+  if (!res.writableFinished) {  
+    fileStream.destroy();  
+  }  
+});  
 
-    try {
-      stat =
-        fs.statSync(
-          filePath,
-        );
-    } catch {
-      pendingDownloads.delete(
-        token,
-      );
+res.on("finish", () => {  
+  pendingDownloads.delete(token);  
 
-      res.status(500).json({
-        error:
-          "Failed to read download file.",
-      });
+  try {  
+    if (fs.existsSync(filePath)) {  
+      fs.unlinkSync(filePath);  
+    }  
+  } catch {  
+    /* best-effort */  
+  }  
+});  
 
-      return;
-    }
+fileStream.pipe(res);
 
-    res.setHeader(
-      "Content-Type",
-      getMimeType(
-        filename,
-      ),
-    );
-
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${filename}"`,
-    );
-
-    res.setHeader(
-      "Content-Length",
-      stat.size,
-    );
-
-    res.setHeader(
-      "Cache-Control",
-      "no-store",
-    );
-
-    const fileStream =
-      fs.createReadStream(
-        filePath,
-        {
-          highWaterMark:
-            FILE_STREAM_HIGH_WATER_MARK,
-        },
-      );
-
-    const removeFailedDownload =
-      () => {
-        pendingDownloads.delete(
-          token,
-        );
-
-        try {
-          if (
-            fs.existsSync(
-              filePath,
-            )
-          ) {
-            fs.unlinkSync(
-              filePath,
-            );
-          }
-        } catch {
-          /* best-effort */
-        }
-      };
-
-    fileStream.on(
-      "error",
-      (err) => {
-        req.log?.error(
-          {
-            err,
-          },
-          "stream read error",
-        );
-
-        removeFailedDownload();
-
-        if (
-          !res.headersSent
-        ) {
-          res.status(500).end();
-        }
-      },
-    );
-
-    res.on(
-      "close",
-      () => {
-        if (
-          !res.writableFinished
-        ) {
-          fileStream.destroy();
-        }
-      },
-    );
-
-    res.on(
-      "finish",
-      () => {
-        pendingDownloads.delete(
-          token,
-        );
-
-        try {
-          if (
-            fs.existsSync(
-              filePath,
-            )
-          ) {
-            fs.unlinkSync(
-              filePath,
-            );
-          }
-        } catch {
-          /* best-effort */
-        }
-      },
-    );
-
-    fileStream.pipe(
-      res,
-    );
-  },
+},
 );
 
 export default router;
