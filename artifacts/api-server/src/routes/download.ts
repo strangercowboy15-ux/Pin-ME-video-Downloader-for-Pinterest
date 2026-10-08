@@ -30,17 +30,17 @@ const FILE_STREAM_HIGH_WATER_MARK =
 const IMAGE_CONVERT_CONCURRENCY = 5;
 
 const TELEGRAM_MAX_FILE_SIZE =
-  50 * 1024 * 1024; // 50 MB
+  50 * 1024 * 1024;
 
 // ============================================================
 // BOT PROTECTION
 // ============================================================
 
 const ALLOWED_ORIGINS = [
-  'https://pinme.download',
-  'https://www.pinme.download',
-  'http://localhost:5173',
-  'http://localhost:3000',
+  "https://pinme.download",
+  "https://www.pinme.download",
+  "http://localhost:5173",
+  "http://localhost:3000",
 ];
 
 const BOT_USER_AGENT_PATTERNS = [
@@ -437,6 +437,8 @@ async function handleTelegramMessage(
       const vid = await downloadVideo(
         trimmed,
         meta.id,
+        undefined,
+        meta.videoUrl,
       );
 
       filePath = vid.filePath;
@@ -960,7 +962,8 @@ async function fetchPinterestCarouselImages(
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept":
           "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Language":
+          "en-US,en;q=0.9",
       },
     });
 
@@ -968,15 +971,22 @@ async function fetchPinterestCarouselImages(
       return [];
     }
 
-    const html = await response.text();
+    const html =
+      await response.text();
 
-    const seenIds = new Set<string>();
+    const seenIds =
+      new Set<string>();
+
     const urls: string[] = [];
 
     const originalsRegex =
       /https:\/\/i\.pinimg\.com\/originals\/([a-f0-9]+)\/[^"'\s\\<>]+\.(?:jpg|jpeg|png|webp)/gi;
 
-    for (const m of html.matchAll(originalsRegex)) {
+    for (
+      const m of html.matchAll(
+        originalsRegex,
+      )
+    ) {
       const fullUrl = m[0];
       const pinId = m[1];
 
@@ -990,7 +1000,11 @@ async function fetchPinterestCarouselImages(
       const mediumRegex =
         /https:\/\/i\.pinimg\.com\/(?:736x|564x|474x)\/([a-f0-9]+)\/[^"'\s\\<>]+\.(?:jpg|jpeg|png|webp)/gi;
 
-      for (const m of html.matchAll(mediumRegex)) {
+      for (
+        const m of html.matchAll(
+          mediumRegex,
+        )
+      ) {
         const fullUrl = m[0];
         const pinId = m[1];
 
@@ -1015,6 +1029,212 @@ async function fetchPinterestCarouselImages(
 }
 
 // ============================================================
+// PINTEREST VIDEO HTML FALLBACK
+// ============================================================
+
+async function fetchPinterestVideoUrl(
+  pinUrl: string,
+): Promise<string | null> {
+  try {
+    const response = await fetch(pinUrl, {
+      method: "GET",
+      redirect: "follow",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept":
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language":
+          "en-US,en;q=0.9",
+      },
+    });
+
+    if (!response.ok) {
+      console.error(
+        "Pinterest video HTML request failed:",
+        response.status,
+      );
+
+      return null;
+    }
+
+    const html =
+      await response.text();
+
+    /*
+     * Pinterest embeds media information in HTML/JSON.
+     * Depending on the current Pinterest response, URLs may
+     * be escaped as \/ or \u002F.
+     */
+    const decoded =
+      html
+        .replace(
+          /\\u002F/gi,
+          "/",
+        )
+        .replace(
+          /\\u0026/gi,
+          "&",
+        )
+        .replace(
+          /\\\//g,
+          "/",
+        )
+        .replace(
+          /&amp;/gi,
+          "&",
+        );
+
+    const candidates: string[] = [];
+
+    // --------------------------------------------------------
+    // HLS / M3U8
+    // --------------------------------------------------------
+
+    const m3u8Regex =
+      /https?:\/\/[^"'\\\s<>]+\.m3u8(?:\?[^"'\\\s<>]*)?/gi;
+
+    for (
+      const match of decoded.matchAll(
+        m3u8Regex,
+      )
+    ) {
+      candidates.push(
+        match[0],
+      );
+    }
+
+    // --------------------------------------------------------
+    // Direct MP4
+    // --------------------------------------------------------
+
+    const mp4Regex =
+      /https?:\/\/[^"'\\\s<>]+\.mp4(?:\?[^"'\\\s<>]*)?/gi;
+
+    for (
+      const match of decoded.matchAll(
+        mp4Regex,
+      )
+    ) {
+      candidates.push(
+        match[0],
+      );
+    }
+
+    const cleaned =
+      candidates
+        .map((value) =>
+          value
+            .replace(
+              /\\u0026/gi,
+              "&",
+            )
+            .replace(
+              /\\\//g,
+              "/",
+            )
+            .replace(
+              /&amp;/gi,
+              "&",
+            ),
+        )
+        .filter((value) =>
+          /^https?:\/\//i.test(
+            value,
+          ),
+        );
+
+    // Prefer HLS.
+    const hls =
+      cleaned.find((value) =>
+        /\.m3u8(?:\?|$)/i.test(
+          value,
+        ),
+      );
+
+    if (hls) {
+      console.log(
+        "Pinterest HTML fallback found HLS video URL",
+      );
+
+      return hls;
+    }
+
+    const mp4 =
+      cleaned.find((value) =>
+        /\.mp4(?:\?|$)/i.test(
+          value,
+        ),
+      );
+
+    if (mp4) {
+      console.log(
+        "Pinterest HTML fallback found MP4 video URL",
+      );
+
+      return mp4;
+    }
+
+    /*
+     * Extra escaped URL pass.
+     */
+    const escapedVideoRegex =
+      /https?:\\?\/\\?\/[^"'\\\s<>]+(?:\.m3u8|\.mp4)(?:\\?[^"'\\\s<>]*)?/gi;
+
+    for (
+      const match of decoded.matchAll(
+        escapedVideoRegex,
+      )
+    ) {
+      const candidate =
+        match[0]
+          .replace(
+            /\\\//g,
+            "/",
+          )
+          .replace(
+            /\\u0026/gi,
+            "&",
+          )
+          .replace(
+            /&amp;/gi,
+            "&",
+          );
+
+      if (
+        /\.m3u8(?:\?|$)/i.test(
+          candidate,
+        ) ||
+        /\.mp4(?:\?|$)/i.test(
+          candidate,
+        )
+      ) {
+        console.log(
+          "Pinterest escaped video URL found",
+        );
+
+        return candidate;
+      }
+    }
+
+    console.log(
+      "Pinterest HTML fallback found no video URL",
+    );
+
+    return null;
+  } catch (err) {
+    console.error(
+      "fetchPinterestVideoUrl failed:",
+      err instanceof Error
+        ? err.message
+        : String(err),
+    );
+
+    return null;
+  }
+}
+
+// ============================================================
 // PIN META
 // ============================================================
 
@@ -1027,6 +1247,7 @@ interface PinMeta {
   isCarousel?: boolean;
   imageUrl?: string | null;
   carouselImages?: string[];
+  videoUrl?: string | null;
 }
 
 function isImageLikeEntry(
@@ -1051,8 +1272,7 @@ function isImageLikeEntry(
     entryFormats.some(
       (f) =>
         f.vcodec &&
-        f.vcodec !==
-          "none" &&
+        f.vcodec !== "none" &&
         f.vcodec !== null,
     );
 
@@ -1095,7 +1315,9 @@ function countImageCollection(
 ): number {
   if (Array.isArray(value)) {
     return value.filter((item) => {
-      if (typeof item === "string") return true;
+      if (typeof item === "string") {
+        return true;
+      }
 
       if (
         item &&
@@ -1123,7 +1345,8 @@ function countImageCollection(
         }
 
         return (
-          typeof obj.url === "string" ||
+          typeof obj.url ===
+            "string" ||
           typeof obj.image_url ===
             "string"
         );
@@ -1133,7 +1356,10 @@ function countImageCollection(
     }).length;
   }
 
-  if (!value || typeof value !== "object") {
+  if (
+    !value ||
+    typeof value !== "object"
+  ) {
     return 0;
   }
 
@@ -1145,8 +1371,14 @@ function countImageCollection(
 
   let count = 0;
 
-  for (const child of Object.values(obj)) {
-    if (typeof child === "string") {
+  for (
+    const child of Object.values(
+      obj,
+    )
+  ) {
+    if (
+      typeof child === "string"
+    ) {
       if (
         /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(
           child,
@@ -1154,10 +1386,14 @@ function countImageCollection(
       ) {
         count++;
       }
+
       continue;
     }
 
-    if (child && typeof child === "object") {
+    if (
+      child &&
+      typeof child === "object"
+    ) {
       const childObj =
         child as Record<
           string,
@@ -1171,7 +1407,8 @@ function countImageCollection(
         childObj.thumbnail;
 
       if (
-        typeof childUrl === "string" &&
+        typeof childUrl ===
+          "string" &&
         /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i.test(
           childUrl,
         )
@@ -1205,29 +1442,138 @@ async function getPinMeta(
       e.stderr || ""
     ).toLowerCase();
 
+    /*
+     * IMPORTANT:
+     *
+     * Previously Pinterest yt-dlp failures such as
+     * "unsupported url", "no video", or "not a video"
+     * were automatically classified as IMAGE.
+     *
+     * That is unsafe because Pinterest can fail to return
+     * metadata even when the actual video is still public.
+     *
+     * Try direct Pinterest HTML extraction first.
+     */
+
     if (
       errLower.includes(
         "unsupported url",
       ) ||
-      errLower.includes("no video") ||
-      errLower.includes("not a video")
+      errLower.includes(
+        "no video",
+      ) ||
+      errLower.includes(
+        "not a video",
+      ) ||
+      errLower.includes(
+        "no video formats",
+      )
     ) {
-      return {
-        id: randomBytes(4).toString("hex"),
-        title: null,
-        hasVideo: false,
-        isImage: true,
-      };
+      console.log(
+        "yt-dlp Pinterest metadata failed; trying HTML video fallback...",
+      );
+
+      const fallbackVideoUrl =
+        await fetchPinterestVideoUrl(
+          url,
+        );
+
+      if (fallbackVideoUrl) {
+        return {
+          id: randomBytes(
+            4,
+          ).toString("hex"),
+          title: null,
+          hasVideo: true,
+          videoUrl:
+            fallbackVideoUrl,
+        };
+      }
+
+      /*
+       * If there is no video, check the page for images.
+       * This preserves image/carousel support.
+       */
+      const carouselImages =
+        await fetchPinterestCarouselImages(
+          url,
+        );
+
+      if (
+        carouselImages.length > 1
+      ) {
+        return {
+          id: randomBytes(
+            4,
+          ).toString("hex"),
+          title: null,
+          hasVideo: false,
+          isCarousel: true,
+          carouselImages,
+        };
+      }
+
+      if (
+        carouselImages.length === 1
+      ) {
+        return {
+          id: randomBytes(
+            4,
+          ).toString("hex"),
+          title: null,
+          hasVideo: false,
+          isImage: true,
+          imageUrl:
+            carouselImages[0],
+        };
+      }
+
+      throw new Error(
+        "UNAVAILABLE",
+      );
     }
 
+    /*
+     * Private/unavailable links get one final direct-media
+     * attempt before being declared unavailable.
+     */
     if (
-      errLower.includes("private") ||
-      errLower.includes("unavailable") ||
-      errLower.includes("not available") ||
-      errLower.includes("not exist") ||
-      errLower.includes("login required")
+      errLower.includes(
+        "private",
+      ) ||
+      errLower.includes(
+        "unavailable",
+      ) ||
+      errLower.includes(
+        "not available",
+      ) ||
+      errLower.includes(
+        "not exist",
+      ) ||
+      errLower.includes(
+        "login required",
+      )
     ) {
-      throw new Error("UNAVAILABLE");
+      const fallbackVideoUrl =
+        await fetchPinterestVideoUrl(
+          url,
+        );
+
+      if (fallbackVideoUrl) {
+        return {
+          id: randomBytes(
+            4,
+          ).toString("hex"),
+          title: null,
+          hasVideo: true,
+          videoUrl:
+            fallbackVideoUrl,
+        };
+      }
+
+      throw new Error(
+        "UNAVAILABLE",
+      );
     }
 
     throw err;
@@ -1241,11 +1587,16 @@ async function getPinMeta(
     | Record<string, unknown>
     | null = null;
 
-  for (let i = lines.length - 1; i >= 0; i--) {
+  for (
+    let i = lines.length - 1;
+    i >= 0;
+    i--
+  ) {
     try {
-      const parsed = JSON.parse(
-        lines[i].trim(),
-      );
+      const parsed =
+        JSON.parse(
+          lines[i].trim(),
+        );
 
       if (
         parsed &&
@@ -1260,7 +1611,9 @@ async function getPinMeta(
   }
 
   if (!info) {
-    throw new Error("PARSE_ERROR");
+    throw new Error(
+      "PARSE_ERROR",
+    );
   }
 
   const formats =
@@ -1280,30 +1633,45 @@ async function getPinMeta(
     (info.ext as string) || ""
   ).toLowerCase();
 
-  // ─── Enhanced GIF detection ───
-  // Pinterest GIFs often come as .mp4 from yt-dlp.
-  // Check original input URL + all info URL fields for .gif pattern.
-  const originalInputUrl = url.toLowerCase();
+  // ========================================================
+  // GIF DETECTION
+  // ========================================================
+
+  const originalInputUrl =
+    url.toLowerCase();
+
   const infoUrl = String(
-    (info.url as string) || ""
+    (info.url as string) || "",
   ).toLowerCase();
+
   const infoImageUrl = String(
-    (info.image_url as string) || ""
+    (info.image_url as string) || "",
   ).toLowerCase();
+
   const infoWebpageUrl = String(
-    (info.webpage_url as string) || ""
+    (info.webpage_url as string) || "",
   ).toLowerCase();
 
   const gifUrlPattern =
     /(?:\.gif(?:[?#]|$)|\/gif\/|\/gifs\/)/i;
 
   const urlLooksLikeGif =
-    gifUrlPattern.test(originalInputUrl) ||
-    gifUrlPattern.test(infoUrl) ||
-    gifUrlPattern.test(infoImageUrl) ||
-    gifUrlPattern.test(infoWebpageUrl);
+    gifUrlPattern.test(
+      originalInputUrl,
+    ) ||
+    gifUrlPattern.test(
+      infoUrl,
+    ) ||
+    gifUrlPattern.test(
+      infoImageUrl,
+    ) ||
+    gifUrlPattern.test(
+      infoWebpageUrl,
+    );
 
-  const isGif = ext === "gif" || urlLooksLikeGif;
+  const isGif =
+    ext === "gif" ||
+    urlLooksLikeGif;
 
   const isImage = [
     "jpg",
@@ -1323,22 +1691,32 @@ async function getPinMeta(
     info._type || "",
   ).toLowerCase();
 
+  // ========================================================
+  // PLAYLIST / CAROUSEL
+  // ========================================================
+
   if (
     infoType === "playlist" &&
     Array.isArray(entries)
   ) {
     const imageEntries =
-      entries.filter((entry) =>
-        isImageLikeEntry(entry),
+      entries.filter(
+        (entry) =>
+          isImageLikeEntry(entry),
       );
 
-    if (imageEntries.length > 1) {
+    if (
+      imageEntries.length > 1
+    ) {
       return {
         id:
           (info.id as string) ||
-          randomBytes(4).toString("hex"),
+          randomBytes(
+            4,
+          ).toString("hex"),
         title:
-          (info.title as string) || null,
+          (info.title as string) ||
+          null,
         hasVideo: false,
         isCarousel: true,
       };
@@ -1351,9 +1729,12 @@ async function getPinMeta(
       return {
         id:
           (info.id as string) ||
-          randomBytes(4).toString("hex"),
+          randomBytes(
+            4,
+          ).toString("hex"),
         title:
-          (info.title as string) || null,
+          (info.title as string) ||
+          null,
         hasVideo: false,
         isCarousel: true,
       };
@@ -1365,17 +1746,23 @@ async function getPinMeta(
     entries.length > 1
   ) {
     const imageEntries =
-      entries.filter((entry) =>
-        isImageLikeEntry(entry),
+      entries.filter(
+        (entry) =>
+          isImageLikeEntry(entry),
       );
 
-    if (imageEntries.length > 1) {
+    if (
+      imageEntries.length > 1
+    ) {
       return {
         id:
           (info.id as string) ||
-          randomBytes(4).toString("hex"),
+          randomBytes(
+            4,
+          ).toString("hex"),
         title:
-          (info.title as string) || null,
+          (info.title as string) ||
+          null,
         hasVideo: false,
         isCarousel: true,
       };
@@ -1383,20 +1770,27 @@ async function getPinMeta(
   }
 
   const imageCollectionCount =
-    countImageCollection(info.images);
+    countImageCollection(
+      info.images,
+    );
 
   const thumbnailCollectionCount =
     countImageCollection(
       info.thumbnails,
     );
 
-  if (imageCollectionCount > 1) {
+  if (
+    imageCollectionCount > 1
+  ) {
     return {
       id:
         (info.id as string) ||
-        randomBytes(4).toString("hex"),
+        randomBytes(
+          4,
+        ).toString("hex"),
       title:
-        (info.title as string) || null,
+        (info.title as string) ||
+        null,
       hasVideo: false,
       isCarousel: true,
     };
@@ -1409,32 +1803,77 @@ async function getPinMeta(
     return {
       id:
         (info.id as string) ||
-        randomBytes(4).toString("hex"),
+        randomBytes(
+          4,
+        ).toString("hex"),
       title:
-        (info.title as string) || null,
+        (info.title as string) ||
+        null,
       hasVideo: false,
       isCarousel: true,
     };
   }
 
-  // ─── HTML-based carousel detection ───
+  // ========================================================
+  // HTML-BASED CAROUSEL DETECTION
+  // ========================================================
+
   if (!hasVideoFormats) {
     const carouselImages =
-      await fetchPinterestCarouselImages(url);
+      await fetchPinterestCarouselImages(
+        url,
+      );
 
-    if (carouselImages.length > 1) {
+    if (
+      carouselImages.length > 1
+    ) {
       return {
         id:
           (info.id as string) ||
-          randomBytes(4).toString("hex"),
+          randomBytes(
+            4,
+          ).toString("hex"),
         title:
-          (info.title as string) || null,
+          (info.title as string) ||
+          null,
         hasVideo: false,
         isCarousel: true,
         carouselImages,
       };
     }
+
+    /*
+     * IMPORTANT:
+     *
+     * If yt-dlp returned metadata but did not expose video
+     * formats, try the Pinterest HTML video fallback before
+     * treating the pin as an image.
+     */
+    const fallbackVideoUrl =
+      await fetchPinterestVideoUrl(
+        url,
+      );
+
+    if (fallbackVideoUrl) {
+      return {
+        id:
+          (info.id as string) ||
+          randomBytes(
+            4,
+          ).toString("hex"),
+        title:
+          (info.title as string) ||
+          null,
+        hasVideo: true,
+        videoUrl:
+          fallbackVideoUrl,
+      };
+    }
   }
+
+  // ========================================================
+  // IMAGE / GIF
+  // ========================================================
 
   if (
     !hasVideoFormats ||
@@ -1444,9 +1883,12 @@ async function getPinMeta(
     return {
       id:
         (info.id as string) ||
-        randomBytes(4).toString("hex"),
+        randomBytes(
+          4,
+        ).toString("hex"),
       title:
-        (info.title as string) || null,
+        (info.title as string) ||
+        null,
       hasVideo: false,
       isImage: true,
       isGif,
@@ -1457,13 +1899,21 @@ async function getPinMeta(
     };
   }
 
+  // ========================================================
+  // NORMAL VIDEO
+  // ========================================================
+
   return {
     id:
       (info.id as string) ||
-      randomBytes(4).toString("hex"),
+      randomBytes(
+        4,
+      ).toString("hex"),
     title:
-      (info.title as string) || null,
+      (info.title as string) ||
+      null,
     hasVideo: true,
+    videoUrl: null,
   };
 }
 
@@ -1488,100 +1938,166 @@ function runGalleryDl(
   stdout: string;
   stderr: string;
 }> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn(
-      getGalleryDlCommand(),
-      args,
-      {
-        stdio: [
-          "ignore",
-          "pipe",
-          "pipe",
-        ],
-      },
-    );
+  return new Promise(
+    (
+      resolve,
+      reject,
+    ) => {
+      const proc =
+        spawn(
+          getGalleryDlCommand(),
+          args,
+          {
+            stdio: [
+              "ignore",
+              "pipe",
+              "pipe",
+            ],
+          },
+        );
 
-    const timeout = setTimeout(() => {
-      proc.kill("SIGKILL");
-      reject(new Error("TIMEOUT"));
-    }, YTDLP_TIMEOUT_MS);
+      const timeout =
+        setTimeout(
+          () => {
+            proc.kill(
+              "SIGKILL",
+            );
 
-    let stdout = "";
-    let stderr = "";
-    let stderrBuf = "";
-
-    proc.stdout.on(
-      "data",
-      (d: Buffer) => {
-        stdout += d.toString();
-      },
-    );
-
-    proc.stderr.on(
-      "data",
-      (d: Buffer) => {
-        const chunk = d.toString();
-        stderr += chunk;
-
-        if (onStderrLine) {
-          stderrBuf += chunk;
-          const lines = stderrBuf.split("\n");
-          stderrBuf = lines.pop() ?? "";
-
-          for (const line of lines) {
-            onStderrLine(line);
-          }
-        }
-      },
-    );
-
-    proc.on(
-      "close",
-      (code: number | null) => {
-        clearTimeout(timeout);
-
-        if (code !== 0) {
-          reject(
-            Object.assign(
+            reject(
               new Error(
-                `gallery-dl exit ${code}`,
+                "TIMEOUT",
               ),
-              { code, stdout, stderr },
-            ),
-          );
-        } else {
-          resolve({ stdout, stderr });
-        }
-      },
-    );
+            );
+          },
+          YTDLP_TIMEOUT_MS,
+        );
 
-    proc.on("error", (err) => {
-      clearTimeout(timeout);
-      reject(err);
-    });
-  });
+      let stdout = "";
+      let stderr = "";
+      let stderrBuf = "";
+
+      proc.stdout.on(
+        "data",
+        (
+          d: Buffer,
+        ) => {
+          stdout +=
+            d.toString();
+        },
+      );
+
+      proc.stderr.on(
+        "data",
+        (
+          d: Buffer,
+        ) => {
+          const chunk =
+            d.toString();
+
+          stderr += chunk;
+
+          if (
+            onStderrLine
+          ) {
+            stderrBuf +=
+              chunk;
+
+            const lines =
+              stderrBuf.split(
+                "\n",
+              );
+
+            stderrBuf =
+              lines.pop() ?? "";
+
+            for (
+              const line of
+              lines
+            ) {
+              onStderrLine(
+                line,
+              );
+            }
+          }
+        },
+      );
+
+      proc.on(
+        "close",
+        (
+          code: number | null,
+        ) => {
+          clearTimeout(
+            timeout,
+          );
+
+          if (
+            code !== 0
+          ) {
+            reject(
+              Object.assign(
+                new Error(
+                  `gallery-dl exit ${code}`,
+                ),
+                {
+                  code,
+                  stdout,
+                  stderr,
+                },
+              ),
+            );
+          } else {
+            resolve({
+              stdout,
+              stderr,
+            });
+          }
+        },
+      );
+
+      proc.on(
+        "error",
+        (err) => {
+          clearTimeout(
+            timeout,
+          );
+
+          reject(err);
+        },
+      );
+    },
+  );
 }
 
 // ============================================================
 // IMAGE HELPERS
 // ============================================================
 
-function findAllImages(dir: string): string[] {
+function findAllImages(
+  dir: string,
+): string[] {
   const results: string[] = [];
 
   if (!fs.existsSync(dir)) {
     return results;
   }
 
-  const entries = fs.readdirSync(dir, {
-    withFileTypes: true,
-  });
-
-  for (const entry of entries) {
-    const fullPath = path.join(
+  const entries =
+    fs.readdirSync(
       dir,
-      entry.name,
+      {
+        withFileTypes: true,
+      },
     );
+
+  for (
+    const entry of entries
+  ) {
+    const fullPath =
+      path.join(
+        dir,
+        entry.name,
+      );
 
     if (entry.isFile()) {
       if (
@@ -1589,41 +2105,73 @@ function findAllImages(dir: string): string[] {
           entry.name,
         )
       ) {
-        results.push(fullPath);
+        results.push(
+          fullPath,
+        );
       }
-    } else if (entry.isDirectory()) {
+    } else if (
+      entry.isDirectory()
+    ) {
       results.push(
-        ...findAllImages(fullPath),
+        ...findAllImages(
+          fullPath,
+        ),
       );
     }
   }
 
-  return results.sort((a, b) =>
-    a.localeCompare(b, undefined, {
-      numeric: true,
-      sensitivity: "base",
-    }),
+  return results.sort(
+    (a, b) =>
+      a.localeCompare(
+        b,
+        undefined,
+        {
+          numeric: true,
+          sensitivity:
+            "base",
+        },
+      ),
   );
 }
 
-function escapeXml(value: string): string {
+function escapeXml(
+  value: string,
+): string {
   return value
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(
+      /&/g,
+      "&amp;",
+    )
+    .replace(
+      /"/g,
+      "&quot;",
+    )
+    .replace(
+      /</g,
+      "&lt;",
+    )
+    .replace(
+      />/g,
+      "&gt;",
+    );
 }
 
 function getImageMimeType(
   filePath: string,
 ): string {
-  const ext = path
-    .extname(filePath)
-    .toLowerCase();
+  const ext =
+    path
+      .extname(filePath)
+      .toLowerCase();
 
-  if (ext === ".png") return "image/png";
-  if (ext === ".webp") return "image/webp";
-  if (ext === ".gif") return "image/gif";
+  if (ext === ".png")
+    return "image/png";
+
+  if (ext === ".webp")
+    return "image/webp";
+
+  if (ext === ".gif")
+    return "image/gif";
 
   return "image/jpeg";
 }
@@ -1631,23 +2179,25 @@ function getImageMimeType(
 async function convertImageToPng(
   inputPath: string,
 ): Promise<string> {
-  const inputExt = path
-    .extname(inputPath)
-    .toLowerCase();
+  const inputExt =
+    path
+      .extname(inputPath)
+      .toLowerCase();
 
   if (inputExt === ".png") {
     return inputPath;
   }
 
-  const outputPath = path.join(
-    path.dirname(inputPath),
-    `${path.basename(
-      inputPath,
-      path.extname(inputPath),
-    )}-converted-${Date.now()}-${randomBytes(
-      3,
-    ).toString("hex")}.png`,
-  );
+  const outputPath =
+    path.join(
+      path.dirname(inputPath),
+      `${path.basename(
+        inputPath,
+        path.extname(inputPath),
+      )}-converted-${Date.now()}-${randomBytes(
+        3,
+      ).toString("hex")}.png`,
+    );
 
   if (
     path.resolve(inputPath) ===
@@ -1656,12 +2206,16 @@ async function convertImageToPng(
     return inputPath;
   }
 
-  await sharp(inputPath, {
-    animated: false,
-  })
+  await sharp(
+    inputPath,
+    {
+      animated: false,
+    },
+  )
     .png({
       compressionLevel: 3,
-      adaptiveFiltering: false,
+      adaptiveFiltering:
+        false,
     })
     .toFile(outputPath);
 
@@ -1670,7 +2224,9 @@ async function convertImageToPng(
     fs.existsSync(inputPath)
   ) {
     try {
-      fs.unlinkSync(inputPath);
+      fs.unlinkSync(
+        inputPath,
+      );
     } catch {
       /* best-effort */
     }
@@ -1682,30 +2238,48 @@ async function convertImageToPng(
 async function convertImageToSvg(
   inputPath: string,
 ): Promise<string> {
-  const buffer = fs.readFileSync(inputPath);
-
-  const metadata = await sharp(
-    inputPath,
-    { animated: false },
-  ).metadata();
-
-  const width = metadata.width || 1;
-  const height = metadata.height || 1;
-
-  const mime = getImageMimeType(inputPath);
-  const base64 = buffer.toString("base64");
-
-  const outputPath = path.join(
-    path.dirname(inputPath),
-    `${path.basename(
+  const buffer =
+    fs.readFileSync(
       inputPath,
-      path.extname(inputPath),
-    )}-converted-${Date.now()}-${randomBytes(
-      3,
-    ).toString("hex")}.svg`,
-  );
+    );
 
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+  const metadata =
+    await sharp(
+      inputPath,
+      {
+        animated: false,
+      },
+    ).metadata();
+
+  const width =
+    metadata.width || 1;
+
+  const height =
+    metadata.height || 1;
+
+  const mime =
+    getImageMimeType(
+      inputPath,
+    );
+
+  const base64 =
+    buffer.toString(
+      "base64",
+    );
+
+  const outputPath =
+    path.join(
+      path.dirname(inputPath),
+      `${path.basename(
+        inputPath,
+        path.extname(inputPath),
+      )}-converted-${Date.now()}-${randomBytes(
+        3,
+      ).toString("hex")}.svg`,
+    );
+
+  const svg =
+    `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg"
      xmlns:xlink="http://www.w3.org/1999/xlink"
      width="${width}"
@@ -1720,14 +2294,20 @@ async function convertImageToSvg(
 </svg>
 `;
 
-  fs.writeFileSync(outputPath, svg, "utf8");
+  fs.writeFileSync(
+    outputPath,
+    svg,
+    "utf8",
+  );
 
   if (
     inputPath !== outputPath &&
     fs.existsSync(inputPath)
   ) {
     try {
-      fs.unlinkSync(inputPath);
+      fs.unlinkSync(
+        inputPath,
+      );
     } catch {
       /* best-effort */
     }
@@ -1740,37 +2320,48 @@ async function convertImage(
   inputPath: string,
   format: ImageFormat,
 ): Promise<string> {
-  const ext = path
-    .extname(inputPath)
-    .toLowerCase();
+  const ext =
+    path
+      .extname(inputPath)
+      .toLowerCase();
 
   if (ext === ".gif") {
     return inputPath;
   }
 
   if (format === "svg") {
-    return convertImageToSvg(inputPath);
+    return convertImageToSvg(
+      inputPath,
+    );
   }
 
-  return convertImageToPng(inputPath);
+  return convertImageToPng(
+    inputPath,
+  );
 }
 
 async function downloadDirectImage(
   imageUrl: string,
   outputDir: string,
   pinId: string,
-): Promise<{ filePath: string }> {
-  const response = await fetch(imageUrl, {
-    redirect: "follow",
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      Referer:
-        "https://www.pinterest.com/",
-      Accept:
-        "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-    },
-  });
+): Promise<{
+  filePath: string;
+}> {
+  const response =
+    await fetch(
+      imageUrl,
+      {
+        redirect: "follow",
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          Referer:
+            "https://www.pinterest.com/",
+          Accept:
+            "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        },
+      },
+    );
 
   if (!response.ok) {
     throw new Error(
@@ -1779,59 +2370,86 @@ async function downloadDirectImage(
   }
 
   const contentType = (
-    response.headers.get("content-type") ||
-    ""
+    response.headers.get(
+      "content-type",
+    ) || ""
   ).toLowerCase();
 
   let ext = "jpg";
 
-  if (contentType.includes("image/png")) {
+  if (
+    contentType.includes(
+      "image/png",
+    )
+  ) {
     ext = "png";
   } else if (
-    contentType.includes("image/webp")
+    contentType.includes(
+      "image/webp",
+    )
   ) {
     ext = "webp";
   } else if (
-    contentType.includes("image/gif")
+    contentType.includes(
+      "image/gif",
+    )
   ) {
     ext = "gif";
   } else if (
-    contentType.includes("image/jpeg")
+    contentType.includes(
+      "image/jpeg",
+    )
   ) {
     ext = "jpg";
   } else {
-    const urlExt = imageUrl.match(
-      /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i,
-    );
+    const urlExt =
+      imageUrl.match(
+        /\.(jpg|jpeg|png|webp|gif)(?:[?#]|$)/i,
+      );
 
     if (urlExt) {
-      ext = urlExt[1].toLowerCase();
-      if (ext === "jpeg") ext = "jpg";
+      ext =
+        urlExt[1].toLowerCase();
+
+      if (ext === "jpeg") {
+        ext = "jpg";
+      }
     }
   }
 
-  const buffer = Buffer.from(
-    await response.arrayBuffer(),
-  );
+  const buffer =
+    Buffer.from(
+      await response.arrayBuffer(),
+    );
 
   if (buffer.length < 100) {
-    throw new Error("EMPTY_IMAGE");
+    throw new Error(
+      "EMPTY_IMAGE",
+    );
   }
 
-  const filePath = path.join(
-    outputDir,
-    `${pinId}.${ext}`,
+  const filePath =
+    path.join(
+      outputDir,
+      `${pinId}.${ext}`,
+    );
+
+  fs.writeFileSync(
+    filePath,
+    buffer,
   );
 
-  fs.writeFileSync(filePath, buffer);
-
-  return { filePath };
+  return {
+    filePath,
+  };
 }
 
 async function downloadImageOrCarousel(
   url: string,
   pinId: string,
-  onStage?: (label: string) => void,
+  onStage?: (
+    label: string,
+  ) => void,
   imageUrl?: string | null,
   imageFormat: ImageFormat = "png",
   mediaKind:
@@ -1840,15 +2458,20 @@ async function downloadImageOrCarousel(
     | "carousel" = "image",
 ): Promise<{
   filePath: string;
-  mediaType: "image" | "carousel";
+  mediaType:
+    | "image"
+    | "carousel";
   imageCount: number;
 }> {
   const outputDir =
     `/tmp/pinme-img-${pinId}`;
 
-  fs.mkdirSync(outputDir, {
-    recursive: true,
-  });
+  fs.mkdirSync(
+    outputDir,
+    {
+      recursive: true,
+    },
+  );
 
   if (
     imageUrl &&
@@ -1868,14 +2491,19 @@ async function downloadImageOrCarousel(
           pinId,
         );
 
-      const ext = path
-        .extname(direct.filePath)
-        .toLowerCase();
+      const ext =
+        path
+          .extname(
+            direct.filePath,
+          )
+          .toLowerCase();
 
       if (ext === ".gif") {
         return {
-          filePath: direct.filePath,
-          mediaType: "image",
+          filePath:
+            direct.filePath,
+          mediaType:
+            "image",
           imageCount: 1,
         };
       }
@@ -1886,14 +2514,17 @@ async function downloadImageOrCarousel(
           : "Converting image to PNG...",
       );
 
-      const converted = await convertImage(
-        direct.filePath,
-        imageFormat,
-      );
+      const converted =
+        await convertImage(
+          direct.filePath,
+          imageFormat,
+        );
 
       return {
-        filePath: converted,
-        mediaType: "image",
+        filePath:
+          converted,
+        mediaType:
+          "image",
         imageCount: 1,
       };
     } catch (err) {
@@ -1904,8 +2535,12 @@ async function downloadImageOrCarousel(
     }
   }
 
-  if (mediaKind === "carousel") {
-    onStage?.("Downloading carousel...");
+  if (
+    mediaKind === "carousel"
+  ) {
+    onStage?.(
+      "Downloading carousel...",
+    );
   } else {
     onStage?.(
       mediaKind === "gif"
@@ -1930,18 +2565,28 @@ async function downloadImageOrCarousel(
     );
   }
 
-  let images = findAllImages(outputDir);
+  let images =
+    findAllImages(
+      outputDir,
+    );
 
-  // ─── HTML fallback for missing carousel images ───
+  // ========================================================
+  // HTML FALLBACK FOR MISSING CAROUSEL IMAGES
+  // ========================================================
+
   if (
     mediaKind === "carousel" &&
     images.length < 2
   ) {
     try {
-      onStage?.("Recovering missing images...");
+      onStage?.(
+        "Recovering missing images...",
+      );
 
       const allImageUrls =
-        await fetchPinterestCarouselImages(url);
+        await fetchPinterestCarouselImages(
+          url,
+        );
 
       console.log(
         "DEBUG: HTML fallback found",
@@ -1951,107 +2596,145 @@ async function downloadImageOrCarousel(
         ")",
       );
 
-      if (allImageUrls.length > images.length) {
-        const batchSize = IMAGE_CONVERT_CONCURRENCY;
+      if (
+        allImageUrls.length >
+        images.length
+      ) {
+        const batchSize =
+          IMAGE_CONVERT_CONCURRENCY;
 
         for (
           let i = 0;
           i < allImageUrls.length;
           i += batchSize
         ) {
-          const batch = allImageUrls.slice(
-            i,
-            i + batchSize,
-          );
+          const batch =
+            allImageUrls.slice(
+              i,
+              i + batchSize,
+            );
 
           await Promise.all(
-            batch.map(async (imgUrl, idx) => {
-              try {
-                const response = await fetch(
-                  imgUrl,
-                  {
-                    redirect: "follow",
-                    headers: {
-                      "User-Agent":
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                      Referer:
-                        "https://www.pinterest.com/",
-                      Accept:
-                        "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-                    },
-                  },
-                );
+            batch.map(
+              async (
+                imgUrl,
+                idx,
+              ) => {
+                try {
+                  const response =
+                    await fetch(
+                      imgUrl,
+                      {
+                        redirect:
+                          "follow",
+                        headers: {
+                          "User-Agent":
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                          Referer:
+                            "https://www.pinterest.com/",
+                          Accept:
+                            "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                        },
+                      },
+                    );
 
-                if (!response.ok) {
-                  console.error(
-                    `Fallback image ${i + idx + 1} failed: ${response.status}`,
+                  if (
+                    !response.ok
+                  ) {
+                    console.error(
+                      `Fallback image ${i + idx + 1} failed: ${response.status}`,
+                    );
+
+                    return;
+                  }
+
+                  const contentType =
+                    (
+                      response.headers.get(
+                        "content-type",
+                      ) || ""
+                    ).toLowerCase();
+
+                  let ext =
+                    "jpg";
+
+                  if (
+                    contentType.includes(
+                      "image/png",
+                    )
+                  ) {
+                    ext =
+                      "png";
+                  } else if (
+                    contentType.includes(
+                      "image/webp",
+                    )
+                  ) {
+                    ext =
+                      "webp";
+                  } else if (
+                    contentType.includes(
+                      "image/gif",
+                    )
+                  ) {
+                    ext =
+                      "gif";
+                  }
+
+                  const buffer =
+                    Buffer.from(
+                      await response.arrayBuffer(),
+                    );
+
+                  if (
+                    buffer.length <
+                    100
+                  ) {
+                    return;
+                  }
+
+                  const filePath =
+                    path.join(
+                      outputDir,
+                      `fallback-${String(
+                        i + idx + 1,
+                      ).padStart(
+                        3,
+                        "0",
+                      )}.${ext}`,
+                    );
+
+                  fs.writeFileSync(
+                    filePath,
+                    buffer,
                   );
-                  return;
+
+                  console.log(
+                    `DEBUG: Fallback downloaded image ${i + idx + 1}`,
+                  );
+                } catch (err) {
+                  console.error(
+                    `Fallback image ${i + idx + 1} error:`,
+                    err,
+                  );
                 }
-
-                const contentType = (
-                  response.headers.get(
-                    "content-type",
-                  ) || ""
-                ).toLowerCase();
-
-                let ext = "jpg";
-                if (
-                  contentType.includes(
-                    "image/png",
-                  )
-                )
-                  ext = "png";
-                else if (
-                  contentType.includes(
-                    "image/webp",
-                  )
-                )
-                  ext = "webp";
-                else if (
-                  contentType.includes(
-                    "image/gif",
-                  )
-                )
-                  ext = "gif";
-
-                const buffer = Buffer.from(
-                  await response.arrayBuffer(),
-                );
-
-                if (buffer.length < 100)
-                  return;
-
-                const filePath = path.join(
-                  outputDir,
-                  `fallback-${String(
-                    i + idx + 1,
-                  ).padStart(3, "0")}.${ext}`,
-                );
-
-                fs.writeFileSync(
-                  filePath,
-                  buffer,
-                );
-
-                console.log(
-                  `DEBUG: Fallback downloaded image ${i + idx + 1}`,
-                );
-              } catch (err) {
-                console.error(
-                  `Fallback image ${i + idx + 1} error:`,
-                  err,
-                );
-              }
-            }),
+              },
+            ),
           );
         }
 
         const allImages =
-          findAllImages(outputDir);
+          findAllImages(
+            outputDir,
+          );
 
-        if (allImages.length > images.length) {
-          images = allImages;
+        if (
+          allImages.length >
+          images.length
+        ) {
+          images =
+            allImages;
+
           console.log(
             "DEBUG: After fallback:",
             images.length,
@@ -2067,13 +2750,17 @@ async function downloadImageOrCarousel(
     }
   }
 
-  if (images.length === 0) {
+  if (
+    images.length === 0
+  ) {
     throw new Error(
       "NO_FILE: no image found",
     );
   }
 
-  if (images.length > 1) {
+  if (
+    images.length > 1
+  ) {
     onStage?.(
       imageFormat === "svg"
         ? "Converting carousel to SVG..."
@@ -2083,38 +2770,49 @@ async function downloadImageOrCarousel(
     const batchSize =
       IMAGE_CONVERT_CONCURRENCY;
 
-    const convertedImages: string[] = [];
+    const convertedImages: string[] =
+      [];
 
     for (
       let i = 0;
       i < images.length;
       i += batchSize
     ) {
-      const batch = images.slice(
-        i,
-        i + batchSize,
-      );
+      const batch =
+        images.slice(
+          i,
+          i + batchSize,
+        );
 
       const batchResults =
         await Promise.all(
-          batch.map(async (imagePath) => {
-            const ext = path
-              .extname(imagePath)
-              .toLowerCase();
+          batch.map(
+            async (
+              imagePath,
+            ) => {
+              const ext =
+                path
+                  .extname(
+                    imagePath,
+                  )
+                  .toLowerCase();
 
-            if (ext === ".gif") {
-              return imagePath;
-            }
+              if (
+                ext === ".gif"
+              ) {
+                return imagePath;
+              }
 
-            try {
-              return await convertImage(
-                imagePath,
-                imageFormat,
-              );
-            } catch {
-              return imagePath;
-            }
-          }),
+              try {
+                return await convertImage(
+                  imagePath,
+                  imageFormat,
+                );
+              } catch {
+                return imagePath;
+              }
+            },
+          ),
         );
 
       convertedImages.push(
@@ -2122,71 +2820,128 @@ async function downloadImageOrCarousel(
       );
     }
 
-    images = convertedImages.sort(
-      (a, b) =>
-        a.localeCompare(b, undefined, {
-          numeric: true,
-          sensitivity: "base",
-        }),
+    images =
+      convertedImages.sort(
+        (a, b) =>
+          a.localeCompare(
+            b,
+            undefined,
+            {
+              numeric: true,
+              sensitivity:
+                "base",
+            },
+          ),
+      );
+
+    onStage?.(
+      "Packaging carousel...",
     );
 
-    onStage?.("Packaging carousel...");
-
-    const zipPath = path.join(
-      outputDir,
-      `pinme-carousel-${pinId}.zip`,
-    );
+    const zipPath =
+      path.join(
+        outputDir,
+        `pinme-carousel-${pinId}.zip`,
+      );
 
     await new Promise<void>(
-      (resolve, reject) => {
+      (
+        resolve,
+        reject,
+      ) => {
         const output =
-          fs.createWriteStream(zipPath);
+          fs.createWriteStream(
+            zipPath,
+          );
 
-        const archive = archiver("zip", {
-          store: true,
-        });
+        const archive =
+          archiver(
+            "zip",
+            {
+              store: true,
+            },
+          );
 
-        output.on("close", () => resolve());
-        output.on("error", (err) =>
-          reject(err),
+        output.on(
+          "close",
+          () => resolve(),
         );
-        archive.on("error", (err) =>
-          reject(err),
+
+        output.on(
+          "error",
+          (err) =>
+            reject(err),
         );
 
-        archive.pipe(output);
+        archive.on(
+          "error",
+          (err) =>
+            reject(err),
+        );
 
-        images.forEach((imgPath, index) => {
-          const ext = path.extname(imgPath);
+        archive.pipe(
+          output,
+        );
 
-          archive.file(imgPath, {
-            name: `image-${String(
-              index + 1,
-            ).padStart(2, "0")}${ext}`,
-          });
-        });
+        images.forEach(
+          (
+            imgPath,
+            index,
+          ) => {
+            const ext =
+              path.extname(
+                imgPath,
+              );
+
+            archive.file(
+              imgPath,
+              {
+                name: `image-${String(
+                  index + 1,
+                ).padStart(
+                  2,
+                  "0",
+                )}${ext}`,
+              },
+            );
+          },
+        );
 
         archive.finalize();
       },
     );
 
     return {
-      filePath: zipPath,
-      mediaType: "carousel",
-      imageCount: images.length,
+      filePath:
+        zipPath,
+      mediaType:
+        "carousel",
+      imageCount:
+        images.length,
     };
   }
 
-  if (images.length === 1) {
-    const single = images[0];
-    const ext = path
-      .extname(single)
-      .toLowerCase();
+  if (
+    images.length === 1
+  ) {
+    const single =
+      images[0];
 
-    if (ext === ".gif") {
+    const ext =
+      path
+        .extname(
+          single,
+        )
+        .toLowerCase();
+
+    if (
+      ext === ".gif"
+    ) {
       return {
-        filePath: single,
-        mediaType: "image",
+        filePath:
+          single,
+        mediaType:
+          "image",
         imageCount: 1,
       };
     }
@@ -2197,14 +2952,17 @@ async function downloadImageOrCarousel(
         : "Converting image to PNG...",
     );
 
-    const converted = await convertImage(
-      single,
-      imageFormat,
-    );
+    const converted =
+      await convertImage(
+        single,
+        imageFormat,
+      );
 
     return {
-      filePath: converted,
-      mediaType: "image",
+      filePath:
+        converted,
+      mediaType:
+        "image",
       imageCount: 1,
     };
   }
@@ -2214,22 +2972,49 @@ async function downloadImageOrCarousel(
   );
 }
 
+// ============================================================
+// VIDEO DOWNLOAD
+// ============================================================
+
 async function downloadVideo(
   url: string,
   pinId: string,
-  onStage?: (label: string) => void,
-): Promise<{ filePath: string }> {
+  onStage?: (
+    label: string,
+  ) => void,
+  directVideoUrl?: string | null,
+): Promise<{
+  filePath: string;
+}> {
   const outputTemplate =
     `/tmp/pinme-${pinId}.%(ext)s`;
 
-  let mergeSignalled = false;
+  let mergeSignalled =
+    false;
+
+  /*
+   * If Pinterest HTML fallback found a direct .m3u8/.mp4,
+   * download that URL instead of sending the original
+   * Pinterest URL back through the broken extractor.
+   */
+  const downloadUrl =
+    directVideoUrl ||
+    url;
+
+  console.log(
+    directVideoUrl
+      ? "Downloading video using Pinterest direct-media fallback"
+      : "Downloading video using yt-dlp Pinterest extractor",
+  );
 
   await runYtDlp(
     [
       "--no-playlist",
       "--no-warnings",
       "--concurrent-fragments",
-      String(YTDLP_CONCURRENT_FRAGMENTS),
+      String(
+        YTDLP_CONCURRENT_FRAGMENTS,
+      ),
       "--retries",
       "2",
       "--fragment-retries",
@@ -2237,20 +3022,28 @@ async function downloadVideo(
       "--socket-timeout",
       "15",
       "--format",
-      "bestvideo+bestaudio/best",
+      directVideoUrl
+        ? "best"
+        : "bestvideo+bestaudio/best",
       "--merge-output-format",
       "mp4",
       "-o",
       outputTemplate,
-      url,
+      downloadUrl,
     ],
     (line) => {
       if (
         !mergeSignalled &&
-        line.includes("[Merger]")
+        line.includes(
+          "[Merger]",
+        )
       ) {
-        mergeSignalled = true;
-        onStage?.("Processing video...");
+        mergeSignalled =
+          true;
+
+        onStage?.(
+          "Processing video...",
+        );
       }
     },
   );
@@ -2258,39 +3051,84 @@ async function downloadVideo(
   const preferredPath =
     `/tmp/pinme-${pinId}.mp4`;
 
-  if (fs.existsSync(preferredPath)) {
-    const stat = fs.statSync(preferredPath);
+  if (
+    fs.existsSync(
+      preferredPath,
+    )
+  ) {
+    const stat =
+      fs.statSync(
+        preferredPath,
+      );
 
-    if (stat.size < 10_000) {
-      fs.unlinkSync(preferredPath);
-      throw new Error("NO_VIDEO");
+    if (
+      stat.size < 10_000
+    ) {
+      fs.unlinkSync(
+        preferredPath,
+      );
+
+      throw new Error(
+        "NO_VIDEO",
+      );
     }
 
-    return { filePath: preferredPath };
+    return {
+      filePath:
+        preferredPath,
+    };
   }
 
-  const files = fs.readdirSync("/tmp");
+  const files =
+    fs.readdirSync(
+      "/tmp",
+    );
 
-  for (const f of files) {
+  for (
+    const f of files
+  ) {
     if (
-      f.startsWith(`pinme-${pinId}.`) &&
-      !f.endsWith(".part") &&
-      !f.endsWith(".ytdl")
+      f.startsWith(
+        `pinme-${pinId}.`,
+      ) &&
+      !f.endsWith(
+        ".part",
+      ) &&
+      !f.endsWith(
+        ".ytdl",
+      )
     ) {
-      const fp = path.join("/tmp", f);
-      const stat = fs.statSync(fp);
+      const fp =
+        path.join(
+          "/tmp",
+          f,
+        );
 
-      if (stat.size >= 10_000) {
-        return { filePath: fp };
+      const stat =
+        fs.statSync(
+          fp,
+        );
+
+      if (
+        stat.size >=
+        10_000
+      ) {
+        return {
+          filePath: fp,
+        };
       }
 
       try {
-        fs.unlinkSync(fp);
+        fs.unlinkSync(
+          fp,
+        );
       } catch {
         /* best-effort */
       }
 
-      throw new Error("NO_VIDEO");
+      throw new Error(
+        "NO_VIDEO",
+      );
     }
   }
 
@@ -2299,73 +3137,131 @@ async function downloadVideo(
   );
 }
 
+// ============================================================
+// FILENAME
+// ============================================================
+
 function buildFilename(
   title: string | null,
   filePath: string,
 ): string {
   const ext =
-    path.extname(filePath).slice(1) ||
+    path
+      .extname(
+        filePath,
+      )
+      .slice(1) ||
     "mp4";
 
-  if (ext.toLowerCase() === "zip") {
+  if (
+    ext.toLowerCase() ===
+    "zip"
+  ) {
     return `pinme-carousel-${Date.now()}.zip`;
   }
 
-  const genericTitles = new Set([
-    "mp4",
-    "mkv",
-    "webm",
-    "video",
-    "watch",
-    "pin",
-    "",
-  ]);
+  const genericTitles =
+    new Set([
+      "mp4",
+      "mkv",
+      "webm",
+      "video",
+      "watch",
+      "pin",
+      "",
+    ]);
 
-  const cleaned = (title || "")
-    .replace(/[^\w\s\-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase();
+  const cleaned =
+    (title || "")
+      .replace(
+        /[^\w\s\-]/g,
+        "",
+      )
+      .replace(
+        /\s+/g,
+        "-",
+      )
+      .replace(
+        /^-+|-+$/g,
+        "",
+      )
+      .toLowerCase();
 
   if (
     !cleaned ||
-    genericTitles.has(cleaned) ||
+    genericTitles.has(
+      cleaned,
+    ) ||
     cleaned.length < 3
   ) {
     return `pinme-download-${Date.now()}.${ext}`;
   }
 
-  return `${cleaned.slice(0, 60)}.${ext}`;
+  return `${cleaned.slice(
+    0,
+    60,
+  )}.${ext}`;
 }
 
-function getMimeType(filename: string): string {
-  const ext = path
-    .extname(filename)
-    .toLowerCase();
+// ============================================================
+// MIME
+// ============================================================
 
-  const types: Record<string, string> = {
-    ".mp4": "video/mp4",
-    ".webm": "video/webm",
-    ".mov": "video/quicktime",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".webp": "image/webp",
-    ".gif": "image/gif",
-    ".svg": "image/svg+xml",
-    ".zip": "application/zip",
+function getMimeType(
+  filename: string,
+): string {
+  const ext =
+    path
+      .extname(
+        filename,
+      )
+      .toLowerCase();
+
+  const types: Record<
+    string,
+    string
+  > = {
+    ".mp4":
+      "video/mp4",
+    ".webm":
+      "video/webm",
+    ".mov":
+      "video/quicktime",
+    ".jpg":
+      "image/jpeg",
+    ".jpeg":
+      "image/jpeg",
+    ".png":
+      "image/png",
+    ".webp":
+      "image/webp",
+    ".gif":
+      "image/gif",
+    ".svg":
+      "image/svg+xml",
+    ".zip":
+      "application/zip",
   };
 
   return (
-    types[ext] || "application/octet-stream"
+    types[ext] ||
+    "application/octet-stream"
   );
 }
 
-function toUserError(msg: string): {
+// ============================================================
+// USER ERROR
+// ============================================================
+
+function toUserError(
+  msg: string,
+): {
   status: number;
   error: string;
 } {
-  if (msg === "NO_VIDEO") {
+  if (
+    msg === "NO_VIDEO"
+  ) {
     return {
       status: 400,
       error:
@@ -2373,7 +3269,9 @@ function toUserError(msg: string): {
     };
   }
 
-  if (msg === "UNAVAILABLE") {
+  if (
+    msg === "UNAVAILABLE"
+  ) {
     return {
       status: 404,
       error:
@@ -2381,7 +3279,9 @@ function toUserError(msg: string): {
     };
   }
 
-  if (msg === "TIMEOUT") {
+  if (
+    msg === "TIMEOUT"
+  ) {
     return {
       status: 504,
       error:
@@ -2402,21 +3302,37 @@ function toUserError(msg: string): {
 
 router.post(
   "/get-pin",
-  async (req, res) => {
-    const userAgent = req.headers[
-      "user-agent"
-    ] as string | undefined;
+  async (
+    req,
+    res,
+  ) => {
+    const userAgent =
+      req.headers[
+        "user-agent"
+      ] as
+        | string
+        | undefined;
 
-    const origin = req.headers[
-      "origin"
-    ] as string | undefined;
+    const origin =
+      req.headers[
+        "origin"
+      ] as
+        | string
+        | undefined;
 
     if (
-      isBotRequest(userAgent) ||
-      !isAllowedOrigin(origin)
+      isBotRequest(
+        userAgent,
+      ) ||
+      !isAllowedOrigin(
+        origin,
+      )
     ) {
       req.log?.warn(
-        { userAgent, origin },
+        {
+          userAgent,
+          origin,
+        },
         "Blocked bot request (silent)",
       );
 
@@ -2428,55 +3344,76 @@ router.post(
       return;
     }
 
-    const { url, imageFormat } =
-      req.body as {
-        url?: string;
-        imageFormat?: ImageFormat;
-      };
+    const {
+      url,
+      imageFormat,
+    } = req.body as {
+      url?: string;
+      imageFormat?: ImageFormat;
+    };
 
     if (
       !url ||
-      typeof url !== "string" ||
+      typeof url !==
+        "string" ||
       !url.trim()
     ) {
       res.status(400).json({
         error:
           "This doesn't look like a Pinterest link.",
       });
+
       return;
     }
 
-    const trimmed = url.trim();
+    const trimmed =
+      url.trim();
 
-    if (!isPinterestUrl(trimmed)) {
+    if (
+      !isPinterestUrl(
+        trimmed,
+      )
+    ) {
       res.status(400).json({
         error:
           "This doesn't look like a Pinterest link.",
       });
+
       return;
     }
 
     const selectedImageFormat =
-      normalizeImageFormat(imageFormat);
+      normalizeImageFormat(
+        imageFormat,
+      );
 
     res.setHeader(
       "Content-Type",
       "text/event-stream",
     );
+
     res.setHeader(
       "Cache-Control",
       "no-cache",
     );
+
     res.setHeader(
       "Connection",
       "keep-alive",
     );
+
     res.flushHeaders();
 
-    const send = (data: object) => {
-      if (!res.writableEnded) {
+    const send = (
+      data: object,
+    ) => {
+      if (
+        !res.writableEnded
+      ) {
         res.write(
-          `data: ${JSON.stringify(data)}\n\n`,
+          `data: ${JSON.stringify(
+            data,
+          )}\n\n`,
         );
       }
     };
@@ -2484,23 +3421,34 @@ router.post(
     try {
       send({
         type: "stage",
-        label: "Checking media type...",
+        label:
+          "Checking media type...",
       });
 
-      const meta = await getPinMeta(trimmed);
+      const meta =
+        await getPinMeta(
+          trimmed,
+        );
 
-      if (meta.isCarousel) {
+      if (
+        meta.isCarousel
+      ) {
         send({
           type: "stage",
           label:
             "Fetching carousel info...",
         });
-      } else if (meta.isGif) {
+      } else if (
+        meta.isGif
+      ) {
         send({
           type: "stage",
-          label: "Fetching GIF info...",
+          label:
+            "Fetching GIF info...",
         });
-      } else if (meta.isImage) {
+      } else if (
+        meta.isImage
+      ) {
         send({
           type: "stage",
           label:
@@ -2515,11 +3463,15 @@ router.post(
       }
 
       let filePath: string;
+
       let mediaType:
         | "video"
         | "image"
         | "carousel";
-      let imageCount: number | undefined;
+
+      let imageCount:
+        | number
+        | undefined;
 
       if (
         meta.isImage ||
@@ -2529,8 +3481,13 @@ router.post(
           await downloadImageOrCarousel(
             trimmed,
             meta.id,
-            (label) =>
-              send({ type: "stage", label }),
+            (
+              label,
+            ) =>
+              send({
+                type: "stage",
+                label,
+              }),
             meta.imageUrl,
             selectedImageFormat,
             meta.isGif
@@ -2540,70 +3497,105 @@ router.post(
                 : "image",
           );
 
-        filePath = result.filePath;
-        mediaType = result.mediaType;
-        imageCount = result.imageCount;
+        filePath =
+          result.filePath;
+
+        mediaType =
+          result.mediaType;
+
+        imageCount =
+          result.imageCount;
       } else {
         send({
           type: "stage",
-          label: "Downloading video...",
+          label:
+            "Downloading video...",
         });
 
-        const vid = await downloadVideo(
-          trimmed,
-          meta.id,
-          (label) =>
-            send({ type: "stage", label }),
-        );
+        const vid =
+          await downloadVideo(
+            trimmed,
+            meta.id,
+            (
+              label,
+            ) =>
+              send({
+                type: "stage",
+                label,
+              }),
+            meta.videoUrl,
+          );
 
-        filePath = vid.filePath;
-        mediaType = "video";
+        filePath =
+          vid.filePath;
+
+        mediaType =
+          "video";
       }
 
       send({
         type: "stage",
-        label: "Preparing download...",
+        label:
+          "Preparing download...",
       });
 
-      const filename = buildFilename(
-        meta.title,
-        filePath,
-      );
+      const filename =
+        buildFilename(
+          meta.title,
+          filePath,
+        );
 
       const expiresAt =
-        Date.now() + DOWNLOAD_TTL_MS;
+        Date.now() +
+        DOWNLOAD_TTL_MS;
 
-      const token = createDownloadToken({
-        url: trimmed,
-        pinId: meta.id,
-        filename,
-        expiresAt,
-        mediaType,
-        imageFormat: selectedImageFormat,
-      });
+      const token =
+        createDownloadToken({
+          url: trimmed,
+          pinId: meta.id,
+          filename,
+          expiresAt,
+          mediaType,
+          imageFormat:
+            selectedImageFormat,
+        });
 
-      pendingDownloads.set(token, {
-        filePath,
-        filename,
-        expiresAt,
-      });
+      pendingDownloads.set(
+        token,
+        {
+          filePath,
+          filename,
+          expiresAt,
+        },
+      );
 
       send({
         type: "ready",
         token,
         filename,
-        title: meta.title ?? null,
+        title:
+          meta.title ??
+          null,
         mediaType,
         imageCount,
-        imageFormat: selectedImageFormat,
+        imageFormat:
+          selectedImageFormat,
       });
 
       sendTelegramNotification(
         `🎉 <b>New Download</b>\n\n` +
           `📁 <b>Type:</b> ${mediaType}\n` +
           `📄 <b>File:</b> <code>${filename}</code>\n` +
-          `${meta.title ? `📝 <b>Title:</b> ${meta.title}\n` : ""}` +
-          `${imageCount ? `🖼️ <b>Images:</b> ${imageCount}\n` : ""}` +
+          `${
+            meta.title
+              ? `📝 <b>Title:</b> ${meta.title}\n`
+              : ""
+          }` +
+          `${
+            imageCount
+              ? `🖼️ <b>Images:</b> ${imageCount}\n`
+              : ""
+          }` +
           `🔗 <b>URL:</b> ${trimmed}`,
       );
     } catch (err) {
@@ -2613,11 +3605,17 @@ router.post(
           : String(err);
 
       req.log?.error(
-        { err: msg, url: trimmed },
+        {
+          err: msg,
+          url: trimmed,
+        },
         "get-pin failed",
       );
 
-      const { error } = toUserError(msg);
+      const { error } =
+        toUserError(
+          msg,
+        );
 
       send({
         type: "error",
@@ -2635,13 +3633,21 @@ router.post(
 
 router.post(
   "/telegram/webhook",
-  async (req, res) => {
+  async (
+    req,
+    res,
+  ) => {
     try {
-      const update = req.body;
+      const update =
+        req.body;
 
-      res.status(200).json({ ok: true });
+      res.status(200).json({
+        ok: true,
+      });
 
-      if (!update?.message) {
+      if (
+        !update?.message
+      ) {
         return;
       }
 
@@ -2652,13 +3658,18 @@ router.post(
         update.message.text;
 
       if (
-        typeof chatId !== "number" ||
-        typeof text !== "string"
+        typeof chatId !==
+          "number" ||
+        typeof text !==
+          "string"
       ) {
         return;
       }
 
-      handleTelegramMessage(chatId, text).catch(
+      handleTelegramMessage(
+        chatId,
+        text,
+      ).catch(
         (err) => {
           console.error(
             "Telegram handler error:",
@@ -2671,7 +3682,10 @@ router.post(
         "Telegram webhook error:",
         err,
       );
-      res.status(200).json({ ok: true });
+
+      res.status(200).json({
+        ok: true,
+      });
     }
   },
 );
@@ -2682,45 +3696,67 @@ router.post(
 
 router.get(
   "/stream/:token",
-  async (req, res): Promise<void> => {
-    const { token } = req.params;
-    const payload = parseDownloadToken(token);
+  async (
+    req,
+    res,
+  ): Promise<void> => {
+    const {
+      token,
+    } = req.params;
+
+    const payload =
+      parseDownloadToken(
+        token,
+      );
 
     if (
       !payload ||
-      payload.expiresAt <= Date.now()
+      payload.expiresAt <=
+        Date.now()
     ) {
       res.status(404).json({
         error:
           "Download link expired. Please try again.",
       });
+
       return;
     }
 
     const entry =
-      pendingDownloads.get(token);
+      pendingDownloads.get(
+        token,
+      );
 
     let filePath: string;
-    let filename = payload.filename;
+
+    let filename =
+      payload.filename;
 
     if (
       entry &&
-      fs.existsSync(entry.filePath)
+      fs.existsSync(
+        entry.filePath,
+      )
     ) {
-      filePath = entry.filePath;
-      filename = entry.filename;
+      filePath =
+        entry.filePath;
+
+      filename =
+        entry.filename;
     } else {
       try {
         req.log?.warn(
           "Prepared download was unavailable; fetching a fresh copy",
         );
 
-        const retryPinId = `retry-${randomBytes(
-          8,
-        ).toString("hex")}`;
+        const retryPinId =
+          `retry-${randomBytes(
+            8,
+          ).toString("hex")}`;
 
         if (
-          payload.mediaType === "carousel"
+          payload.mediaType ===
+          "carousel"
         ) {
           const carousel =
             await downloadImageOrCarousel(
@@ -2734,13 +3770,17 @@ router.get(
               "carousel",
             );
 
-          filePath = carousel.filePath;
-          filename = buildFilename(
-            null,
-            filePath,
-          );
+          filePath =
+            carousel.filePath;
+
+          filename =
+            buildFilename(
+              null,
+              filePath,
+            );
         } else if (
-          payload.mediaType === "image"
+          payload.mediaType ===
+          "image"
         ) {
           const image =
             await downloadImageOrCarousel(
@@ -2754,29 +3794,51 @@ router.get(
               "image",
             );
 
-          filePath = image.filePath;
-          filename = buildFilename(
-            null,
-            filePath,
-          );
-        } else {
-          const fresh = await downloadVideo(
-            payload.url,
-            retryPinId,
-          );
+          filePath =
+            image.filePath;
 
-          filePath = fresh.filePath;
-          filename = buildFilename(
-            null,
-            filePath,
-          );
+          filename =
+            buildFilename(
+              null,
+              filePath,
+            );
+        } else {
+          /*
+           * Re-run metadata detection so that a Pinterest
+           * direct-media fallback URL is recovered if needed.
+           */
+          const freshMeta =
+            await getPinMeta(
+              payload.url,
+            );
+
+          const fresh =
+            await downloadVideo(
+              payload.url,
+              retryPinId,
+              undefined,
+              freshMeta.videoUrl,
+            );
+
+          filePath =
+            fresh.filePath;
+
+          filename =
+            buildFilename(
+              null,
+              filePath,
+            );
         }
 
-        pendingDownloads.set(token, {
-          filePath,
-          filename,
-          expiresAt: payload.expiresAt,
-        });
+        pendingDownloads.set(
+          token,
+          {
+            filePath,
+            filename,
+            expiresAt:
+              payload.expiresAt,
+          },
+        );
       } catch (err) {
         const msg =
           err instanceof Error
@@ -2784,111 +3846,176 @@ router.get(
             : String(err);
 
         req.log?.error(
-          { err: msg },
+          {
+            err: msg,
+          },
           "Fresh download retry failed",
         );
 
-        const { status, error } =
-          toUserError(msg);
+        const {
+          status,
+          error,
+        } =
+          toUserError(
+            msg,
+          );
 
-        res.status(status).json({ error });
+        res
+          .status(status)
+          .json({
+            error,
+          });
+
         return;
       }
     }
 
-    if (!fs.existsSync(filePath)) {
-      pendingDownloads.delete(token);
+    if (
+      !fs.existsSync(
+        filePath,
+      )
+    ) {
+      pendingDownloads.delete(
+        token,
+      );
 
       res.status(404).json({
         error:
           "File not found. Please try again.",
       });
+
       return;
     }
 
     let stat: fs.Stats;
 
     try {
-      stat = fs.statSync(filePath);
+      stat =
+        fs.statSync(
+          filePath,
+        );
     } catch {
-      pendingDownloads.delete(token);
+      pendingDownloads.delete(
+        token,
+      );
 
       res.status(500).json({
         error:
           "Failed to read download file.",
       });
+
       return;
     }
 
     res.setHeader(
       "Content-Type",
-      getMimeType(filename),
+      getMimeType(
+        filename,
+      ),
     );
+
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${filename}"`,
     );
+
     res.setHeader(
       "Content-Length",
       stat.size,
     );
+
     res.setHeader(
       "Cache-Control",
       "no-store",
     );
 
-    const fileStream = fs.createReadStream(
-      filePath,
-      {
-        highWaterMark:
-          FILE_STREAM_HIGH_WATER_MARK,
+    const fileStream =
+      fs.createReadStream(
+        filePath,
+        {
+          highWaterMark:
+            FILE_STREAM_HIGH_WATER_MARK,
+        },
+      );
+
+    const removeFailedDownload =
+      () => {
+        pendingDownloads.delete(
+          token,
+        );
+
+        try {
+          if (
+            fs.existsSync(
+              filePath,
+            )
+          ) {
+            fs.unlinkSync(
+              filePath,
+            );
+          }
+        } catch {
+          /* best-effort */
+        }
+      };
+
+    fileStream.on(
+      "error",
+      (err) => {
+        req.log?.error(
+          {
+            err,
+          },
+          "stream read error",
+        );
+
+        removeFailedDownload();
+
+        if (
+          !res.headersSent
+        ) {
+          res.status(500).end();
+        }
       },
     );
 
-    const removeFailedDownload = () => {
-      pendingDownloads.delete(token);
-
-      try {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
+    res.on(
+      "close",
+      () => {
+        if (
+          !res.writableFinished
+        ) {
+          fileStream.destroy();
         }
-      } catch {
-        /* best-effort */
-      }
-    };
+      },
+    );
 
-    fileStream.on("error", (err) => {
-      req.log?.error(
-        { err },
-        "stream read error",
-      );
+    res.on(
+      "finish",
+      () => {
+        pendingDownloads.delete(
+          token,
+        );
 
-      removeFailedDownload();
-
-      if (!res.headersSent) {
-        res.status(500).end();
-      }
-    });
-
-    res.on("close", () => {
-      if (!res.writableFinished) {
-        fileStream.destroy();
-      }
-    });
-
-    res.on("finish", () => {
-      pendingDownloads.delete(token);
-
-      try {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
+        try {
+          if (
+            fs.existsSync(
+              filePath,
+            )
+          ) {
+            fs.unlinkSync(
+              filePath,
+            );
+          }
+        } catch {
+          /* best-effort */
         }
-      } catch {
-        /* best-effort */
-      }
-    });
+      },
+    );
 
-    fileStream.pipe(res);
+    fileStream.pipe(
+      res,
+    );
   },
 );
 
