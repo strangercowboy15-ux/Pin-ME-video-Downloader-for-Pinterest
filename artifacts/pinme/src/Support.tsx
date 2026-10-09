@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export default function Support({
@@ -75,6 +76,7 @@ export default function Support({
             </h2>
 
             <div className="space-y-4">
+              {/* PayPal Support */}
               <a
                 href="https://www.paypal.com/ncp/payment/64BBX79BRA23S"
                 target="_blank"
@@ -109,6 +111,45 @@ export default function Support({
 
                     <p className="text-sm text-muted-foreground mt-1">
                       Choose any amount to support pinME
+                    </p>
+                  </div>
+                </div>
+              </a>
+
+              {/* Razorpay Support */}
+              <a
+                href="https://razorpay.me/@pinme"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded-xl border border-border bg-muted/20 p-5 hover:bg-primary/10 hover:border-primary/40 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <svg
+                    width="30"
+                    height="30"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                    className="shrink-0"
+                  >
+                    <path
+                      d="M4 3H20L12 21L4 3Z"
+                      fill="#3395FF"
+                    />
+                    <path
+                      d="M4 3H12L12 21L4 3Z"
+                      fill="#072654"
+                    />
+                  </svg>
+
+                  <div>
+                    <h3 className="font-semibold">
+                      Support with Razorpay
+                    </h3>
+
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Support pinME using available payment methods
                     </p>
                   </div>
                 </div>
