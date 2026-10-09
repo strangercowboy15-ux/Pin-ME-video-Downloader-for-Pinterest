@@ -1503,10 +1503,10 @@ export default function App({
                 <img
                   src="/header-logo.png"
                   alt="pinME Logo"
-                  className="h-10 w-10 md:h-12 md:w-12 object-contain"
+                  className="h-10 w-10 md:h-14 md:w-14 object-contain"
                 />
 
-                <span className="text-2xl md:text-3xl font-bold tracking-tight">
+                <span className="text-2xl md:text-4xl font-bold tracking-tight">
                   <span className="text-foreground">
                     pin
                   </span>
@@ -1522,21 +1522,21 @@ export default function App({
               </span>
             </header>
 
-            <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 md:p-10 lg:p-12 w-full max-w-md md:max-w-lg lg:max-w-2xl mx-auto">
+            <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 md:p-10 lg:p-12 w-full max-w-md md:max-w-3xl lg:max-w-5xl mx-auto">
               <div className="w-full space-y-8 md:space-y-10">
                 <div className="text-center space-y-2 md:space-y-3">
-                  <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight text-balance max-w-[360px] md:max-w-[520px] lg:max-w-[620px] mx-auto">
+                  <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight text-balance max-w-[360px] md:max-w-[700px] lg:max-w-[900px] mx-auto">
                     {t('heading')}
                   </h1>
 
-                  <p className="text-muted-foreground text-sm md:text-base max-w-[320px] md:max-w-[420px] mx-auto">
+                  <p className="text-muted-foreground text-sm md:text-lg max-w-[320px] md:max-w-[550px] mx-auto">
                     {t('subtitle')}
                   </p>
                 </div>
 
                 <form
                   onSubmit={handleSubmit}
-                  className="w-full space-y-4 md:space-y-5"
+                  className="w-full space-y-4 md:space-y-6"
                 >
                   <div className="relative flex items-center">
                     <input
@@ -1558,7 +1558,7 @@ export default function App({
                       placeholder={t(
                         'placeholder'
                       )}
-                      className={`w-full bg-input/50 border rounded-xl py-4 md:py-5 pl-4 md:pl-6 pr-14 md:pr-16 text-foreground md:text-base placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner ${
+                      className={`w-full bg-input/50 border rounded-xl py-4 md:py-6 pl-4 md:pl-7 pr-14 md:pr-16 text-foreground md:text-lg placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner ${
                         isLinkFading
                           ? 'border-red-500 focus:ring-red-500/50'
                           : 'border-border'
@@ -1596,6 +1596,7 @@ export default function App({
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
                         aria-hidden="true"
+                        className="md:w-6 md:h-6"
                       >
                         <rect
                           x="5.5"
@@ -1645,7 +1646,7 @@ export default function App({
                     )}
                   </AnimatePresence>
 
-                  <div className="pt-2 min-h-[92px] md:min-h-[110px] flex justify-center items-center w-full">
+                  <div className="pt-2 min-h-[92px] md:min-h-[120px] flex justify-center items-center w-full">
                     <AnimatePresence mode="wait">
                       {status ===
                       'loading' ? (
@@ -1704,16 +1705,16 @@ export default function App({
                               delay: 0.1,
                               duration: 0.22,
                             }}
-                            className="w-full py-4 md:py-5 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2 px-3 md:px-4"
+                            className="w-full py-4 md:py-6 rounded-xl bg-[#2ECC71]/20 text-[#2ECC71] border border-[#2ECC71]/30 font-semibold text-center flex items-center justify-center gap-2 px-3 md:px-4"
                           >
-                            <span className="text-sm sm:text-base md:text-lg">
+                            <span className="text-sm sm:text-base md:text-xl">
                               {getSuccessMessage(
                                 successInfo,
                                 t
                               )}
                             </span>
 
-                            <span className="text-lg md:text-xl leading-none">
+                            <span className="text-lg md:text-2xl leading-none">
                               ✓
                             </span>
                           </motion.div>
@@ -1732,7 +1733,7 @@ export default function App({
                             'default'
                               ? 'bg-primary hover:bg-primary/90 disabled:hover:bg-primary'
                               : `seasonal-button seasonal-button-${season}`
-                          } disabled:opacity-50 text-primary-foreground py-4 md:py-5 rounded-xl font-semibold text-lg md:text-xl transition-colors shadow-[0_0_20px_rgba(230,0,35,0.2)]`}
+                          } disabled:opacity-50 text-primary-foreground py-4 md:py-6 rounded-xl font-semibold text-lg md:text-2xl transition-colors shadow-[0_0_20px_rgba(230,0,35,0.2)]`}
                           data-testid="button-submit"
                         >
                           {t(
@@ -1744,7 +1745,7 @@ export default function App({
                   </div>
                 </form>
 
-                <p className="text-center text-xs md:text-sm text-muted-foreground leading-relaxed px-4">
+                <p className="text-center text-xs md:text-sm text-muted-foreground leading-relaxed px-4 md:px-8">
                   {t('infoText')}
                 </p>
 
