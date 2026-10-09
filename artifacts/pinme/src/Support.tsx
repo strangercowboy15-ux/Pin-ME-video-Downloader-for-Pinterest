@@ -76,7 +76,7 @@ export default function Support({
             </h2>
 
             <div className="space-y-4">
-              {/* PayPal Support */}
+              {/* PayPal */}
               <a
                 href="https://www.paypal.com/ncp/payment/64BBX79BRA23S"
                 target="_blank"
@@ -84,25 +84,11 @@ export default function Support({
                 className="block rounded-xl border border-border bg-muted/20 p-5 hover:bg-primary/10 hover:border-primary/40 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <svg
-                    width="30"
-                    height="30"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden="true"
-                    className="shrink-0"
-                  >
-                    <path
-                      d="M7.2 3.5H13C16.6 3.5 18.8 5.4 18.8 8.4C18.8 11.7 16.3 13.8 12.5 13.8H9.9L9 19.5H5.8L7.2 3.5Z"
-                      fill="#003087"
-                    />
-
-                    <path
-                      d="M10.2 6.3H14C16.1 6.3 17.4 7.3 17.4 9C17.4 10.9 15.9 12.1 13.7 12.1H9.8L10.2 6.3Z"
-                      fill="#0070BA"
-                    />
-                  </svg>
+                  <img
+                    src="/paypal-logo.svg"
+                    alt="PayPal"
+                    className="w-[30px] h-[30px] object-contain shrink-0"
+                  />
 
                   <div>
                     <h3 className="font-semibold">
@@ -116,7 +102,7 @@ export default function Support({
                 </div>
               </a>
 
-              {/* Razorpay Support */}
+              {/* Razorpay */}
               <a
                 href="https://razorpay.me/@pinme"
                 target="_blank"
@@ -124,24 +110,11 @@ export default function Support({
                 className="block rounded-xl border border-border bg-muted/20 p-5 hover:bg-primary/10 hover:border-primary/40 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <svg
-                    width="30"
-                    height="30"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden="true"
-                    className="shrink-0"
-                  >
-                    <path
-                      d="M4 3H20L12 21L4 3Z"
-                      fill="#3395FF"
-                    />
-                    <path
-                      d="M4 3H12L12 21L4 3Z"
-                      fill="#072654"
-                    />
-                  </svg>
+                  <img
+                    src="/razorpay-logo.svg"
+                    alt="Razorpay"
+                    className="w-[30px] h-[30px] object-contain shrink-0"
+                  />
 
                   <div>
                     <h3 className="font-semibold">
@@ -149,7 +122,7 @@ export default function Support({
                     </h3>
 
                     <p className="text-sm text-muted-foreground mt-1">
-                      Support pinME using available payment methods
+                      Choose any amount to support pinME
                     </p>
                   </div>
                 </div>
