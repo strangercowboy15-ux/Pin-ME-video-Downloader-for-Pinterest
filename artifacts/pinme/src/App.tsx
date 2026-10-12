@@ -1093,10 +1093,11 @@ export default function App({
   ] = useState('');
 
   const [progress, setProgress] =
-    useState(10);
+    useState(1);
 
-  const [fakeProgress, setFakeProgress] =
-    useState(95);
+  // 👇 Smooth timer progress (goes 1 → 99)
+  const [smoothProgress, setSmoothProgress] =
+    useState(1);
 
   const [errorMsg, setErrorMsg] =
     useState('');
@@ -1157,30 +1158,38 @@ export default function App({
     };
   }, []);
 
+  // ─── Smooth timer progress (1 → 99) ─────────────────────────────────────
+  // Starts at 1, climbs smoothly, respects the actual stage floor.
+  // Never exceeds 99 — jumps to 100 on real completion.
   useEffect(() => {
     if (status !== 'loading') {
-      setFakeProgress(95);
-      return;
-    }
-
-    if (progress < 95) {
-      setFakeProgress(progress);
+      setSmoothProgress(1);
       return;
     }
 
     const id = setInterval(() => {
-      setFakeProgress((prev) => {
+      setSmoothProgress((prev) => {
         if (prev >= 99) return 99;
 
-        const increment =
-          prev < 97 ? 0.5 : 0.2;
+        // Adaptive speed: fast at start, slower near end
+        let increment = 0.5;
+        if (prev > 40) increment = 0.4;
+        if (prev > 70) increment = 0.3;
+        if (prev > 85) increment = 0.2;
+        if (prev > 95) increment = 0.1;
 
+        const next = prev + increment;
+
+        // Never below the actual stage progress (floor)
+        const floor = progress;
+
+        // Never above 99
         return Math.min(
           99,
-          prev + increment
+          Math.max(next, floor)
         );
       });
-    }, 200);
+    }, 150);
 
     return () => clearInterval(id);
   }, [status, progress]);
@@ -1233,7 +1242,7 @@ export default function App({
     setStatus('loading');
     setProgressLabel(t('checkingMedia'));
     setProgress(10);
-    setFakeProgress(10);
+    setSmoothProgress(1);
     setErrorMsg('');
     setIsLinkFading(false);
     setSuccessInfo({});
@@ -1318,7 +1327,9 @@ export default function App({
             event.mediaType
           );
 
+          // 🎯 Complete — force smooth to 100
           setProgress(100);
+          setSmoothProgress(100);
 
           showDownloadNotification(
             event.mediaType,
@@ -1337,8 +1348,8 @@ export default function App({
               setDisplayUrl('');
               setStatus('idle');
               setProgressLabel('');
-              setProgress(10);
-              setFakeProgress(95);
+              setProgress(1);
+              setSmoothProgress(1);
               setSuccessInfo({});
               resetTimerRef.current = null;
             }, 3000);
@@ -1667,14 +1678,9 @@ export default function App({
                                 'checkingMedia'
                               )
                             }
-                            progress={
-                              progress >=
-                              95
-                                ? Math.round(
-                                    fakeProgress
-                                  )
-                                : progress
-                            }
+                            progress={Math.round(
+                              smoothProgress
+                            )}
                           />
                         </motion.div>
                       ) : status ===
