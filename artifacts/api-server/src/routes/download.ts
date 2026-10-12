@@ -708,6 +708,50 @@ async function getPinMeta(url: string): Promise<PinMeta> {
   const isGif = ext === "gif" || urlLooksLikeGif;
   const isImage = ["jpg", "jpeg", "png", "webp"].includes(ext);
 
+  // ──────────────────────────────────────────────────────────
+  // 🎯 VIDEO CHECK FIRST — before any carousel checks
+  // ──────────────────────────────────────────────────────────
+
+  const infoUrlStr = String(info.url || "").toLowerCase();
+  const isVideoExt = ["mp4", "webm", "mov", "m4v", "mkv"].includes(ext);
+  const infoUrlLooksVideo = /\.(mp4|webm|mov|m4v|mkv)(?:\?|#|$)/i.test(infoUrlStr);
+  const inputUrlLooksVideo = /\.(mp4|webm|mov|m4v|mkv)(?:\?|#|$)/i.test(
+    originalInputUrl,
+  );
+
+  // ✅ VIDEO — if yt-dlp says video formats exist
+  // ✅ OR video extension in URL
+  // ✅ GIF handled separately (as image/GIF)
+  if (
+    hasVideoFormats ||
+    isVideoExt ||
+    infoUrlLooksVideo ||
+    inputUrlLooksVideo
+  ) {
+    // Check if it's actually a GIF (video-like format)
+    if (isGif) {
+      return {
+        id: (info.id as string) || randomBytes(4).toString("hex"),
+        title: (info.title as string) || null,
+        hasVideo: false,
+        isImage: true,
+        isGif: true,
+        imageUrl: (info.url as string) || (info.image_url as string) || null,
+      };
+    }
+
+    // Regular video
+    return {
+      id: (info.id as string) || randomBytes(4).toString("hex"),
+      title: (info.title as string) || null,
+      hasVideo: true,
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // CAROUSEL CHECKS (only if NOT video)
+  // ──────────────────────────────────────────────────────────
+
   const entries = info.entries as Array<Record<string, unknown>> | undefined;
   const infoType = String(info._type || "").toLowerCase();
 
@@ -755,7 +799,7 @@ async function getPinMeta(url: string): Promise<PinMeta> {
     };
   }
 
-  if (thumbnailCollectionCount > 1 && !hasVideoFormats) {
+  if (thumbnailCollectionCount > 1) {
     return {
       id: (info.id as string) || randomBytes(4).toString("hex"),
       title: (info.title as string) || null,
@@ -764,37 +808,22 @@ async function getPinMeta(url: string): Promise<PinMeta> {
     };
   }
 
-  if (!hasVideoFormats) {
-    const carouselImages = await fetchPinterestCarouselImages(url);
-    if (carouselImages.length > 1) {
-      return {
-        id: (info.id as string) || randomBytes(4).toString("hex"),
-        title: (info.title as string) || null,
-        hasVideo: false,
-        isCarousel: true,
-        carouselImages,
-      };
-    }
-  }
-
-  // ─── Video URL detection (before image fallback) ───
-  // Pinterest videos sometimes come without formats array
-  const infoUrlStr = String(info.url || "").toLowerCase();
-  const isVideoExt = ["mp4", "webm", "mov", "m4v", "mkv"].includes(ext);
-  const infoUrlLooksVideo = /\.(mp4|webm|mov|m4v|mkv)(?:\?|#|$)/i.test(infoUrlStr);
-  const inputUrlLooksVideo = /\.(mp4|webm|mov|m4v|mkv)(?:\?|#|$)/i.test(
-    originalInputUrl,
-  );
-
-  if (isVideoExt || infoUrlLooksVideo || inputUrlLooksVideo) {
+  const carouselImages = await fetchPinterestCarouselImages(url);
+  if (carouselImages.length > 1) {
     return {
       id: (info.id as string) || randomBytes(4).toString("hex"),
       title: (info.title as string) || null,
-      hasVideo: true,
+      hasVideo: false,
+      isCarousel: true,
+      carouselImages,
     };
   }
 
-  if (!hasVideoFormats || isImage || isGif) {
+  // ──────────────────────────────────────────────────────────
+  // IMAGE FALLBACK
+  // ──────────────────────────────────────────────────────────
+
+  if (isImage || isGif) {
     return {
       id: (info.id as string) || randomBytes(4).toString("hex"),
       title: (info.title as string) || null,
@@ -804,6 +833,10 @@ async function getPinMeta(url: string): Promise<PinMeta> {
       imageUrl: (info.url as string) || (info.image_url as string) || null,
     };
   }
+
+  // ──────────────────────────────────────────────────────────
+  // DEFAULT: VIDEO (failsafe)
+  // ──────────────────────────────────────────────────────────
 
   return {
     id: (info.id as string) || randomBytes(4).toString("hex"),
