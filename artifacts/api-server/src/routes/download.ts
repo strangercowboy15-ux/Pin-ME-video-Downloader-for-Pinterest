@@ -1243,6 +1243,7 @@ async function downloadVideo(
   url: string,
   pinId: string,
   onStage?: (label: string) => void,
+  onProgress?: (percent: number) => void,
 ): Promise<{ filePath: string }> {
   const outputTemplate = `/tmp/pinme-${pinId}.%(ext)s`;
   let mergeSignalled = false;
@@ -1250,6 +1251,7 @@ async function downloadVideo(
     [
       "--no-playlist",
       "--no-warnings",
+      "--newline",
       "--concurrent-fragments",
       String(YTDLP_CONCURRENT_FRAGMENTS),
       "--retries",
@@ -1267,6 +1269,19 @@ async function downloadVideo(
       url,
     ],
     (line) => {
+      // Parse yt-dlp progress
+      try {
+        const match = line.match(/\[download\]\s+([\d.]+)%/);
+        if (match && onProgress) {
+          const percent = parseFloat(match[1]);
+          if (!isNaN(percent)) {
+            onProgress(percent);
+          }
+        }
+      } catch {
+        /* silent — never crash on parse failure */
+      }
+
       if (!mergeSignalled && line.includes("[Merger]")) {
         mergeSignalled = true;
         onStage?.("Processing video...");
@@ -1441,8 +1456,11 @@ router.post("/get-pin", async (req, res) => {
       imageCount = result.imageCount;
     } else {
       send({ type: "stage", label: "Downloading video..." });
-      const vid = await downloadVideo(trimmed, meta.id, (label) =>
-        send({ type: "stage", label }),
+      const vid = await downloadVideo(
+        trimmed,
+        meta.id,
+        (label) => send({ type: "stage", label }),
+        (percent) => send({ type: "progress", percent }),
       );
       filePath = vid.filePath;
       mediaType = "video";
