@@ -632,6 +632,10 @@ type SSEEvent =
       label: string;
     }
   | {
+      type: 'progress';
+      percent: number;
+    }
+  | {
       type: 'ready';
       token: string;
       filename: string;
@@ -1294,6 +1298,18 @@ export default function App({
             getProgressFromStage(event.label)
           );
 
+          continue;
+        }
+
+        if (event.type === 'progress') {
+          try {
+            // Map real 0-100 to UI 10-95 range
+            const mapped = 10 + (event.percent * 0.85);
+            setProgress(mapped);
+            setSmoothProgress(mapped);
+          } catch {
+            /* silent */
+          }
           continue;
         }
 
