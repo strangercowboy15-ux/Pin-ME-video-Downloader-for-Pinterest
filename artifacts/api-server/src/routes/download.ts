@@ -718,6 +718,21 @@ async function getPinMeta(url: string): Promise<PinMeta> {
   const inputUrlLooksVideo = /\.(mp4|webm|mov|m4v|mkv)(?:\?|#|$)/i.test(
     originalInputUrl,
   );
+  let ytDlpSaysVideo = false;
+  try {
+    ytDlpSaysVideo = Boolean(
+      (info.vcodec && info.vcodec !== "none") ||
+        (info.ext &&
+          ["mp4", "webm", "mov", "m4v"].includes(
+            String(info.ext).toLowerCase(),
+          )) ||
+        (info.duration !== undefined && Number(info.duration) > 0) ||
+        String(info._type || "").toLowerCase() === "video" ||
+        String(info.format_note || "").toLowerCase().includes("video"),
+    );
+  } catch {
+    /* silent — never crash on detection failure */
+  }
 
   // ✅ VIDEO — if yt-dlp says video formats exist
   // ✅ OR video extension in URL
@@ -726,7 +741,8 @@ async function getPinMeta(url: string): Promise<PinMeta> {
     hasVideoFormats ||
     isVideoExt ||
     infoUrlLooksVideo ||
-    inputUrlLooksVideo
+    inputUrlLooksVideo ||
+    ytDlpSaysVideo
   ) {
     // Check if it's actually a GIF (video-like format)
     if (isGif) {
