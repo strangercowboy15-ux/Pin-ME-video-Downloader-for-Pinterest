@@ -1123,69 +1123,67 @@ async function downloadImageOrCarousel(
 
   let images = findAllImages(outputDir);
 
-  if (mediaKind === "carousel" && images.length < 2) {
+  if (mediaKind === "carousel") {
     try {
       onStage?.("Recovering missing images...");
       const allImageUrls = await fetchPinterestCarouselImages(url);
-      console.log(
-        "DEBUG: HTML fallback found",
-        allImageUrls.length,
-        "image URLs (gallery-dl got",
-        images.length,
-        ")",
-      );
-      if (allImageUrls.length > images.length) {
-        const batchSize = IMAGE_CONVERT_CONCURRENCY;
-        for (let i = 0; i < allImageUrls.length; i += batchSize) {
-          const batch = allImageUrls.slice(i, i + batchSize);
-          await Promise.all(
-            batch.map(async (imgUrl, idx) => {
-              try {
-                const response = await fetch(imgUrl, {
-                  redirect: "follow",
-                  headers: {
-                    "User-Agent":
-                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    Referer: "https://www.pinterest.com/",
-                    Accept:
-                      "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-                  },
-                });
-                if (!response.ok) {
-                  console.error(
-                    `Fallback image ${i + idx + 1} failed: ${response.status}`,
-                  );
-                  return;
-                }
-                const contentType = (
-                  response.headers.get("content-type") || ""
-                ).toLowerCase();
-                let ext = "jpg";
-                if (contentType.includes("image/png")) ext = "png";
-                else if (contentType.includes("image/webp")) ext = "webp";
-                else if (contentType.includes("image/gif")) ext = "gif";
-                const buffer = Buffer.from(await response.arrayBuffer());
-                if (buffer.length < 100) return;
-                const filePath = path.join(
-                  outputDir,
-                  `fallback-${String(i + idx + 1).padStart(3, "0")}.${ext}`,
-                );
-                fs.writeFileSync(filePath, buffer);
-                console.log(`DEBUG: Fallback downloaded image ${i + idx + 1}`);
-              } catch (err) {
-                console.error(`Fallback image ${i + idx + 1} error:`, err);
+      const pendingFilenames = new Set<string>();
+      const batchSize = IMAGE_CONVERT_CONCURRENCY;
+      for (let i = 0; i < allImageUrls.length; i += batchSize) {
+        const batch = allImageUrls.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async (imgUrl, idx) => {
+            try {
+              const filename = path.basename(new URL(imgUrl).pathname);
+              const filenameStem = path.parse(filename).name;
+              if (
+                !filenameStem ||
+                images.some((imagePath) =>
+                  path.basename(imagePath).includes(filenameStem),
+                ) ||
+                pendingFilenames.has(filenameStem)
+              ) {
+                return;
               }
-            }),
-          );
-        }
-        const allImages = findAllImages(outputDir);
-        if (allImages.length > images.length) {
-          images = allImages;
-          console.log("DEBUG: After fallback:", images.length, "images");
-        }
+              pendingFilenames.add(filenameStem);
+
+              const response = await fetch(imgUrl, {
+                redirect: "follow",
+                headers: {
+                  "User-Agent":
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                  Referer: "https://www.pinterest.com/",
+                  Accept:
+                    "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                },
+              });
+              if (!response.ok) return;
+
+              const contentType = (
+                response.headers.get("content-type") || ""
+              ).toLowerCase();
+              let ext = "jpg";
+              if (contentType.includes("image/png")) ext = "png";
+              else if (contentType.includes("image/webp")) ext = "webp";
+              else if (contentType.includes("image/gif")) ext = "gif";
+              const buffer = Buffer.from(await response.arrayBuffer());
+              if (buffer.length < 100) return;
+
+              const filePath = path.join(
+                outputDir,
+                `fallback-${String(i + idx + 1).padStart(3, "0")}-${filenameStem}.${ext}`,
+              );
+              fs.writeFileSync(filePath, buffer);
+              images.push(filePath);
+            } catch {
+              /* silent — fallback images are best-effort */
+            }
+          }),
+        );
       }
-    } catch (err) {
-      console.error("HTML fallback failed:", err);
+      images = findAllImages(outputDir);
+    } catch {
+      /* silent — fallback is best-effort */
     }
   }
 
