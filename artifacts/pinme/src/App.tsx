@@ -20,6 +20,103 @@ const GET_PIN_URL =
 const STREAM_URL =
   `${API_BASE}/api/stream`;
 
+type MicroMediaType =
+  | 'video'
+  | 'image'
+  | 'gif'
+  | 'carousel';
+
+const MICRO_STAGES: Record<MicroMediaType, readonly string[]> = {
+  video: [
+    'Checking media type...',
+    'Analyzing Pinterest link...',
+    'Verifying link status...',
+    'Detecting media...',
+    'Fetching video info...',
+    'Extracting video URL...',
+    'Preparing video metadata...',
+    'Video ready...',
+    'Downloading video...',
+    'Buffering fragments...',
+    'Merging parts...',
+    'Almost downloaded...',
+    'Processing video...',
+    'Merging audio+video...',
+    'Finalizing output...',
+    'Preparing download...',
+    'Generating secure link...',
+    'Link ready...',
+    'Starting download...',
+    'Saving to device...',
+  ],
+  image: [
+    'Checking media type...',
+    'Analyzing Pinterest link...',
+    'Verifying link status...',
+    'Detecting image...',
+    'Fetching image info...',
+    'Extracting image URL...',
+    'Preparing image metadata...',
+    'Image found...',
+    'Downloading image...',
+    'Buffering image data...',
+    'Checking image quality...',
+    'Processing image...',
+    'Preparing image file...',
+    'Optimizing image data...',
+    'Finalizing image...',
+    'Preparing download...',
+    'Generating secure link...',
+    'Link ready...',
+    'Starting download...',
+    'Saving image to device...',
+  ],
+  gif: [
+    'Checking media type...',
+    'Analyzing Pinterest link...',
+    'Verifying link status...',
+    'Detecting GIF...',
+    'Fetching GIF info...',
+    'Extracting GIF URL...',
+    'Preparing GIF metadata...',
+    'GIF found...',
+    'Downloading GIF...',
+    'Buffering animation...',
+    'Checking animation frames...',
+    'Processing GIF...',
+    'Preserving animation...',
+    'Preparing GIF file...',
+    'Finalizing animation...',
+    'Preparing download...',
+    'Generating secure link...',
+    'Link ready...',
+    'Starting download...',
+    'Saving GIF to device...',
+  ],
+  carousel: [
+    'Checking media type...',
+    'Analyzing Pinterest link...',
+    'Verifying link status...',
+    'Detecting carousel...',
+    'Fetching carousel info...',
+    'Finding carousel images...',
+    'Counting image slides...',
+    'Preparing image list...',
+    'Downloading carousel...',
+    'Fetching next image...',
+    'Checking images...',
+    'Recovering missing images...',
+    'Processing image slides...',
+    'Organizing carousel images...',
+    'Bundling carousel files...',
+    'Preparing download archive...',
+    'Finalizing carousel ZIP...',
+    'Generating secure link...',
+    'Link ready...',
+    'Saving carousel to device...',
+  ],
+};
+
 // ─── Pinterest URL check ─────────────────────────────────────────────────────
 
 function isPinterestUrl(rawUrl: string): boolean {
@@ -1096,6 +1193,29 @@ export default function App({
     setProgressLabel,
   ] = useState('');
 
+  const [microIndex, setMicroIndex] = useState(0);
+
+  const detectMediaType = (): MicroMediaType => {
+    try {
+      const label = String(progressLabel || '').toLowerCase();
+      if (label.includes('carousel')) return 'carousel';
+      if (label.includes('gif')) return 'gif';
+      if (label.includes('image')) return 'image';
+      return 'video';
+    } catch {
+      return 'video';
+    }
+  };
+
+  const currentMicroStage = (): string => {
+    try {
+      const messages = MICRO_STAGES[detectMediaType()];
+      return messages[microIndex] || MICRO_STAGES.video[0];
+    } catch {
+      return MICRO_STAGES.video[0];
+    }
+  };
+
   const [progress, setProgress] =
     useState(1);
 
@@ -1161,6 +1281,31 @@ export default function App({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (status !== 'loading') {
+      setMicroIndex(0);
+      return;
+    }
+
+    const id = setInterval(() => {
+      setMicroIndex((i) => {
+        try {
+          const messages = MICRO_STAGES[detectMediaType()];
+          return messages.length > 0
+            ? (i + 1) % messages.length
+            : 0;
+        } catch {
+          const fallbackLength = MICRO_STAGES.video.length;
+          return fallbackLength > 0
+            ? (i + 1) % fallbackLength
+            : 0;
+        }
+      });
+    }, 1500);
+
+    return () => clearInterval(id);
+  }, [status, progressLabel]);
 
   // ─── Smooth timer progress (1 → 99) ─────────────────────────────────────
   // Starts at 1, climbs smoothly, respects the actual stage floor.
@@ -1688,12 +1833,7 @@ export default function App({
                           className="w-full"
                         >
                           <ProgressLabel
-                            label={
-                              progressLabel ||
-                              t(
-                                'checkingMedia'
-                              )
-                            }
+                            label={currentMicroStage()}
                             progress={Math.round(
                               smoothProgress
                             )}
