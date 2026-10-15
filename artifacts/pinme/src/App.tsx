@@ -26,95 +26,94 @@ type MicroMediaType =
   | 'gif'
   | 'carousel';
 
-const MICRO_STAGES: Record<MicroMediaType, readonly string[]> = {
-  video: [
-    'Checking media type...',
-    'Analyzing Pinterest link...',
-    'Verifying link status...',
-    'Detecting media...',
-    'Fetching video info...',
-    'Extracting video URL...',
-    'Preparing video metadata...',
-    'Video ready...',
-    'Downloading video...',
-    'Buffering fragments...',
-    'Merging parts...',
-    'Almost downloaded...',
-    'Processing video...',
-    'Merging audio+video...',
-    'Finalizing output...',
-    'Preparing download...',
-    'Generating secure link...',
-    'Link ready...',
-    'Starting download...',
-    'Saving to device...',
-  ],
-  image: [
-    'Checking media type...',
-    'Analyzing Pinterest link...',
-    'Verifying link status...',
-    'Detecting image...',
-    'Fetching image info...',
-    'Extracting image URL...',
-    'Preparing image metadata...',
-    'Image found...',
-    'Downloading image...',
-    'Buffering image data...',
-    'Checking image quality...',
-    'Processing image...',
-    'Preparing image file...',
-    'Optimizing image data...',
-    'Finalizing image...',
-    'Preparing download...',
-    'Generating secure link...',
-    'Link ready...',
-    'Starting download...',
-    'Saving image to device...',
-  ],
-  gif: [
-    'Checking media type...',
-    'Analyzing Pinterest link...',
-    'Verifying link status...',
-    'Detecting GIF...',
-    'Fetching GIF info...',
-    'Extracting GIF URL...',
-    'Preparing GIF metadata...',
-    'GIF found...',
-    'Downloading GIF...',
-    'Buffering animation...',
-    'Checking animation frames...',
-    'Processing GIF...',
-    'Preserving animation...',
-    'Preparing GIF file...',
-    'Finalizing animation...',
-    'Preparing download...',
-    'Generating secure link...',
-    'Link ready...',
-    'Starting download...',
-    'Saving GIF to device...',
-  ],
-  carousel: [
-    'Checking media type...',
-    'Analyzing Pinterest link...',
-    'Verifying link status...',
-    'Detecting carousel...',
-    'Fetching carousel info...',
-    'Finding carousel images...',
-    'Counting image slides...',
-    'Preparing image list...',
-    'Downloading carousel...',
-    'Fetching next image...',
-    'Checking images...',
-    'Recovering missing images...',
-    'Processing image slides...',
-    'Organizing carousel images...',
-    'Bundling carousel files...',
-    'Preparing download archive...',
-    'Finalizing carousel ZIP...',
-    'Generating secure link...',
-    'Link ready...',
-    'Saving carousel to device...',
-  ],
+const NEUTRAL_STAGES = [
+  'Checking media type...',
+  'Analyzing Pinterest link...',
+  'Verifying link status...',
+  'Detecting media...',
+] as const;
+
+const IMAGE_STAGES = [
+  'Fetching image info...',
+  'Extracting image URL...',
+  'Preparing image metadata...',
+  'Image found...',
+  'Downloading image...',
+  'Buffering image data...',
+  'Checking image quality...',
+  'Processing image...',
+  'Preparing image file...',
+  'Optimizing image data...',
+  'Finalizing image...',
+  'Preparing image download...',
+  'Generating image download link...',
+  'Image link ready...',
+  'Starting image download...',
+  'Saving image to device...',
+] as const;
+
+const VIDEO_STAGES = [
+  'Fetching video info...',
+  'Extracting video URL...',
+  'Preparing video metadata...',
+  'Video ready...',
+  'Downloading video...',
+  'Buffering video fragments...',
+  'Merging video parts...',
+  'Almost finished with video...',
+  'Processing video...',
+  'Merging video and audio...',
+  'Finalizing video output...',
+  'Preparing video file...',
+  'Generating video download link...',
+  'Video link ready...',
+  'Starting video download...',
+  'Saving video to device...',
+] as const;
+
+const GIF_STAGES = [
+  'Fetching GIF info...',
+  'Extracting GIF URL...',
+  'Preparing GIF metadata...',
+  'GIF found...',
+  'Downloading GIF...',
+  'Buffering GIF animation...',
+  'Checking GIF animation frames...',
+  'Processing GIF...',
+  'Preserving GIF animation...',
+  'Preparing GIF file...',
+  'Finalizing GIF animation...',
+  'Preparing GIF download...',
+  'Generating GIF download link...',
+  'GIF link ready...',
+  'Starting GIF download...',
+  'Saving GIF to device...',
+] as const;
+
+const CAROUSEL_STAGES = [
+  'Fetching carousel info...',
+  'Finding carousel images...',
+  'Counting carousel slides...',
+  'Preparing carousel image list...',
+  'Downloading carousel images...',
+  'Fetching the next carousel slide...',
+  'Checking carousel images...',
+  'Recovering missing carousel images...',
+  'Processing carousel slides...',
+  'Organizing carousel images...',
+  'Bundling carousel images...',
+  'Preparing carousel ZIP...',
+  'Finalizing carousel ZIP...',
+  'Generating carousel download link...',
+  'Carousel link ready...',
+  'Saving carousel ZIP to device...',
+] as const;
+
+const TYPE_STAGES: Record<MicroMediaType, readonly string[]> = {
+  image: IMAGE_STAGES,
+  video: VIDEO_STAGES,
+  gif: GIF_STAGES,
+  carousel: CAROUSEL_STAGES,
 };
 
 // ─── Pinterest URL check ─────────────────────────────────────────────────────
@@ -1194,25 +1193,59 @@ export default function App({
   ] = useState('');
 
   const [microIndex, setMicroIndex] = useState(0);
+  const [detectedType, setDetectedType] =
+    useState<MicroMediaType | null>(null);
 
-  const detectMediaType = (): MicroMediaType => {
+  const detectMediaType = (): MicroMediaType | null => {
     try {
       const label = String(progressLabel || '').toLowerCase();
-      if (label.includes('carousel')) return 'carousel';
-      if (label.includes('gif')) return 'gif';
-      if (label.includes('image')) return 'image';
-      return 'video';
+      const matchesTranslatedStage = (key: string) =>
+        label === String(t(key) || '').trim().toLowerCase();
+
+      if (
+        label.includes('carousel') ||
+        matchesTranslatedStage('fetchingCarouselInfo') ||
+        matchesTranslatedStage('downloadingCarousel')
+      ) {
+        return 'carousel';
+      }
+      if (
+        label.includes('gif') ||
+        matchesTranslatedStage('fetchingGifInfo') ||
+        matchesTranslatedStage('downloadingGif')
+      ) {
+        return 'gif';
+      }
+      if (
+        label.includes('video') ||
+        matchesTranslatedStage('fetchingVideoInfo') ||
+        matchesTranslatedStage('downloadingVideo') ||
+        matchesTranslatedStage('processingVideo')
+      ) {
+        return 'video';
+      }
+      if (
+        label.includes('image info') ||
+        label.includes('downloading image') ||
+        matchesTranslatedStage('fetchingImageInfo') ||
+        matchesTranslatedStage('downloadingImage')
+      ) {
+        return 'image';
+      }
+      return null;
     } catch {
-      return 'video';
+      return null;
     }
   };
 
   const currentMicroStage = (): string => {
     try {
-      const messages = MICRO_STAGES[detectMediaType()];
-      return messages[microIndex] || MICRO_STAGES.video[0];
+      const stages = detectedType
+        ? TYPE_STAGES[detectedType]
+        : NEUTRAL_STAGES;
+      return stages[microIndex % stages.length] || NEUTRAL_STAGES[0];
     } catch {
-      return MICRO_STAGES.video[0];
+      return NEUTRAL_STAGES[0];
     }
   };
 
@@ -1284,6 +1317,22 @@ export default function App({
 
   useEffect(() => {
     if (status !== 'loading') {
+      setDetectedType(null);
+      return;
+    }
+
+    const typeFromLabel = detectMediaType();
+    if (typeFromLabel) {
+      setDetectedType(typeFromLabel);
+    }
+  }, [status, progressLabel, t]);
+
+  useEffect(() => {
+    setMicroIndex(0);
+  }, [detectedType]);
+
+  useEffect(() => {
+    if (status !== 'loading') {
       setMicroIndex(0);
       return;
     }
@@ -1291,21 +1340,20 @@ export default function App({
     const id = setInterval(() => {
       setMicroIndex((i) => {
         try {
-          const messages = MICRO_STAGES[detectMediaType()];
-          return messages.length > 0
-            ? (i + 1) % messages.length
+          const stages = detectedType
+            ? TYPE_STAGES[detectedType]
+            : NEUTRAL_STAGES;
+          return stages.length > 0
+            ? (i + 1) % stages.length
             : 0;
         } catch {
-          const fallbackLength = MICRO_STAGES.video.length;
-          return fallbackLength > 0
-            ? (i + 1) % fallbackLength
-            : 0;
+          return 0;
         }
       });
     }, 1500);
 
     return () => clearInterval(id);
-  }, [status, progressLabel]);
+  }, [status, detectedType]);
 
   // ─── Smooth timer progress (1 → 99) ─────────────────────────────────────
   // Starts at 1, climbs smoothly, respects the actual stage floor.
