@@ -1240,10 +1240,14 @@ export default function App({
 
   const currentMicroStage = (): string => {
     try {
-      const stages = detectedType
+      const currentStages = detectedType
         ? TYPE_STAGES[detectedType]
         : NEUTRAL_STAGES;
-      return stages[microIndex % stages.length] || NEUTRAL_STAGES[0];
+      const safeIndex = Math.max(
+        0,
+        Math.min(microIndex, currentStages.length - 1),
+      );
+      return currentStages[safeIndex] || NEUTRAL_STAGES[0];
     } catch {
       return NEUTRAL_STAGES[0];
     }
@@ -1329,11 +1333,10 @@ export default function App({
 
   useEffect(() => {
     setMicroIndex(0);
-  }, [detectedType]);
+  }, [status, detectedType]);
 
   useEffect(() => {
     if (status !== 'loading') {
-      setMicroIndex(0);
       return;
     }
 
@@ -1343,14 +1346,16 @@ export default function App({
           const stages = detectedType
             ? TYPE_STAGES[detectedType]
             : NEUTRAL_STAGES;
-          return stages.length > 0
-            ? (i + 1) % stages.length
-            : 0;
+          if (stages.length === 0) return 0;
+          if (i >= stages.length - 1) {
+            return stages.length - 1;
+          }
+          return i + 1;
         } catch {
           return 0;
         }
       });
-    }, 1500);
+    }, 1800);
 
     return () => clearInterval(id);
   }, [status, detectedType]);
